@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(prd-writing)",
+      "Skill(functional-design)",
+      "Skill(architecture-design)",
+      "Skill(repository-structure)",
+      "Skill(development-guidelines)",
+      "Skill(glossary-creation)",
+      "Skill(solana-dev)",
+      "Skill(steering)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "hooks": {}
+}
