@@ -171,6 +171,36 @@ Sublyは、プライバシーを最優先にしたWeb3ネイティブのサブ�
 
 **優先度**: P1（重要）
 
+#### A7: 多層プライバシー保護（MagicBlock PER統合）
+
+**ユーザーストーリー**:
+プライバシーを重視するユーザーとして、暗号化されたデータだけでなく、そのデータの存在自体も隠蔽したい。第三者がオンチェーンでPDAの存在を確認できないようにしたい
+
+**受け入れ条件**:
+
+- [ ] 会員データを格納するPDAをMagicBlock PERに委譲（delegate）できる
+- [ ] 委譲されたPDAはTEE（Intel TDX）内でのみアクセス可能
+- [ ] Permission Programによりアカウント単位のアクセス制御を実装
+- [ ] 許可されたユーザー（本人、検証者）のみがPDAにアクセス可能
+- [ ] Arciumの暗号化と組み合わせた多層防御が機能する
+- [ ] プライベートRPC経由での操作が可能
+
+**技術的背景**:
+
+```
+┌─────────────────────────────────────────────────────┐
+│ 第1層: MagicBlock PER (アクセス制御)                │
+│   - PDAへのアクセス自体を制限                       │
+│   - 許可されたユーザーのみがPDAの存在を認識         │
+├─────────────────────────────────────────────────────┤
+│ 第2層: Arcium MPC (データ暗号化)                    │
+│   - アクセスできてもデータは復号不可                │
+│   - 暗号化された状態で計算可能                      │
+└─────────────────────────────────────────────────────┘
+```
+
+**優先度**: P1.5（重要だが必須ではない - 多層防御のオプション機能）
+
 ---
 
 ### Protocol B: subly-vault（Mainnet）
@@ -414,6 +444,8 @@ Arcium Mainnetローンチ後、2つのプロトコルを統合:
 - [Arcium Arcis Framework](https://docs.arcium.com/developers/arcis)
 - [Arcium Roadmap](https://www.arcium.com/articles/arcium-roadmap-update)
 - [Light Protocol / ZK Compression](https://www.zkcompression.com/)
+- [MagicBlock Private Ephemeral Rollups](https://docs.magicblock.gg/pages/private-ephemeral-rollups-pers/how-to-guide/quickstart)
+- [MagicBlock Privacy on Solana](https://www.magicblock.xyz/solana-privacy)
 - [Privacy Cash](https://privacycash.mintlify.app/)
 - [Privacy Cash SDK (Rust)](https://docs.rs/privacy-cash-sdk/latest/privacy_cash/)
 - [Privacy Cash SDK (npm)](https://libraries.io/npm/privacycash)
