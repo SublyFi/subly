@@ -351,6 +351,212 @@ pub struct MxeAccount {
 }
 ```
 
+#### PDA導出ルール - Protocol A
+
+```rust
+// ========================================
+// PDA Seeds定義 - Protocol A
+// ========================================
+
+// BusinessAccount PDA
+// 事業者ごとに1つのアカウント
+seeds = [b"business", authority.key().as_ref()]
+bump = business_bump
+
+// Plan PDA
+// 事業者ごとにプランを識別
+seeds = [b"plan", business.key().as_ref(), &plan_nonce.to_le_bytes()]
+bump = plan_bump
+// plan_nonce: 事業者が作成したプランの連番（0, 1, 2, ...）
+
+// Subscription PDA
+// プラン × ユーザーコミットメントで一意
+seeds = [b"subscription", plan.key().as_ref(), user_commitment.as_ref()]
+bump = subscription_bump
+// user_commitment: hash(secret || plan_id) - ユーザーを特定せずに契約を識別
+
+// UserAccount PDA (制裁チェック用)
+seeds = [b"user", authority.key().as_ref()]
+bump = user_bump
+
+// MembershipNullifier PDA
+// 証明の二重使用防止
+seeds = [b"nullifier", nullifier_hash.as_ref()]
+bump = nullifier_bump
+
+// MXE Account PDA
+// Arcium統合用（プログラム全体で1つ）
+seeds = [b"mxe", program_id.as_ref()]
+bump = mxe_bump
+```
+
+#### アカウントサイズ計算 - Protocol A
+
+```rust
+// ========================================
+// Account Space Calculations
+// ========================================
+// 計算式: 8 (discriminator) + 各フィールドのサイズ
+
+impl BusinessAccount {
+    pub const SPACE: usize = 8    // discriminator
+        + 32                       // authority: Pubkey
+        + 4 + 32                   // name: String (max 32 chars)
+        + 4 + 128                  // metadata_uri: String (max 128 chars)
+        + 8                        // created_at: i64
+        + 1                        // is_active: bool
+        + 1;                       // bump: u8
+    // Total: 218 bytes
+}
+
+impl Plan {
+    pub const SPACE: usize = 8    // discriminator
+        + 32                       // plan_id: Pubkey
+        + 32                       // business: Pubkey
+        + 32                       // encrypted_name: [u8; 32]
+        + 64                       // encrypted_description: [u8; 64]
+        + 8                        // price_usdc: u64
+        + 4                        // billing_cycle_seconds: u32
+        + 8                        // created_at: i64
+        + 1                        // is_active: bool
+        + 8                        // subscription_count: u64 (または暗号化時は32)
+        + 16                       // nonce: u128
+        + 1;                       // bump: u8
+    // Total: 214 bytes (平文カウント) / 238 bytes (暗号化カウント)
+}
+
+impl UserAccount {
+    pub const SPACE: usize = 8    // discriminator
+        + 32                       // authority: Pubkey
+        + 1                        // sanctions_checked: bool
+        + 1                        // sanctions_passed: bool
+        + 8                        // last_check_timestamp: i64
+        + 1;                       // bump: u8
+    // Total: 51 bytes
+}
+
+impl Subscription {
+    pub const SPACE: usize = 8    // discriminator
+        + 32                       // subscription_id: Pubkey
+        + 32                       // plan: Pubkey
+        + 32                       // encrypted_user_commitment: [u8; 32]
+        + 32                       // membership_commitment: [u8; 32]
+        + 8                        // subscribed_at: i64
+        + 8                        // cancelled_at: i64 (追加)
+        + 1                        // is_active: bool
+        + 16                       // nonce: u128
+        + 1;                       // bump: u8
+    // Total: 170 bytes
+}
+
+impl MembershipNullifier {
+    pub const SPACE: usize = 8    // discriminator
+        + 32                       // nullifier: [u8; 32]
+        + 32                       // plan: Pubkey
+        + 8                        // created_at: i64
+        + 1                        // is_used: bool
+        + 8                        // used_at: i64
+        + 1;                       // bump: u8
+    // Total: 90 bytes
+}
+
+impl MxeAccount {
+    pub const SPACE: usize = 8    // discriminator
+        + 1;                       // bump: u8
+    // Total: 9 bytes
+    // Note: Arciumが追加フィールドを必要とする場合は拡張
+}
+```
+
+#### MXE Account統合詳細
+
+Arcium MPCとの統合には、MXEクラスターとの通信設定が必要。
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ MXE Account初期化フロー                                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  1. プログラムデプロイ時                                                 │
+│     ┌─────────────────┐                                                │
+│     │ initialize_mxe  │                                                │
+│     │ (Admin only)    │                                                │
+│     └────────┬────────┘                                                │
+│              │                                                          │
+│              ▼                                                          │
+│     ┌─────────────────────────────────────────────────┐                │
+│     │ MxeAccount PDA作成                              │                │
+│     │ - seeds: [b"mxe", program_id]                   │                │
+│     │ - Arcium Programに登録                          │                │
+│     └─────────────────────────────────────────────────┘                │
+│                                                                         │
+│  2. 計算キュー時                                                         │
+│     ┌─────────────────┐                                                │
+│     │ queue_computation│                                               │
+│     └────────┬────────┘                                                │
+│              │                                                          │
+│              ▼                                                          │
+│     ┌─────────────────────────────────────────────────┐                │
+│     │ Arcium Program                                  │                │
+│     │ - MxeAccountの検証                              │                │
+│     │ - 計算をMXEクラスターに分配                     │                │
+│     └─────────────────────────────────────────────────┘                │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│ 必要なArciumアカウント                                                   │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Account                  │ Purpose                                     │
+│──────────────────────────┼─────────────────────────────────────────────│
+│ MxeAccount               │ プログラム固有のMXE設定                     │
+│ ComputationAccount       │ 進行中の計算を追跡（一時的）               │
+│ ArciumProgram            │ Arciumメインプログラム参照                  │
+│ MxeClusterAccount        │ 使用するMXEクラスターの設定                │
+├─────────────────────────────────────────────────────────────────────────┤
+│ 初期化コード例                                                           │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+```rust
+/// MXE Account初期化（プログラムデプロイ後に1回実行）
+pub fn initialize_mxe(
+    ctx: Context<InitializeMxe>,
+    cluster_id: Pubkey,  // 使用するMXEクラスターのID
+) -> Result<()> {
+    let mxe = &mut ctx.accounts.mxe_account;
+    mxe.bump = ctx.bumps.mxe_account;
+
+    // Arcium Programに登録
+    arcium_cpi::register_mxe(
+        ctx.accounts.into_arcium_context(),
+        cluster_id,
+    )?;
+
+    Ok(())
+}
+
+#[derive(Accounts)]
+pub struct InitializeMxe<'info> {
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    #[account(
+        init,
+        payer = admin,
+        space = MxeAccount::SPACE,
+        seeds = [b"mxe", crate::ID.as_ref()],
+        bump
+    )]
+    pub mxe_account: Account<'info, MxeAccount>,
+
+    pub arcium_program: Program<'info, Arcium>,
+
+    #[account(mut)]
+    pub cluster_account: Account<'info, MxeClusterAccount>,
+
+    pub system_program: Program<'info, System>,
+}
+```
+
 #### Arcis命令設計（MXE内で実行）
 
 ArciumのMXE内で実行される暗号化処理ロジック。`#[instruction]`マクロで定義。
@@ -557,6 +763,273 @@ pub fn create_plan_callback(
 
     Ok(())
 }
+
+/// サブスクリプション契約命令（Anchor）
+/// ユーザーがプランに契約する
+pub fn subscribe(
+    ctx: Context<Subscribe>,
+    computation_offset: u64,
+    encrypted_user_commitment: [u8; 32], // クライアントで暗号化済み
+    encryption_pubkey: [u8; 32],
+    nonce: u128,
+) -> Result<()> {
+    let plan = &ctx.accounts.plan;
+    let subscription = &mut ctx.accounts.subscription;
+
+    // プランが有効か確認
+    require!(plan.is_active, MembershipError::PlanInactive);
+
+    // サブスクリプションの基本情報を設定
+    subscription.subscription_id = subscription.key();
+    subscription.plan = plan.key();
+    subscription.subscribed_at = Clock::get()?.unix_timestamp;
+    subscription.is_active = true;
+    subscription.nonce = nonce;
+
+    // Arcium計算をキュー（契約数インクリメント + コミットメント処理）
+    let args = vec![
+        Argument::ArcisPubkey(encryption_pubkey),
+        Argument::PlaintextU128(nonce),
+        Argument::EncryptedBytes32(encrypted_user_commitment),
+        Argument::EncryptedBytes32(plan.subscription_count), // 現在の暗号化カウント
+    ];
+
+    queue_computation(
+        ctx.accounts,
+        computation_offset,
+        args,
+        vec![
+            CallbackAccount {
+                pubkey: ctx.accounts.subscription.key(),
+                is_writable: true,
+            },
+            CallbackAccount {
+                pubkey: ctx.accounts.plan.key(),
+                is_writable: true,
+            },
+        ],
+        None,
+    )?;
+
+    Ok(())
+}
+
+/// サブスクリプション契約のコールバック
+#[arcium_callback(encrypted_ix = "process_subscription")]
+pub fn subscribe_callback(
+    ctx: Context<SubscribeCallback>,
+    output: ComputationOutputs,
+) -> Result<()> {
+    let bytes = match output {
+        ComputationOutputs::Bytes(bytes) => bytes,
+        _ => return Err(ErrorCode::InvalidComputationOutput.into()),
+    };
+
+    // 出力をパース
+    // [0..32]: membership_commitment (Light Protocol用)
+    // [32..64]: new_encrypted_count
+    // [64..80]: new_nonce
+    let membership_commitment: [u8; 32] = bytes[0..32].try_into().unwrap();
+    let new_encrypted_count: [u8; 32] = bytes[32..64].try_into().unwrap();
+    let new_nonce: u128 = u128::from_le_bytes(bytes[64..80].try_into().unwrap());
+
+    // Subscription PDAを更新
+    let subscription = &mut ctx.accounts.subscription;
+    subscription.membership_commitment = membership_commitment;
+    subscription.nonce = new_nonce;
+
+    // Plan PDAの契約数を更新
+    let plan = &mut ctx.accounts.plan;
+    plan.subscription_count = new_encrypted_count;
+
+    // Light ProtocolのMerkle Treeにコミットメントを追加
+    light_protocol_cpi::add_leaf(
+        ctx.accounts.into_light_protocol_context(),
+        membership_commitment,
+    )?;
+
+    emit!(SubscriptionCreated {
+        plan: plan.key(),
+        commitment: membership_commitment,
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+
+    Ok(())
+}
+
+/// サブスクリプション解約命令（Anchor）
+/// ユーザーがサブスクリプションを解約する
+pub fn unsubscribe(
+    ctx: Context<Unsubscribe>,
+    computation_offset: u64,
+    nullifier: [u8; 32],         // 解約用nullifier = hash(secret || "unsubscribe" || subscription_id)
+    proof: Vec<u8>,              // 所有権証明（ZK証明）
+    public_inputs: Vec<[u8; 32]>,
+) -> Result<()> {
+    let subscription = &ctx.accounts.subscription;
+    let plan = &ctx.accounts.plan;
+    let nullifier_account = &mut ctx.accounts.nullifier_account;
+
+    // サブスクリプションが有効か確認
+    require!(subscription.is_active, MembershipError::SubscriptionNotActive);
+
+    // Nullifierの重複チェック（二重解約防止）
+    require!(
+        !nullifier_account.is_used,
+        MembershipError::NullifierAlreadyUsed
+    );
+
+    // ZK証明を検証（ユーザーがこのサブスクリプションの所有者であることを証明）
+    light_protocol_cpi::verify_proof(
+        ctx.accounts.into_light_protocol_context(),
+        &proof,
+        &public_inputs,
+    )?;
+
+    // Nullifierを使用済みにマーク
+    nullifier_account.nullifier = nullifier;
+    nullifier_account.is_used = true;
+    nullifier_account.used_at = Clock::get()?.unix_timestamp;
+
+    // Arcium計算をキュー（契約数デクリメント）
+    let args = vec![
+        Argument::EncryptedBytes32(plan.subscription_count), // 現在の暗号化カウント
+        Argument::PlaintextU128(subscription.nonce),
+    ];
+
+    queue_computation(
+        ctx.accounts,
+        computation_offset,
+        args,
+        vec![
+            CallbackAccount {
+                pubkey: ctx.accounts.subscription.key(),
+                is_writable: true,
+            },
+            CallbackAccount {
+                pubkey: ctx.accounts.plan.key(),
+                is_writable: true,
+            },
+        ],
+        None,
+    )?;
+
+    Ok(())
+}
+
+/// サブスクリプション解約のコールバック
+#[arcium_callback(encrypted_ix = "process_unsubscription")]
+pub fn unsubscribe_callback(
+    ctx: Context<UnsubscribeCallback>,
+    output: ComputationOutputs,
+) -> Result<()> {
+    let bytes = match output {
+        ComputationOutputs::Bytes(bytes) => bytes,
+        _ => return Err(ErrorCode::InvalidComputationOutput.into()),
+    };
+
+    // 出力をパース
+    // [0..32]: new_encrypted_count
+    // [32..48]: new_nonce
+    let new_encrypted_count: [u8; 32] = bytes[0..32].try_into().unwrap();
+    let new_nonce: u128 = u128::from_le_bytes(bytes[32..48].try_into().unwrap());
+
+    // Plan PDAの契約数を更新
+    let plan = &mut ctx.accounts.plan;
+    plan.subscription_count = new_encrypted_count;
+    plan.nonce = new_nonce;
+
+    // Subscription PDAを無効化
+    let subscription = &mut ctx.accounts.subscription;
+    subscription.is_active = false;
+    subscription.cancelled_at = Clock::get()?.unix_timestamp;
+
+    // Light ProtocolのMerkle Treeからコミットメントを無効化
+    // (実際にはnullifierを登録して証明を無効化)
+    light_protocol_cpi::register_nullifier(
+        ctx.accounts.into_light_protocol_context(),
+        subscription.membership_commitment,
+    )?;
+
+    emit!(SubscriptionCancelled {
+        plan: plan.key(),
+        commitment: subscription.membership_commitment,
+        timestamp: Clock::get()?.unix_timestamp,
+    });
+
+    Ok(())
+}
+
+// ========================================
+// Account Contexts
+// ========================================
+
+#[derive(Accounts)]
+pub struct Subscribe<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    #[account(
+        mut,
+        constraint = plan.is_active @ MembershipError::PlanInactive
+    )]
+    pub plan: Account<'info, Plan>,
+
+    #[account(
+        init,
+        payer = payer,
+        space = Subscription::SPACE,
+        seeds = [b"subscription", plan.key().as_ref(), &subscription_nonce.to_le_bytes()],
+        bump
+    )]
+    pub subscription: Account<'info, Subscription>,
+
+    pub subscription_nonce: u64,
+
+    /// Arcium関連アカウント
+    pub arcium_program: Program<'info, Arcium>,
+    pub mxe_account: Account<'info, MxeAccount>,
+
+    /// Light Protocol関連アカウント
+    pub light_program: Program<'info, LightProtocol>,
+    #[account(mut)]
+    pub merkle_tree: AccountInfo<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Unsubscribe<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    #[account(
+        mut,
+        constraint = subscription.is_active @ MembershipError::SubscriptionNotActive
+    )]
+    pub subscription: Account<'info, Subscription>,
+
+    #[account(mut)]
+    pub plan: Account<'info, Plan>,
+
+    #[account(
+        init,
+        payer = payer,
+        space = MembershipNullifier::SPACE,
+        seeds = [b"nullifier", subscription.key().as_ref()],
+        bump
+    )]
+    pub nullifier_account: Account<'info, MembershipNullifier>,
+
+    /// Arcium関連アカウント
+    pub arcium_program: Program<'info, Arcium>,
+    pub mxe_account: Account<'info, MxeAccount>,
+
+    /// Light Protocol関連アカウント
+    pub light_program: Program<'info, LightProtocol>,
+
+    pub system_program: Program<'info, System>,
+}
 ```
 
 ### Protocol B: subly-vault
@@ -705,6 +1178,202 @@ pub enum TransferStatus {
     Pending,
     Completed,
     Failed,
+}
+
+// ========================================
+// Deposit History - 入金履歴（利益計算用）
+// ========================================
+
+#[account]
+pub struct DepositHistory {
+    pub history_id: Pubkey,          // 履歴ID
+    pub pool: Pubkey,                // Shield Poolへの参照
+    pub user_commitment: [u8; 32],   // ユーザーコミットメント（UserShareと紐付け）
+    pub amount: u64,                 // 入金額（USDC）
+    pub shares_received: u64,        // 受け取ったシェア数
+    pub pool_value_at_deposit: u64,  // 入金時のプール評価額
+    pub total_shares_at_deposit: u64, // 入金時の総シェア数
+    pub deposited_at: i64,           // 入金日時
+    pub bump: u8,
+}
+```
+
+#### PDA導出ルール - Protocol B
+
+```rust
+// ========================================
+// PDA Seeds定義 - Protocol B
+// ========================================
+
+// ShieldPool PDA
+// プロトコル全体で1つ（または複数プール対応の場合はpool_nonce使用）
+seeds = [b"shield_pool"]
+bump = pool_bump
+// 複数プール対応時: seeds = [b"shield_pool", &pool_nonce.to_le_bytes()]
+
+// UserShare PDA
+// プール × ユーザーコミットメントで一意
+seeds = [b"share", pool.key().as_ref(), user_commitment.as_ref()]
+bump = share_bump
+// user_commitment: hash(secret || pool_id) - ユーザーを特定せずにシェアを識別
+
+// KaminoPosition PDA
+// プールごとに1つのDeFiポジション
+seeds = [b"kamino_position", pool.key().as_ref()]
+bump = position_bump
+
+// ScheduledTransfer PDA
+// ユーザーコミットメント × 連番で一意
+seeds = [b"transfer", user_commitment.as_ref(), &transfer_nonce.to_le_bytes()]
+bump = transfer_bump
+
+// TransferHistory PDA
+// 定期送金 × 実行回数で一意
+seeds = [b"history", scheduled_transfer.key().as_ref(), &execution_index.to_le_bytes()]
+bump = history_bump
+
+// DepositHistory PDA
+// ユーザーコミットメント × 入金連番で一意
+seeds = [b"deposit_history", user_commitment.as_ref(), &deposit_index.to_le_bytes()]
+bump = deposit_history_bump
+
+// Nullifier PDA
+// 二重使用防止
+seeds = [b"nullifier", nullifier_hash.as_ref()]
+bump = nullifier_bump
+
+// WithdrawRequest PDA
+// 出金リクエストごとに一意
+seeds = [b"withdraw", user_commitment.as_ref(), &request_nonce.to_le_bytes()]
+bump = request_bump
+
+// BatchProofStorage PDA
+// 定期送金 × インデックスで一意
+seeds = [b"batch_proof", scheduled_transfer.key().as_ref(), &index.to_le_bytes()]
+bump = batch_bump
+```
+
+#### アカウントサイズ計算 - Protocol B
+
+```rust
+// ========================================
+// Account Space Calculations - Protocol B
+// ========================================
+
+impl ShieldPool {
+    pub const SPACE: usize = 8    // discriminator
+        + 32                       // pool_id: Pubkey
+        + 32                       // authority: Pubkey
+        + 8                        // total_pool_value: u64
+        + 8                        // total_shares: u64
+        + 32                       // kamino_obligation: Pubkey
+        + 8                        // last_yield_update: i64
+        + 16                       // nonce: u128
+        + 1;                       // bump: u8
+    // Total: 145 bytes
+}
+
+impl UserShare {
+    pub const SPACE: usize = 8    // discriminator
+        + 32                       // share_id: Pubkey
+        + 32                       // pool: Pubkey
+        + 64                       // encrypted_share_amount: [u8; 64]
+        + 32                       // user_commitment: [u8; 32]
+        + 8                        // last_update: i64
+        + 1;                       // bump: u8
+    // Total: 177 bytes
+}
+
+impl KaminoPosition {
+    pub const SPACE: usize = 8    // discriminator
+        + 32                       // position_id: Pubkey
+        + 32                       // pool: Pubkey
+        + 32                       // kamino_obligation: Pubkey
+        + 8                        // deposited_amount: u64
+        + 8                        // current_value: u64
+        + 8                        // apy_bps: u64
+        + 8                        // last_update: i64
+        + 1;                       // bump: u8
+    // Total: 137 bytes
+}
+
+impl ScheduledTransfer {
+    pub const SPACE: usize = 8    // discriminator
+        + 32                       // transfer_id: Pubkey
+        + 32                       // user_commitment: [u8; 32]
+        + 32                       // recipient: Pubkey
+        + 8                        // amount: u64
+        + 4                        // interval_seconds: u32
+        + 8                        // next_execution: i64
+        + 1                        // is_active: bool
+        + 1                        // skip_count: u8 (追加: 連続スキップ回数)
+        + 1;                       // bump: u8
+    // Total: 127 bytes
+}
+
+impl TransferHistory {
+    pub const SPACE: usize = 8    // discriminator
+        + 32                       // history_id: Pubkey
+        + 32                       // scheduled_transfer: Pubkey
+        + 32                       // privacy_cash_tx: [u8; 32]
+        + 8                        // amount: u64
+        + 8                        // executed_at: i64
+        + 1                        // status: TransferStatus (enum = 1 byte)
+        + 1;                       // bump: u8
+    // Total: 122 bytes
+}
+
+impl DepositHistory {
+    pub const SPACE: usize = 8    // discriminator
+        + 32                       // history_id: Pubkey
+        + 32                       // pool: Pubkey
+        + 32                       // user_commitment: [u8; 32]
+        + 8                        // amount: u64
+        + 8                        // shares_received: u64
+        + 8                        // pool_value_at_deposit: u64
+        + 8                        // total_shares_at_deposit: u64
+        + 8                        // deposited_at: i64
+        + 1;                       // bump: u8
+    // Total: 145 bytes
+}
+
+impl Nullifier {
+    pub const SPACE: usize = 8    // discriminator
+        + 32                       // nullifier: [u8; 32]
+        + 1                        // is_used: bool
+        + 8                        // used_at: i64
+        + 1                        // operation_type: OperationType (enum = 1 byte)
+        + 1;                       // bump: u8
+    // Total: 51 bytes
+}
+
+impl WithdrawRequest {
+    pub const SPACE: usize = 8    // discriminator
+        + 32                       // request_id: Pubkey
+        + 32                       // commitment: [u8; 32]
+        + 8                        // amount: u64
+        + 1                        // status: WithdrawStatus (enum = 1 byte)
+        + 1                        // retry_count: u8
+        + 8                        // created_at: i64
+        + 8                        // completed_at: i64
+        + 8                        // expires_at: i64
+        + 1;                       // bump: u8
+    // Total: 107 bytes
+}
+
+impl BatchProofStorage {
+    pub const SPACE: usize = 8    // discriminator
+        + 32                       // transfer_id: Pubkey
+        + 4                        // index: u32
+        + 4 + 256                  // proof: Vec<u8> (max 256 bytes)
+        + 4 + (32 * 8)             // public_inputs: Vec<[u8; 32]> (max 8 inputs)
+        + 64                       // new_encrypted_share: [u8; 64]
+        + 32                       // nullifier: [u8; 32]
+        + 1                        // is_used: bool
+        + 8                        // pool_value_at_generation: u64
+        + 2                        // pool_value_tolerance_bps: u16
+        + 1;                       // bump: u8
+    // Total: 672 bytes
 }
 ```
 
@@ -1856,6 +2525,169 @@ async function getYieldInfo(
 }
 ```
 
+#### Clockwork統合詳細シーケンス図
+
+```mermaid
+sequenceDiagram
+    participant CW as Clockwork Network
+    participant TH as Thread Account
+    participant PB as subly-vault Program
+    participant SP as Shield Pool
+    participant KP as Kamino Position
+    participant PC as Privacy Cash
+    participant B as Business Wallet
+
+    Note over CW: 定期送金トリガー（cron: 月次）
+
+    CW->>TH: check_trigger()
+    TH-->>CW: trigger_condition_met
+
+    CW->>PB: execute_scheduled_transfer(transfer_id)
+
+    Note over PB: 1. バッチ証明を取得
+
+    PB->>PB: get_batch_proof(transfer_id, current_index)
+
+    Note over PB: 2. ZK証明を検証
+
+    PB->>PB: verify_transfer_proof()
+
+    alt 証明が有効
+        Note over PB: 3. シェア更新
+        PB->>SP: update_user_share()
+
+        Note over PB: 4. プール残高確認
+        PB->>SP: check_liquidity()
+
+        alt 流動性十分
+            PB->>PC: withdrawSPL_to(recipient, amount)
+            PC->>B: プライベート送金
+            PB->>PB: mark_transfer_completed()
+        else 流動性不足
+            Note over PB: Kaminoから引き出しをトリガー
+            PB->>KP: request_withdrawal(needed_amount)
+            PB->>PB: mark_transfer_pending_liquidity()
+        end
+
+        PB->>TH: update_next_execution()
+    else 証明が無効/切れ
+        PB->>PB: increment_skip_count()
+        alt skip_count >= 5
+            PB->>PB: deactivate_transfer()
+        end
+        PB->>PB: emit!(BatchProofNeeded)
+    end
+
+    CW-->>CW: schedule_next_run()
+```
+
+#### Crank処理インフラ設計
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Crank処理アーキテクチャ                                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    │
+│  │   Clockwork     │    │   Helius        │    │   Self-hosted   │    │
+│  │   Network       │    │   Webhooks      │    │   Crank         │    │
+│  │   (Primary)     │    │   (Fallback)    │    │   (Emergency)   │    │
+│  └────────┬────────┘    └────────┬────────┘    └────────┬────────┘    │
+│           │                      │                      │              │
+│           └──────────────────────┼──────────────────────┘              │
+│                                  │                                      │
+│                                  ▼                                      │
+│                    ┌─────────────────────────┐                         │
+│                    │   subly-vault Program   │                         │
+│                    └─────────────────────────┘                         │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│ 実行タイミング                                                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│ Job                        │ Frequency      │ Trigger                  │
+│────────────────────────────┼────────────────┼──────────────────────────│
+│ update_pool_value          │ 1時間ごと      │ Clockwork cron           │
+│ deposit_to_kamino          │ 条件ベース     │ buffer < 20% threshold   │
+│ process_withdraw_requests  │ 10分ごと       │ Clockwork cron           │
+│ execute_scheduled_transfer │ 条件ベース     │ next_execution reached   │
+│ process_transfer_payments  │ 10分ごと       │ Clockwork cron           │
+├─────────────────────────────────────────────────────────────────────────┤
+│ フェイルオーバー設計                                                      │
+├─────────────────────────────────────────────────────────────────────────┤
+│ 1. Primary: Clockwork Network                                          │
+│    - Thread-based automation                                           │
+│    - 自動リトライ（最大3回）                                            │
+│    - Fee: SOL per execution                                            │
+│                                                                         │
+│ 2. Fallback: Helius Webhooks                                           │
+│    - Account変更監視（WithdrawRequest, ScheduledTransfer）             │
+│    - Clockworkが30分以上未実行の場合にトリガー                         │
+│    - AWS Lambda経由で実行                                               │
+│                                                                         │
+│ 3. Emergency: Self-hosted Crank                                        │
+│    - EC2/Cloud Run上のNode.jsプロセス                                  │
+│    - 1時間以上未実行の緊急時のみ起動                                   │
+│    - PagerDutyアラート連携                                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│ 監視・アラート                                                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│ - Datadog: Crank実行成功率、レイテンシ                                  │
+│ - PagerDuty: 30分以上の実行遅延でアラート                               │
+│ - Slack: 日次サマリー（実行件数、失敗件数、スキップ件数）               │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+```typescript
+// Crank設定例（Clockwork Thread）
+
+interface CrankConfig {
+  // プール評価額更新
+  poolValueUpdate: {
+    schedule: '0 * * * *';           // 毎時0分
+    maxRetries: 3;
+    retryDelayMs: 30000;
+    priority: 'high';
+  };
+
+  // 出金処理
+  withdrawProcessing: {
+    schedule: '*/10 * * * *';        // 10分ごと
+    maxRetries: 3;
+    retryDelayMs: 60000;
+    priority: 'high';
+  };
+
+  // 定期送金実行
+  scheduledTransfers: {
+    schedule: null;                   // 条件ベース
+    triggerCondition: 'next_execution <= now';
+    maxRetries: 5;
+    retryDelayMs: 120000;
+    priority: 'medium';
+  };
+
+  // Kamino入金
+  kaminoDeposit: {
+    schedule: null;                   // 条件ベース
+    triggerCondition: 'buffer_ratio < 0.2';
+    maxRetries: 3;
+    retryDelayMs: 60000;
+    priority: 'low';
+  };
+}
+
+// Helius Webhook設定（フォールバック用）
+interface HeliusWebhookConfig {
+  webhookURL: 'https://api.subly.io/crank/webhook';
+  transactionTypes: ['PROGRAM_INVOKE'];
+  accountAddresses: [
+    SHIELD_POOL_ADDRESS,
+    WITHDRAW_REQUEST_PDA_PREFIX,
+  ];
+  webhookType: 'enhanced';
+}
+```
+
 #### エッジケース・エラーハンドリング
 
 ```
@@ -2081,6 +2913,518 @@ graph TB
     UD_D --> SDK_V
     UD_SL --> SDK_M
     UD_ST --> SDK_V
+```
+
+### コンポーネントインターフェース詳細
+
+#### 主要コンポーネントのProps/State定義
+
+```typescript
+// ========================================
+// Shared Components
+// ========================================
+
+interface WalletConnectProps {
+  onConnect: (publicKey: PublicKey) => void;
+  onDisconnect: () => void;
+  autoConnect?: boolean;
+}
+
+interface WalletConnectState {
+  isConnecting: boolean;
+  isConnected: boolean;
+  publicKey: PublicKey | null;
+  walletName: string | null;
+  error: string | null;
+}
+
+interface LoadingProps {
+  message?: string;
+  progress?: number;        // 0-100, ZK証明生成などの進捗表示用
+  showProgress?: boolean;
+}
+
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
+}
+
+// ========================================
+// Business Dashboard Components
+// ========================================
+
+interface PlanCreateProps {
+  onSuccess: (plan: Plan) => void;
+  onCancel: () => void;
+}
+
+interface PlanCreateState {
+  name: string;
+  description: string;
+  priceUsdc: string;
+  billingCycle: BillingCycle;
+  isDemo: boolean;           // デモモード（1時間周期）
+  isSubmitting: boolean;
+  isEncrypting: boolean;     // Arcium暗号化処理中
+  encryptionProgress: number; // 暗号化進捗
+  errors: {
+    name?: string;
+    priceUsdc?: string;
+    general?: string;
+  };
+}
+
+interface PlanListProps {
+  businessId: PublicKey;
+  onPlanSelect: (plan: Plan) => void;
+  onCreateNew: () => void;
+}
+
+interface PlanListState {
+  plans: Plan[];
+  isLoading: boolean;
+  error: string | null;
+  selectedPlanId: PublicKey | null;
+}
+
+interface StatsProps {
+  businessId: PublicKey;
+}
+
+interface StatsState {
+  totalSubscriptions: number;
+  planStats: Array<{
+    planId: PublicKey;
+    planName: string;
+    subscriptionCount: number;
+  }>;
+  isLoading: boolean;
+  isRevealingCount: boolean;  // Arciumでのreveal処理中
+  error: string | null;
+}
+
+// ========================================
+// User Dashboard Components
+// ========================================
+
+interface DepositProps {
+  poolId: PublicKey;
+  maxAmount: number;         // ウォレット残高
+  onSuccess: (result: DepositResult) => void;
+  onCancel: () => void;
+}
+
+interface DepositState {
+  amount: string;
+  isValidating: boolean;
+  isGeneratingProof: boolean;  // ZK証明生成中
+  proofProgress: number;       // 0-100
+  isDepositing: boolean;
+  isWaitingConfirmation: boolean;
+  errors: {
+    amount?: string;
+    proof?: string;
+    general?: string;
+  };
+}
+
+interface WithdrawProps {
+  poolId: PublicKey;
+  maxAmount: number;         // シェア評価額
+  onSuccess: (result: WithdrawResult) => void;
+  onCancel: () => void;
+}
+
+interface WithdrawState {
+  amount: string;
+  recipient?: string;        // 出金先（空の場合は自分のウォレット）
+  isDecryptingShare: boolean; // シェア復号中
+  isGeneratingProof: boolean;
+  proofProgress: number;
+  isWithdrawing: boolean;
+  isWaitingConfirmation: boolean;
+  errors: {
+    amount?: string;
+    recipient?: string;
+    proof?: string;
+    general?: string;
+  };
+}
+
+interface BalanceProps {
+  poolId: PublicKey;
+  userCommitment: Uint8Array;
+}
+
+interface BalanceState {
+  isDecrypting: boolean;
+  shareAmount: bigint | null;
+  shareValue: number | null;    // USDC評価額
+  totalDeposited: number | null;
+  profit: number | null;
+  yieldPercent: number | null;
+  poolApy: number | null;
+  lastUpdate: Date | null;
+  error: string | null;
+}
+
+interface SubscriptionListProps {
+  onSubscribe: (planId: PublicKey) => void;
+  onUnsubscribe: (subscriptionId: PublicKey) => void;
+}
+
+interface SubscriptionListState {
+  subscriptions: Subscription[];
+  isLoading: boolean;
+  unsubscribingId: PublicKey | null;  // 解約処理中のID
+  error: string | null;
+}
+
+interface ScheduledTransfersProps {
+  poolId: PublicKey;
+  userCommitment: Uint8Array;
+  onCreateNew: () => void;
+}
+
+interface ScheduledTransfersState {
+  transfers: ScheduledTransfer[];
+  isLoading: boolean;
+  batchProofStatus: Map<string, {
+    remaining: number;
+    total: number;
+    needsRefill: boolean;
+  }>;
+  error: string | null;
+}
+
+interface CreateScheduledTransferProps {
+  poolId: PublicKey;
+  userCommitment: Uint8Array;
+  onSuccess: (transfer: ScheduledTransfer) => void;
+  onCancel: () => void;
+}
+
+interface CreateScheduledTransferState {
+  recipientAddress: string;
+  amount: string;
+  interval: 'hourly' | 'daily' | 'weekly' | 'monthly' | 'custom';
+  customIntervalSeconds?: number;
+  numPrepaidProofs: number;   // 事前生成する証明数（デフォルト12）
+  isValidating: boolean;
+  isGeneratingProofs: boolean;
+  proofGenerationProgress: number;  // 0-100
+  currentProofIndex: number;        // 何個目の証明を生成中か
+  isSubmitting: boolean;
+  errors: {
+    recipientAddress?: string;
+    amount?: string;
+    interval?: string;
+    general?: string;
+  };
+}
+```
+
+### 状態管理設計
+
+```typescript
+// ========================================
+// Zustand Store設計
+// ========================================
+
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+// Wallet Store
+interface WalletStore {
+  publicKey: PublicKey | null;
+  isConnected: boolean;
+  connect: (publicKey: PublicKey) => void;
+  disconnect: () => void;
+}
+
+export const useWalletStore = create<WalletStore>((set) => ({
+  publicKey: null,
+  isConnected: false,
+  connect: (publicKey) => set({ publicKey, isConnected: true }),
+  disconnect: () => set({ publicKey: null, isConnected: false }),
+}));
+
+// User Secret Store (永続化 - localStorage暗号化)
+interface UserSecretStore {
+  // プールごとのユーザーシークレット（暗号化して保存）
+  secrets: Map<string, Uint8Array>;  // poolId -> encrypted secret
+  setSecret: (poolId: string, secret: Uint8Array) => void;
+  getSecret: (poolId: string) => Uint8Array | null;
+  clearSecrets: () => void;
+}
+
+export const useUserSecretStore = create<UserSecretStore>()(
+  persist(
+    (set, get) => ({
+      secrets: new Map(),
+      setSecret: (poolId, secret) =>
+        set((state) => {
+          const newSecrets = new Map(state.secrets);
+          newSecrets.set(poolId, secret);
+          return { secrets: newSecrets };
+        }),
+      getSecret: (poolId) => get().secrets.get(poolId) ?? null,
+      clearSecrets: () => set({ secrets: new Map() }),
+    }),
+    {
+      name: 'subly-user-secrets',
+      // カスタムシリアライズ（暗号化）
+      storage: createEncryptedStorage(),
+    }
+  )
+);
+
+// Business Store
+interface BusinessStore {
+  businessAccount: BusinessAccount | null;
+  plans: Plan[];
+  isLoading: boolean;
+  error: string | null;
+  fetchBusiness: () => Promise<void>;
+  fetchPlans: () => Promise<void>;
+  addPlan: (plan: Plan) => void;
+  updatePlan: (planId: PublicKey, updates: Partial<Plan>) => void;
+}
+
+// Vault Store
+interface VaultStore {
+  poolState: ShieldPoolState | null;
+  userShare: UserShareState | null;
+  scheduledTransfers: ScheduledTransfer[];
+  isLoading: boolean;
+  error: string | null;
+  fetchPoolState: (poolId: PublicKey) => Promise<void>;
+  fetchUserShare: (poolId: PublicKey, commitment: Uint8Array) => Promise<void>;
+  fetchScheduledTransfers: (commitment: Uint8Array) => Promise<void>;
+  updateShareLocally: (newShare: UserShareState) => void;
+}
+
+// ========================================
+// React Query キャッシュ戦略
+// ========================================
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 1000,      // 30秒間はキャッシュを使用
+      gcTime: 5 * 60 * 1000,     // 5分間キャッシュを保持
+      retry: 3,
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30000),
+    },
+  },
+});
+
+// プール状態のキャッシュ（頻繁に更新される）
+const usePoolState = (poolId: PublicKey) => {
+  return useQuery({
+    queryKey: ['poolState', poolId.toBase58()],
+    queryFn: () => vaultSdk.pool.getState(poolId),
+    staleTime: 10 * 1000,       // 10秒
+    refetchInterval: 60 * 1000, // 1分ごとに自動更新
+  });
+};
+
+// ユーザーシェアのキャッシュ（復号が必要なため長めにキャッシュ）
+const useUserShare = (poolId: PublicKey, commitment: Uint8Array) => {
+  return useQuery({
+    queryKey: ['userShare', poolId.toBase58(), uint8ArrayToHex(commitment)],
+    queryFn: () => vaultSdk.shares.get(poolId, commitment),
+    staleTime: 5 * 60 * 1000,   // 5分
+  });
+};
+
+// プラン一覧のキャッシュ
+const usePlans = (businessId?: PublicKey) => {
+  return useQuery({
+    queryKey: ['plans', businessId?.toBase58()],
+    queryFn: () => membershipSdk.plans.list(businessId),
+    staleTime: 60 * 1000,       // 1分
+  });
+};
+```
+
+### エラーメッセージマッピング
+
+```typescript
+// ========================================
+// エラーコード → ユーザー向けメッセージ
+// ========================================
+
+// Protocol A エラーマッピング
+const membershipErrorMessages: Record<number, string> = {
+  6000: '権限がありません。ウォレットを確認してください。',
+  6001: 'プランが見つかりません。',
+  6002: 'このプランは現在無効です。',
+  6003: 'サブスクリプションが見つかりません。',
+  6004: 'すでにこのプランに契約しています。',
+  6005: 'このアドレスからの契約は制限されています。',
+  6006: '会員証明の検証に失敗しました。再度お試しください。',
+  6007: 'この証明は既に使用されています。',
+  6008: '暗号化処理に失敗しました。しばらく経ってから再度お試しください。',
+  6009: '会員証明の生成に失敗しました。',
+};
+
+// Protocol B エラーマッピング
+const vaultErrorMessages: Record<number, string> = {
+  7000: '権限がありません。ウォレットを確認してください。',
+  7001: '残高が不足しています。',
+  7002: '定期送金が見つかりません。',
+  7003: 'この定期送金は無効です。',
+  7004: '金額が無効です。',
+  7005: 'プライベート送金に失敗しました。しばらく経ってから再度お試しください。',
+  7006: 'DeFi運用処理に失敗しました。',
+  7007: '自動実行の設定に失敗しました。',
+  7008: '運用益の計算に失敗しました。',
+};
+
+// ZK証明エラー
+const zkProofErrorMessages: Record<string, string> = {
+  PROOF_GENERATION_FAILED: 'ZK証明の生成に失敗しました。再度お試しください。',
+  PROOF_VERIFICATION_FAILED: 'ZK証明の検証に失敗しました。',
+  INSUFFICIENT_SHARES: '残高が不足しています。',
+  INVALID_COMMITMENT: 'ユーザー情報の検証に失敗しました。',
+  NULLIFIER_ALREADY_USED: 'この操作は既に実行されています。',
+  POOL_STATE_CHANGED: 'プール状態が変更されました。再度お試しください。',
+};
+
+// 汎用エラーメッセージ
+const genericErrorMessages: Record<string, string> = {
+  NETWORK_ERROR: 'ネットワークエラーが発生しました。接続を確認してください。',
+  WALLET_REJECTED: 'ウォレットで署名が拒否されました。',
+  TRANSACTION_FAILED: 'トランザクションに失敗しました。',
+  TIMEOUT: '処理がタイムアウトしました。再度お試しください。',
+  UNKNOWN: '予期しないエラーが発生しました。',
+};
+
+// エラーハンドラー
+function getErrorMessage(error: unknown): string {
+  if (error instanceof AnchorError) {
+    const code = error.error.errorCode.number;
+    return membershipErrorMessages[code]
+      ?? vaultErrorMessages[code]
+      ?? `エラーコード: ${code}`;
+  }
+
+  if (error instanceof ZKProofError) {
+    return zkProofErrorMessages[error.code] ?? error.message;
+  }
+
+  if (error instanceof Error) {
+    if (error.message.includes('network')) {
+      return genericErrorMessages.NETWORK_ERROR;
+    }
+    if (error.message.includes('rejected')) {
+      return genericErrorMessages.WALLET_REJECTED;
+    }
+    if (error.message.includes('timeout')) {
+      return genericErrorMessages.TIMEOUT;
+    }
+  }
+
+  return genericErrorMessages.UNKNOWN;
+}
+```
+
+### ローディング状態のUX設計
+
+```typescript
+// ========================================
+// ローディング・進捗表示コンポーネント
+// ========================================
+
+interface ProgressStep {
+  id: string;
+  label: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'error';
+  progress?: number;  // 0-100
+  errorMessage?: string;
+}
+
+interface MultiStepProgressProps {
+  steps: ProgressStep[];
+  currentStepId: string;
+}
+
+// 入金処理の進捗ステップ
+const depositSteps: ProgressStep[] = [
+  { id: 'validate', label: '入力検証', status: 'pending' },
+  { id: 'privacy_cash', label: 'Privacy Cashへ入金', status: 'pending' },
+  { id: 'generate_proof', label: 'ZK証明生成', status: 'pending' },
+  { id: 'submit', label: 'トランザクション送信', status: 'pending' },
+  { id: 'confirm', label: '確認待ち', status: 'pending' },
+];
+
+// 定期送金設定の進捗ステップ
+const createTransferSteps: ProgressStep[] = [
+  { id: 'validate', label: '入力検証', status: 'pending' },
+  { id: 'ownership_proof', label: '所有権証明生成', status: 'pending' },
+  { id: 'create_transfer', label: '定期送金作成', status: 'pending' },
+  { id: 'batch_proofs', label: 'バッチ証明生成 (1/12)', status: 'pending' },
+  { id: 'store_proofs', label: '証明保存', status: 'pending' },
+  { id: 'confirm', label: '完了', status: 'pending' },
+];
+
+// ZK証明生成の詳細進捗
+interface ZKProofProgress {
+  phase: 'loading_circuit' | 'computing_witness' | 'generating_proof' | 'done';
+  phaseProgress: number;  // 0-100
+  totalProgress: number;  // 0-100
+  estimatedTimeRemaining?: number;  // 秒
+}
+
+// 進捗表示フック
+function useZKProofProgress() {
+  const [progress, setProgress] = useState<ZKProofProgress>({
+    phase: 'loading_circuit',
+    phaseProgress: 0,
+    totalProgress: 0,
+  });
+
+  const generateProofWithProgress = async (
+    circuitName: string,
+    inputs: ProofInputs
+  ): Promise<ProofResult> => {
+    setProgress({ phase: 'loading_circuit', phaseProgress: 0, totalProgress: 0 });
+
+    // 回路読み込み（約10%）
+    const circuit = await loadCircuit(circuitName, (p) => {
+      setProgress({ phase: 'loading_circuit', phaseProgress: p, totalProgress: p * 0.1 });
+    });
+
+    // Witness計算（約30%）
+    setProgress({ phase: 'computing_witness', phaseProgress: 0, totalProgress: 10 });
+    const witness = await computeWitness(circuit, inputs, (p) => {
+      setProgress({ phase: 'computing_witness', phaseProgress: p, totalProgress: 10 + p * 0.3 });
+    });
+
+    // 証明生成（約60%）
+    setProgress({ phase: 'generating_proof', phaseProgress: 0, totalProgress: 40 });
+    const proof = await generateProof(circuit, witness, (p) => {
+      setProgress({ phase: 'generating_proof', phaseProgress: p, totalProgress: 40 + p * 0.6 });
+    });
+
+    setProgress({ phase: 'done', phaseProgress: 100, totalProgress: 100 });
+
+    return proof;
+  };
+
+  return { progress, generateProofWithProgress };
+}
+
+// タイムアウト設定
+const operationTimeouts = {
+  zkProofGeneration: 60 * 1000,     // 60秒
+  transactionSubmit: 30 * 1000,     // 30秒
+  transactionConfirm: 60 * 1000,    // 60秒
+  arciumComputation: 45 * 1000,     // 45秒
+  batchProofGeneration: 5 * 60 * 1000, // 5分（複数証明生成）
+};
 ```
 
 ### SDK構成
@@ -2359,6 +3703,116 @@ sequenceDiagram
     APP->>U: コンテンツ表示
 ```
 
+### Protocol A: サブスクリプション解約フロー
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant UD as User Dashboard
+    participant SDK as membership-sdk
+    participant PA as subly-membership<br/>(Anchor)
+    participant ARC as Arcium Program
+    participant MXE as MXE Cluster<br/>(Arcis)
+    participant LP as Light Protocol
+
+    U->>UD: マイサブスクリプション画面
+    U->>UD: 解約ボタンクリック
+
+    UD->>UD: 解約確認ダイアログ表示
+
+    Note over UD: Protocol B連携確認<br/>「定期送金も停止しますか？」
+
+    U->>UD: 解約を確定
+
+    Note over SDK: 1. 解約用Nullifier生成<br/>nullifier = hash(secret || "unsubscribe" || subscription_id)
+
+    Note over SDK: 2. 所有権ZK証明生成<br/>「このサブスクリプションの所有者である」
+
+    SDK->>LP: generate_ownership_proof()
+    LP-->>SDK: proof, public_inputs
+
+    SDK->>PA: unsubscribe(nullifier, proof, public_inputs)
+
+    Note over PA: Nullifier重複チェック<br/>（二重解約防止）
+
+    PA->>LP: verify_proof(proof, public_inputs)
+    LP-->>PA: verified: true
+
+    Note over PA: Nullifier使用済みマーク
+
+    PA->>ARC: queue_computation(process_unsubscription)
+    ARC->>MXE: 秘密分散 & 実行
+
+    Note over MXE: process_unsubscription<br/>#[instruction] 実行<br/>- 契約数デクリメント
+
+    MXE-->>ARC: 新しい暗号化カウント
+    ARC->>PA: unsubscribe_callback()
+
+    Note over PA: Plan.subscription_count更新<br/>Subscription.is_active = false
+
+    PA->>LP: register_nullifier(membership_commitment)
+
+    Note over LP: コミットメントを無効化<br/>（以後の証明生成不可）
+
+    LP-->>PA: 無効化完了
+    PA-->>SDK: 解約完了
+
+    SDK-->>UD: 解約完了通知
+
+    alt Protocol B連携あり
+        UD->>UD: 定期送金キャンセル画面へ遷移
+    end
+
+    U->>UD: 完了確認
+```
+
+### Protocol A: エラー発生時のフロー
+
+```mermaid
+stateDiagram-v2
+    [*] --> NormalOperation
+
+    NormalOperation --> SanctionCheckError: 制裁チェック失敗
+    NormalOperation --> ZKProofError: ZK証明生成失敗
+    NormalOperation --> ArciumError: Arcium処理失敗
+    NormalOperation --> NetworkError: ネットワークエラー
+    NormalOperation --> InsufficientBalance: 残高不足
+
+    SanctionCheckError --> ErrorScreen_Sanction
+    ErrorScreen_Sanction --> [*]: ユーザーに通知（利用不可）
+
+    ZKProofError --> RetryScreen
+    RetryScreen --> NormalOperation: 再試行
+    RetryScreen --> [*]: キャンセル
+
+    ArciumError --> RetryScreen_Arcium
+    RetryScreen_Arcium --> NormalOperation: 再試行
+    RetryScreen_Arcium --> SupportContact: 3回失敗
+
+    NetworkError --> RetryScreen_Network
+    RetryScreen_Network --> NormalOperation: 再試行
+    RetryScreen_Network --> OfflineMode: オフライン継続
+
+    InsufficientBalance --> DepositPrompt
+    DepositPrompt --> DepositScreen: 入金へ
+    DepositPrompt --> [*]: キャンセル
+
+    state ErrorScreen_Sanction {
+        [*] --> ShowMessage
+        ShowMessage: このアドレスからは<br/>ご利用いただけません
+    }
+
+    state RetryScreen {
+        [*] --> ShowRetryOption
+        ShowRetryOption: 処理に失敗しました<br/>[再試行] [キャンセル]
+    }
+
+    state SupportContact {
+        [*] --> ShowSupport
+        ShowSupport: エラーが続いています<br/>サポートにお問い合わせください
+    }
+```
+
 ### 補足: Arciumと Light Protocolの役割分担
 
 ```
@@ -2614,6 +4068,164 @@ stateDiagram-v2
     CancelTransfer --> ScheduledTransfers
 ```
 
+### バッチ証明補充フロー
+
+```mermaid
+stateDiagram-v2
+    [*] --> ScheduledTransfers
+
+    ScheduledTransfers --> ProofStatusCheck: 証明残数確認
+
+    ProofStatusCheck --> NormalState: 残数 > 3
+    ProofStatusCheck --> WarningState: 残数 <= 3
+    ProofStatusCheck --> CriticalState: 残数 = 0
+
+    NormalState --> ScheduledTransfers
+
+    WarningState --> ShowWarningBanner
+    ShowWarningBanner --> RefillProofs: 補充ボタン
+    ShowWarningBanner --> ScheduledTransfers: 後で
+
+    CriticalState --> ShowCriticalAlert
+    ShowCriticalAlert --> RefillProofs: 今すぐ補充
+    ShowCriticalAlert --> TransferPaused: 無視
+
+    TransferPaused --> RefillProofs: 補充して再開
+    TransferPaused --> CancelTransfer: 定期送金をキャンセル
+
+    RefillProofs --> GeneratingProofs
+    GeneratingProofs --> ProofProgress
+
+    state ProofProgress {
+        [*] --> Generating
+        Generating: 証明生成中...<br/>3/12 完了
+        Generating --> Storing: 生成完了
+        Storing: 保存中...
+        Storing --> [*]: 完了
+    }
+
+    ProofProgress --> RefillComplete
+    RefillComplete --> ScheduledTransfers: 完了
+```
+
+### エラー画面フロー
+
+```mermaid
+stateDiagram-v2
+    [*] --> AnyOperation
+
+    AnyOperation --> ErrorOccurred: エラー発生
+
+    ErrorOccurred --> ClassifyError
+
+    ClassifyError --> RecoverableError: リトライ可能
+    ClassifyError --> UserActionRequired: ユーザー操作必要
+    ClassifyError --> FatalError: 致命的エラー
+
+    state RecoverableError {
+        [*] --> ShowRetryDialog
+        ShowRetryDialog: エラーが発生しました<br/>[再試行] [キャンセル]
+        ShowRetryDialog --> Retry: 再試行
+        ShowRetryDialog --> Cancel: キャンセル
+        Retry --> [*]: 成功
+        Retry --> ShowRetryDialog: 失敗
+    }
+
+    state UserActionRequired {
+        [*] --> DetermineAction
+
+        DetermineAction --> InsufficientFunds: 残高不足
+        DetermineAction --> ProofExpired: 証明期限切れ
+        DetermineAction --> WalletIssue: ウォレット問題
+
+        InsufficientFunds --> DepositPromptScreen
+        DepositPromptScreen: 残高が不足しています<br/>必要額: $XX USDC<br/>[入金する] [キャンセル]
+
+        ProofExpired --> RegenerateProofScreen
+        RegenerateProofScreen: 証明の有効期限が切れました<br/>[証明を再生成] [キャンセル]
+
+        WalletIssue --> WalletReconnectScreen
+        WalletReconnectScreen: ウォレットを再接続してください<br/>[再接続]
+    }
+
+    state FatalError {
+        [*] --> ShowFatalScreen
+        ShowFatalScreen: 予期しないエラーが発生しました<br/>エラーコード: XXXX<br/>[サポートに連絡] [ホームへ戻る]
+    }
+
+    RecoverableError --> [*]: 解決
+    UserActionRequired --> [*]: 解決
+    FatalError --> Home: ホームへ
+```
+
+### バッチ証明補充ワイヤフレーム
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Subly                                       [Wallet: 7yM3...] │
+├─────────────────────────────────────────────────────────────────┤
+│  💰 Vault  |  📋 Subscriptions  |  📜 History                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ⚠️ 定期送金の証明補充が必要です                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  Premium Service への定期送金                            │   │
+│  │  残り証明: 2/12                                         │   │
+│  │                                                         │   │
+│  │  ⚠️ あと2回分の証明しか残っていません。                  │   │
+│  │  補充しないと送金が停止します。                          │   │
+│  │                                                         │   │
+│  │                              [今すぐ補充] [後で]         │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  定期送金一覧                                                   │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  🔄 Premium Service → $9.99/月                          │   │
+│  │     次回: 2025年2月1日                                  │   │
+│  │     証明: ⚠️ 2/12 [補充]                                │   │
+│  │                                                         │   │
+│  │  🔄 Analytics Tool → $4.99/月                           │   │
+│  │     次回: 2025年2月15日                                 │   │
+│  │     証明: ✅ 10/12                                      │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### バッチ証明生成中ワイヤフレーム
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  証明を生成中...                                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Premium Service への定期送金                                   │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                                                         │   │
+│  │     ████████████████████░░░░░░░░░░░░░░░   58%          │   │
+│  │                                                         │   │
+│  │     証明 7/12 を生成中...                                │   │
+│  │                                                         │   │
+│  │     ステップ:                                            │   │
+│  │     ✅ 入力検証                                         │   │
+│  │     ✅ 所有権証明生成                                   │   │
+│  │     ✅ 証明 1-6 生成完了                                │   │
+│  │     🔄 証明 7 生成中 (ZK回路実行)                       │   │
+│  │     ⏳ 証明 8-12 待機中                                 │   │
+│  │     ⏳ 証明保存                                         │   │
+│  │                                                         │   │
+│  │     推定残り時間: 約2分                                  │   │
+│  │                                                         │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ⚠️ ブラウザを閉じないでください                                │
+│                                                                 │
+│                                              [バックグラウンド] │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ## ワイヤフレーム
 
 ### 事業者ダッシュボード - プラン一覧
@@ -2853,6 +4465,428 @@ stateDiagram-v2
 | `cancel_scheduled_transfer` | Program Instruction | 定期送金キャンセル |
 | `execute_transfer` | Program Instruction (Clockwork trigger) | 送金実行 |
 | `get_transfer_history` | RPC Call | 送金履歴取得 |
+
+### Instruction引数詳細定義
+
+#### Protocol A: subly-membership Instructions
+
+```rust
+// ========================================
+// Anchor IDL形式 - Protocol A
+// ========================================
+
+/// 事業者登録
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct CreateBusinessArgs {
+    pub name: String,              // max 32 chars
+    pub metadata_uri: String,      // max 128 chars, IPFS/Arweave URI
+}
+// Accounts: payer, business (init), system_program
+
+/// プラン作成
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct CreatePlanArgs {
+    pub computation_offset: u64,            // Arcium計算オフセット
+    pub encrypted_name: [u8; 32],           // クライアント暗号化済み
+    pub encrypted_description: [u8; 64],    // クライアント暗号化済み
+    pub price_usdc: u64,                    // 6 decimals (1_000_000 = 1 USDC)
+    pub billing_cycle_seconds: u32,         // min: 3600, max: 31536000
+    pub encryption_pubkey: [u8; 32],        // X25519公開鍵
+    pub nonce: u128,                        // 操作nonce
+}
+// Accounts: payer, business, plan (init), arcium_program, mxe_account, system_program
+
+/// サブスクリプション契約
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct SubscribeArgs {
+    pub computation_offset: u64,
+    pub encrypted_user_commitment: [u8; 32],  // hash(secret || plan_id)を暗号化
+    pub encryption_pubkey: [u8; 32],
+    pub nonce: u128,
+}
+// Accounts: payer, plan, subscription (init), arcium_program, mxe_account,
+//           light_program, merkle_tree, system_program
+
+/// サブスクリプション解約
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct UnsubscribeArgs {
+    pub computation_offset: u64,
+    pub nullifier: [u8; 32],               // hash(secret || "unsubscribe" || subscription_id)
+    pub proof: Vec<u8>,                     // 所有権ZK証明 (max 256 bytes)
+    pub public_inputs: Vec<[u8; 32]>,       // max 8 inputs
+}
+// Accounts: payer, subscription, plan, nullifier_account (init),
+//           arcium_program, mxe_account, light_program, system_program
+
+/// 会員証明検証
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct VerifyMembershipArgs {
+    pub proof: Vec<u8>,                     // Light Protocol ZK証明 (max 256 bytes)
+    pub public_inputs: Vec<[u8; 32]>,       // max 8 inputs
+    pub nullifier: [u8; 32],                // 二重使用防止
+}
+// Accounts: plan, nullifier_account (init), light_program, system_program
+```
+
+#### Protocol B: subly-vault Instructions
+
+```rust
+// ========================================
+// Anchor IDL形式 - Protocol B
+// ========================================
+
+/// 入金
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct DepositArgs {
+    pub deposit_amount: u64,                // 6 decimals
+    pub new_encrypted_share: [u8; 64],      // ECIES暗号化シェア
+    pub proof: Vec<u8>,                     // ZK証明 (max 256 bytes)
+    pub public_inputs: Vec<[u8; 32]>,       // max 8 inputs
+}
+// Accounts: payer, shield_pool, user_share (init_if_needed),
+//           pool_token_account, user_token_account, token_program, system_program
+
+/// 出金
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct WithdrawArgs {
+    pub withdrawal_amount: u64,
+    pub new_encrypted_share: [u8; 64],
+    pub proof: Vec<u8>,
+    pub public_inputs: Vec<[u8; 32]>,
+    pub nullifier: [u8; 32],
+}
+// Accounts: payer, shield_pool, user_share, withdraw_request (init),
+//           nullifier_account (init), system_program
+
+/// 定期送金作成
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct CreateScheduledTransferArgs {
+    pub recipient: Pubkey,                  // 送金先（事業者）
+    pub amount: u64,                        // 送金額
+    pub interval_seconds: u32,              // min: 3600, max: 31536000
+    pub ownership_proof: Vec<u8>,           // 所有権証明
+    pub public_inputs: Vec<[u8; 32]>,
+}
+// Accounts: payer, user_share, scheduled_transfer (init), clockwork_thread, system_program
+
+/// バッチ証明保存
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct StoreBatchProofArgs {
+    pub index: u32,                         // 0-based index
+    pub proof: Vec<u8>,
+    pub public_inputs: Vec<[u8; 32]>,
+    pub new_encrypted_share: [u8; 64],
+    pub nullifier: [u8; 32],
+    pub pool_value_tolerance_bps: u16,      // 許容変動幅 (500 = 5%)
+}
+// Accounts: payer, scheduled_transfer, batch_proof_storage (init), system_program
+
+/// 定期送金実行（Clockworkトリガー）
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct ExecuteScheduledTransferArgs {
+    pub batch_proof_index: u32,             // 使用する証明のインデックス
+}
+// Accounts: scheduled_transfer, batch_proof_storage, user_share, shield_pool,
+//           nullifier_account (init), transfer_history (init), clockwork_thread
+```
+
+### イベント定義
+
+```rust
+// ========================================
+// Protocol A Events
+// ========================================
+
+#[event]
+pub struct BusinessCreated {
+    pub business: Pubkey,
+    pub authority: Pubkey,
+    pub name: String,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct PlanCreated {
+    pub plan: Pubkey,
+    pub business: Pubkey,
+    pub price_usdc: u64,
+    pub billing_cycle_seconds: u32,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct PlanUpdated {
+    pub plan: Pubkey,
+    pub price_usdc: u64,
+    pub billing_cycle_seconds: u32,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct PlanDeactivated {
+    pub plan: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct SubscriptionCreated {
+    pub plan: Pubkey,
+    pub commitment: [u8; 32],      // ユーザー特定不可
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct SubscriptionCancelled {
+    pub plan: Pubkey,
+    pub commitment: [u8; 32],      // ユーザー特定不可
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct MembershipVerified {
+    pub plan: Pubkey,
+    pub nullifier: [u8; 32],       // 二重使用防止用
+    pub timestamp: i64,
+}
+
+// ========================================
+// Protocol B Events
+// ========================================
+
+#[event]
+pub struct DepositEvent {
+    pub pool: Pubkey,
+    pub commitment: [u8; 32],      // ユーザー特定不可
+    pub amount: u64,               // 入金額は公開（プール総額に影響）
+    pub new_total_shares: u64,
+    pub new_total_value: u64,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct WithdrawRequestCreated {
+    pub pool: Pubkey,
+    pub commitment: [u8; 32],
+    pub amount: u64,
+    pub request_id: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct WithdrawCompleted {
+    pub pool: Pubkey,
+    pub commitment: [u8; 32],
+    pub amount: u64,
+    pub new_total_shares: u64,
+    pub new_total_value: u64,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct ScheduledTransferCreated {
+    pub transfer_id: Pubkey,
+    pub commitment: [u8; 32],
+    pub recipient: Pubkey,
+    pub amount: u64,
+    pub interval_seconds: u32,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct TransferExecuted {
+    pub transfer_id: Pubkey,
+    pub commitment: [u8; 32],
+    pub recipient: Pubkey,
+    pub amount: u64,
+    pub batch_proof_index: u32,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct TransferSkipped {
+    pub transfer_id: Pubkey,
+    pub reason: TransferSkipReason,
+    pub skip_count: u8,
+    pub timestamp: i64,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
+pub enum TransferSkipReason {
+    NoBatchProofAvailable,
+    PoolStateOutOfTolerance,
+    InsufficientLiquidity,
+}
+
+#[event]
+pub struct BatchProofNeeded {
+    pub transfer_id: Pubkey,
+    pub commitment: [u8; 32],
+    pub remaining_proofs: u32,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct PoolValueUpdated {
+    pub pool: Pubkey,
+    pub old_value: u64,
+    pub new_value: u64,
+    pub apy_bps: u64,
+    pub timestamp: i64,
+}
+```
+
+### RPC呼び出しフィルタリング仕様
+
+```typescript
+// ========================================
+// Protocol A RPC Filters
+// ========================================
+
+// プラン一覧取得（事業者別）
+interface GetPlansFilter {
+  businessId?: PublicKey;      // 特定事業者のプランのみ
+  isActive?: boolean;          // 有効/無効フィルタ
+  priceRange?: {
+    min?: number;              // 最低価格（USDC）
+    max?: number;              // 最高価格（USDC）
+  };
+  billingCycleType?: 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+}
+
+// 使用例
+const plans = await membershipSdk.plans.list({
+  businessId: businessPubkey,
+  isActive: true,
+  priceRange: { max: 20 },
+});
+
+// サブスクリプション一覧取得（ユーザー別）
+interface GetSubscriptionsFilter {
+  planId?: PublicKey;          // 特定プランのサブスクのみ
+  isActive?: boolean;
+  createdAfter?: Date;
+  createdBefore?: Date;
+}
+
+// 注: ユーザーのコミットメントで検索するため、
+//     秘密値を知っているユーザー本人のみが取得可能
+const subscriptions = await membershipSdk.subscriptions.list({
+  isActive: true,
+});
+
+// ========================================
+// Protocol B RPC Filters
+// ========================================
+
+// 送金履歴取得
+interface GetTransferHistoryFilter {
+  transferId?: PublicKey;      // 特定の定期送金のみ
+  status?: TransferStatus;     // Pending | Completed | Failed
+  executedAfter?: Date;
+  executedBefore?: Date;
+  limit?: number;              // デフォルト: 50, 最大: 100
+  offset?: number;             // ページネーション用
+}
+
+// 使用例
+const history = await vaultSdk.transfers.getHistory({
+  status: 'Completed',
+  executedAfter: new Date('2025-01-01'),
+  limit: 20,
+  offset: 0,
+});
+
+// 入金履歴取得
+interface GetDepositHistoryFilter {
+  depositedAfter?: Date;
+  depositedBefore?: Date;
+  amountRange?: {
+    min?: number;
+    max?: number;
+  };
+  limit?: number;
+  offset?: number;
+}
+
+// 定期送金一覧取得
+interface GetScheduledTransfersFilter {
+  recipient?: PublicKey;       // 特定の送金先のみ
+  isActive?: boolean;
+  nextExecutionBefore?: Date;  // 指定日時までに実行予定のもの
+  limit?: number;
+  offset?: number;
+}
+
+// ========================================
+// ページネーション共通仕様
+// ========================================
+
+interface PaginatedResponse<T> {
+  items: T[];
+  total: number;               // 全件数
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+}
+
+// 使用例
+const result: PaginatedResponse<TransferHistory> = await vaultSdk.transfers.getHistory({
+  limit: 20,
+  offset: 40,  // 3ページ目
+});
+
+console.log(`${result.offset + 1}-${result.offset + result.items.length} / ${result.total}`);
+// "41-60 / 150"
+
+// ========================================
+// SDK内部実装（Anchor getProgramAccounts使用）
+// ========================================
+
+async function getPlans(filter: GetPlansFilter): Promise<Plan[]> {
+  const filters: GetProgramAccountsFilter[] = [
+    {
+      memcmp: {
+        offset: 8,  // discriminator後
+        bytes: PLAN_DISCRIMINATOR,
+      },
+    },
+  ];
+
+  if (filter.businessId) {
+    filters.push({
+      memcmp: {
+        offset: 8 + 32,  // plan_id後のbusinessフィールド
+        bytes: filter.businessId.toBase58(),
+      },
+    });
+  }
+
+  if (filter.isActive !== undefined) {
+    filters.push({
+      memcmp: {
+        offset: 8 + 32 + 32 + 32 + 64 + 8 + 4 + 8,  // is_activeフィールド
+        bytes: filter.isActive ? bs58.encode([1]) : bs58.encode([0]),
+      },
+    });
+  }
+
+  const accounts = await connection.getProgramAccounts(MEMBERSHIP_PROGRAM_ID, {
+    filters,
+  });
+
+  // クライアント側でさらにフィルタリング（price, billingCycleなど）
+  let plans = accounts.map(({ account }) => decodePlan(account.data));
+
+  if (filter.priceRange?.min !== undefined) {
+    plans = plans.filter(p => p.priceUsdc >= filter.priceRange!.min! * 1_000_000);
+  }
+  if (filter.priceRange?.max !== undefined) {
+    plans = plans.filter(p => p.priceUsdc <= filter.priceRange!.max! * 1_000_000);
+  }
+
+  return plans;
+}
+```
 
 ### 外部API連携
 
