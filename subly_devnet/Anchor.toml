@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-subly_devnet = "82moMVorsMbeLex9fczUPzkTkLxLB5ZSQLr33NBCmNLM"
+subly_devnet = "2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA"
 
 [registry]
 url = "https://api.apr.dev"
