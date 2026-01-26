@@ -8,31 +8,32 @@
 
 SublyはDevnet（Arcium MPC）とMainnet（Anchor）で異なる技術スタックを使用するため、プログラムとSDKを環境ごとに分離する。
 
-| 環境 | 用途 | 初期化コマンド | 技術スタック |
-|------|------|---------------|-------------|
-| Devnet | Protocol A: 会員管理 | `arcium init` | Arcium MPC、Light Protocol |
-| Mainnet | Protocol B: Vault | `anchor init` | Anchor Framework、Privacy Cash |
+| 環境    | 用途                 | 初期化コマンド | 技術スタック                   |
+| ------- | -------------------- | -------------- | ------------------------------ |
+| Devnet  | Protocol A: 会員管理 | `arcium init`  | Arcium MPC、Light Protocol     |
+| Mainnet | Protocol B: Vault    | `anchor init`  | Anchor Framework、Privacy Cash |
 
 **分離の理由**:
+
 - `arcium init`と`anchor init`で生成されるディレクトリ構造が異なる
 - 各環境固有の設定ファイル（Arcium.toml、Anchor.toml）が必要
 - SDKもそれぞれの環境専用となり、共有パッケージは不要
 
 ### モノレポ採用の理由
 
-| 観点 | モノレポ | マルチリポ |
-|------|---------|-----------|
-| 型共有 | 共通パッケージで一元管理 | npm公開が必要 |
-| 依存管理 | pnpm workspacesで統一 | 各リポジトリで個別管理 |
-| CI/CD | 1パイプラインで全コンポーネント | 複数パイプライン |
-| コードレビュー | 関連変更を1PRで確認可能 | 複数PRに分散 |
-| バージョン管理 | changesets で統一 | 個別バージョニング |
+| 観点           | モノレポ                        | マルチリポ             |
+| -------------- | ------------------------------- | ---------------------- |
+| 型共有         | 共通パッケージで一元管理        | npm公開が必要          |
+| 依存管理       | pnpm workspacesで統一           | 各リポジトリで個別管理 |
+| CI/CD          | 1パイプラインで全コンポーネント | 複数パイプライン       |
+| コードレビュー | 関連変更を1PRで確認可能         | 複数PRに分散           |
+| バージョン管理 | changesets で統一               | 個別バージョニング     |
 
 ## プロジェクト構造
 
 ```
 subly/
-├── devnet/                         # Devnet環境 (Arcium MPC)
+├── subly-devnet/                         # Devnet環境 (Arcium MPC)
 │   ├── programs/                   # Arciumプログラム
 │   │   └── subly-membership/       # Protocol A: 会員管理
 │   ├── packages/                   # Devnet用SDKパッケージ
@@ -42,7 +43,7 @@ subly/
 │   ├── Cargo.toml                  # Rust workspace設定
 │   └── package.json                # Devnet用package.json
 │
-├── mainnet/                        # Mainnet環境 (Anchor)
+├── subly-mainnet/                        # Mainnet環境 (Anchor)
 │   ├── programs/                   # Anchorプログラム
 │   │   └── subly-vault/            # Protocol B: Vault
 │   ├── packages/                   # Mainnet用SDKパッケージ
@@ -106,11 +107,13 @@ subly/
 **役割**: Protocol A - 会員管理とプライバシー保護（Devnet）
 
 **技術スタック**:
+
 - Arcium MPC Framework
 - Light Protocol連携
 - MagicBlock PER連携（オプション）
 
 **構造**（arcium initベース）:
+
 ```
 devnet/programs/subly-membership/
 ├── src/
@@ -139,6 +142,7 @@ devnet/programs/subly-membership/
 ```
 
 **命名規則**:
+
 - ファイル名: snake_case
 - 関数名: snake_case
 - 構造体名: PascalCase
@@ -151,6 +155,7 @@ devnet/programs/subly-membership/
 **公開先**: npm（`@subly/membership-sdk`）
 
 **構造**:
+
 ```
 devnet/packages/membership-sdk/
 ├── src/
@@ -181,17 +186,18 @@ devnet/packages/membership-sdk/
 ```
 
 **API設計**:
+
 ```typescript
 // 使用例
-import { SublyMembershipClient } from '@subly/membership-sdk';
+import { SublyMembershipClient } from "@subly/membership-sdk";
 
 const client = new SublyMembershipClient(connection, wallet);
 
 // 事業者: プラン作成
 const plan = await client.createPlan({
-  name: 'Premium',
+  name: "Premium",
   priceUsdc: 10_000_000, // 10 USDC (6 decimals)
-  billingCycle: 'monthly',
+  billingCycle: "monthly",
 });
 
 // ユーザー: サブスクリプション契約
@@ -209,6 +215,7 @@ const count = await client.getSubscriptionCount(planId);
 **役割**: Devnet環境専用のテスト
 
 **構造**:
+
 ```
 devnet/tests/
 ├── unit/                           # ユニットテスト
@@ -230,6 +237,7 @@ devnet/
 ```
 
 **Arcium.toml例**:
+
 ```toml
 [programs.devnet]
 subly_membership = "MEMBERSHIP_PROGRAM_ID"
@@ -263,12 +271,14 @@ devnet/target/
 **役割**: Protocol B - 資金運用とプライベート決済（Mainnet）
 
 **技術スタック**:
+
 - Anchor Framework
 - Privacy Cash連携
 - Kamino Lending連携
 - Clockwork連携（オートメーション）
 
 **構造**（anchor initベース）:
+
 ```
 mainnet/programs/subly-vault/
 ├── src/
@@ -304,6 +314,7 @@ mainnet/programs/subly-vault/
 **公開先**: npm（`@subly/vault-sdk`）
 
 **構造**:
+
 ```
 mainnet/packages/vault-sdk/
 ├── src/
@@ -332,9 +343,10 @@ mainnet/packages/vault-sdk/
 ```
 
 **API設計**:
+
 ```typescript
 // 使用例
-import { SublyVaultClient } from '@subly/vault-sdk';
+import { SublyVaultClient } from "@subly/vault-sdk";
 
 const client = new SublyVaultClient(connection, wallet);
 
@@ -350,7 +362,7 @@ const balance = await client.getBalance();
 await client.setupRecurringPayment({
   recipientAddress: businessWallet,
   amountUsdc: 10_000_000, // 10 USDC
-  interval: 'monthly',
+  interval: "monthly",
 });
 
 // ユーザー: 出金
@@ -364,6 +376,7 @@ await client.withdraw({
 **役割**: Mainnet環境専用のテスト
 
 **構造**:
+
 ```
 mainnet/tests/
 ├── unit/                           # ユニットテスト
@@ -385,6 +398,7 @@ mainnet/
 ```
 
 **Anchor.toml例**:
+
 ```toml
 [features]
 seeds = false
@@ -429,6 +443,7 @@ mainnet/target/
 **接続環境**: Devnet（Protocol A: membership-sdk使用）
 
 **技術スタック**:
+
 - Next.js 14 (App Router)
 - TailwindCSS
 - shadcn/ui
@@ -436,6 +451,7 @@ mainnet/target/
 - @subly/membership-sdk
 
 **構造**:
+
 ```
 apps/dashboard-business/
 ├── src/
@@ -488,10 +504,12 @@ apps/dashboard-business/
 **役割**: ユーザー向けダッシュボード（Devnet + Mainnet: 両環境使用）
 
 **接続環境**:
+
 - Devnet: Protocol A（サブスクリプション契約、会員証明 - membership-sdk使用）
 - Mainnet: Protocol B（Vault入出金、定期送金 - vault-sdk使用）
 
 **技術スタック**:
+
 - Next.js 14 (App Router)
 - TailwindCSS
 - shadcn/ui
@@ -500,6 +518,7 @@ apps/dashboard-business/
 - @subly/vault-sdk（Mainnet用）
 
 **構造**:
+
 ```
 apps/dashboard-user/
 ├── src/
@@ -565,6 +584,7 @@ apps/dashboard-user/
 ```
 
 **マルチクラスタ対応の注意点**:
+
 - WalletProviderはDevnetとMainnetの両方に接続可能に設定
 - 各SDKは対応するクラスタのConnectionを使用
 - ユーザーはウォレット接続時にネットワーク切り替えが必要な場合がある
@@ -576,6 +596,7 @@ apps/dashboard-user/
 クロスパッケージのテストを配置。Devnet/Mainnet横断のテストもここで管理。
 
 **構造**:
+
 ```
 tests/
 ├── e2e/                            # E2Eテスト (Playwright)
@@ -603,10 +624,10 @@ tests/
 
 ```yaml
 packages:
-  - 'devnet/packages/*'
-  - 'mainnet/packages/*'
-  - 'apps/*'
-  - 'tests'
+  - "devnet/packages/*"
+  - "mainnet/packages/*"
+  - "apps/*"
+  - "tests"
 ```
 
 ### turbo.json
@@ -729,6 +750,7 @@ apps/dashboard-user
 ```
 
 **重要**: DevnetとMainnetのSDKは独立しており、相互に依存しない。
+
 - `devnet/packages/membership-sdk`: Devnet専用、Arciumとの連携に特化
 - `mainnet/packages/vault-sdk`: Mainnet専用、Anchorとの連携に特化
 
@@ -751,33 +773,33 @@ apps/dashboard-user
 
 ### 環境ディレクトリ
 
-| 環境 | ディレクトリ名 | 用途 |
-|------|--------------|------|
-| Devnet | `devnet/` | Arcium MPC環境（Protocol A） |
-| Mainnet | `mainnet/` | Anchor環境（Protocol B） |
+| 環境    | ディレクトリ名 | 用途                         |
+| ------- | -------------- | ---------------------------- |
+| Devnet  | `devnet/`      | Arcium MPC環境（Protocol A） |
+| Mainnet | `mainnet/`     | Anchor環境（Protocol B）     |
 
 ### ディレクトリ名
 
-| 種別 | 規則 | 例 |
-|------|------|-----|
-| 環境ディレクトリ | lowercase | `devnet`, `mainnet` |
-| パッケージ | kebab-case | `membership-sdk`, `vault-sdk` |
-| アプリ | kebab-case | `dashboard-business`, `dashboard-user` |
-| Rustモジュール | snake_case | `instructions`, `state` |
-| TypeScriptモジュール | kebab-case または camelCase | `components`, `hooks` |
+| 種別                 | 規則                        | 例                                     |
+| -------------------- | --------------------------- | -------------------------------------- |
+| 環境ディレクトリ     | lowercase                   | `devnet`, `mainnet`                    |
+| パッケージ           | kebab-case                  | `membership-sdk`, `vault-sdk`          |
+| アプリ               | kebab-case                  | `dashboard-business`, `dashboard-user` |
+| Rustモジュール       | snake_case                  | `instructions`, `state`                |
+| TypeScriptモジュール | kebab-case または camelCase | `components`, `hooks`                  |
 
 ### ファイル名
 
-| 種別 | 規則 | 例 |
-|------|------|-----|
-| Rust | snake_case.rs | `create_plan.rs`, `user_account.rs` |
-| TypeScript (モジュール/エントリー) | camelCase.ts | `client.ts`, `index.ts`, `pda.ts` |
-| TypeScript (関数) | camelCase.ts | `createPlan.ts`, `formatDate.ts` |
-| TypeScript (型定義) | camelCase.ts | `plan.ts`, `subscription.ts` |
-| React コンポーネント | PascalCase.tsx | `PlanCard.tsx`, `Header.tsx` |
-| React フック | camelCase.ts | `usePlans.ts`, `useVaultBalance.ts` |
-| テスト | *.test.ts / *.spec.ts | `client.test.ts`, `deposit-flow.spec.ts` |
-| 環境別設定 | 環境名を接尾辞に | `solana-devnet.ts`, `solana-mainnet.ts` |
+| 種別                               | 規則                  | 例                                       |
+| ---------------------------------- | --------------------- | ---------------------------------------- |
+| Rust                               | snake_case.rs         | `create_plan.rs`, `user_account.rs`      |
+| TypeScript (モジュール/エントリー) | camelCase.ts          | `client.ts`, `index.ts`, `pda.ts`        |
+| TypeScript (関数)                  | camelCase.ts          | `createPlan.ts`, `formatDate.ts`         |
+| TypeScript (型定義)                | camelCase.ts          | `plan.ts`, `subscription.ts`             |
+| React コンポーネント               | PascalCase.tsx        | `PlanCard.tsx`, `Header.tsx`             |
+| React フック                       | camelCase.ts          | `usePlans.ts`, `useVaultBalance.ts`      |
+| テスト                             | _.test.ts / _.spec.ts | `client.test.ts`, `deposit-flow.spec.ts` |
+| 環境別設定                         | 環境名を接尾辞に      | `solana-devnet.ts`, `solana-mainnet.ts`  |
 
 **補足**: TypeScriptファイルは基本的にcamelCaseを使用する。Reactコンポーネント（`.tsx`）のみPascalCaseを使用する。
 
@@ -788,18 +810,21 @@ apps/dashboard-user
 ### 機能追加時の指針
 
 **Devnet（Protocol A: 会員管理）への追加**:
+
 1. **新しいプログラム命令**: `devnet/programs/subly-membership/src/instructions/` に追加
 2. **新しいPDA**: `devnet/programs/subly-membership/src/state/` に追加
 3. **新しいSDKメソッド**: `devnet/packages/membership-sdk/src/instructions/` に追加
 4. **MPC計算ロジック**: `devnet/programs/subly-membership/src/mxe/` に追加
 
 **Mainnet（Protocol B: Vault）への追加**:
+
 1. **新しいプログラム命令**: `mainnet/programs/subly-vault/src/instructions/` に追加
 2. **新しいPDA**: `mainnet/programs/subly-vault/src/state/` に追加
 3. **新しいSDKメソッド**: `mainnet/packages/vault-sdk/src/instructions/` に追加
 4. **外部プロトコル連携**: `mainnet/programs/subly-vault/src/integrations/` に追加
 
 **フロントエンドへの追加**:
+
 1. **新しいダッシュボードページ**: `apps/*/src/app/` に追加
 2. **Devnet機能用コンポーネント**: `apps/*/src/components/` 内でDevnet用フォルダに配置
 3. **Mainnet機能用コンポーネント**: `apps/*/src/components/` 内でMainnet用フォルダに配置
@@ -813,6 +838,7 @@ apps/dashboard-user
 ### 新しいプロトコルの追加
 
 将来的に新しいプロトコルを追加する場合:
+
 1. 該当する環境（devnet/mainnet）の `programs/` に新しいプログラムディレクトリを作成
 2. 対応するSDKを同環境の `packages/` に作成
 3. フロントエンドで必要に応じてProviderとhooksを追加
