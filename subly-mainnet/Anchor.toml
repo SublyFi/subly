@@ -6,7 +6,10 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-subly_mainnet = "BRU5ubQjz7DjF6wWzs16SmEzPgfHTe6u8iYNpoMuAVPL"
+subly_vault = "BRU5ubQjz7DjF6wWzs16SmEzPgfHTe6u8iYNpoMuAVPL"
+
+[programs.mainnet]
+subly_vault = "BRU5ubQjz7DjF6wWzs16SmEzPgfHTe6u8iYNpoMuAVPL"
 
 [registry]
 url = "https://api.apr.dev"
