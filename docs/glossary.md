@@ -7,6 +7,19 @@
 
 **更新日**: 2026-01-26
 
+### 対象読者
+
+- Sublyの開発チームメンバー
+- SDKを使用してSublyを統合する事業者開発者
+- プロダクトマネージャー
+
+### 前提知識
+
+- Solanaブロックチェーンの基本概念（アカウント、トランザクション、PDA）
+- スマートコントラクト（プログラム）の概念
+- Web3ウォレットの基本操作（Phantom、Backpack等）
+- Rust / TypeScriptの基礎知識（開発者向け）
+
 ---
 
 ## ドメイン用語
@@ -368,6 +381,10 @@ SDK統合用の設定情報の取得ができる。
 - 契約数の秘密計算（暗号化されたままインクリメント/デクリメント）
 - コールバックによる暗号化結果の保存
 
+**使用例**:
+- 「Arcium MPCでサブスクリプション契約データを暗号化する」
+- 「Arcium MPC経由で契約数をインクリメントする」
+
 **関連コンポーネント**: [MXE](#mxe-multi-party-execution-environment), [Arcis](#arcis)
 
 **関連ドキュメント**: [機能設計書](./functional-design.md)
@@ -387,6 +404,10 @@ SDK統合用の設定情報の取得ができる。
 - Merkle Treeへのコミットメント追加
 - ZK証明の検証
 
+**使用例**:
+- 「Light Protocolで会員証明を生成する」
+- 「Light ProtocolのMerkle Treeにコミットメントを追加する」
+
 **関連コンポーネント**: [Merkle Tree](#merkle-tree-マークルツリー), [ZK Proof](#zk-proof-ゼロ知識証明)
 
 **英語表記**: Light Protocol / ZK Compression
@@ -403,6 +424,10 @@ SDK統合用の設定情報の取得ができる。
 - プライベートUSDC入金（`depositSPL()`）
 - プライベートUSDC送金（`withdrawSPL()`）
 - 定期送金の秘匿化
+
+**使用例**:
+- 「Privacy Cashの`depositSPL()`でUSDCをプライベートに入金する」
+- 「Privacy Cash経由で事業者へプライベート送金を実行する」
 
 **対応トークン**: USDC, USDT, SOL
 
@@ -460,6 +485,23 @@ SDK統合用の設定情報の取得ができる。
 - subly-membershipプログラムの開発
 - subly-vaultプログラムの開発
 - PDA管理、アカウント検証、CPI
+
+**使用例**:
+- 「Anchorでsubly-membershipプログラムを実装する」
+- 「Anchor CPIでArcium Programを呼び出す」
+
+**コード例**:
+```rust
+#[program]
+pub mod subly_membership {
+    use super::*;
+
+    pub fn create_plan(ctx: Context<CreatePlan>, name: String, price: u64) -> Result<()> {
+        // プラン作成ロジック
+        Ok(())
+    }
+}
+```
 
 **関連ドキュメント**: [アーキテクチャ設計書](./architecture.md)
 
@@ -724,15 +766,234 @@ User Wallet → Privacy Cash → Shield Pool → Kamino
 
 ---
 
+## コード上の命名規則
+
+本プロジェクトで使用するコード上の命名規則を定義する。
+
+### Anchorアカウント構造体
+
+| 概念 | Rust構造体名 | PDAシード | 備考 |
+|------|--------------|-----------|------|
+| 事業者 | `BusinessAccount` | `[b"business", authority]` | |
+| プラン | `Plan` | `[b"plan", business, plan_nonce]` | |
+| サブスクリプション | `Subscription` | `[b"subscription", plan, user_commitment]` | |
+| ユーザー | `UserAccount` | `[b"user", authority]` | |
+| Nullifier | `MembershipNullifier` | `[b"nullifier", nullifier_hash]` | |
+
+### Arcium連携時の命名規則
+
+Arciumと連携する際は、以下の命名規則に従う必要がある。
+
+**アカウント名のサフィックス規則**:
+
+Arciumのフレームワークでは、アカウント変数名に`_account`サフィックスを付与する必要がある。
+
+```rust
+// Arcium連携時のContext定義例
+#[derive(Accounts)]
+pub struct Subscribe<'info> {
+    #[account(mut)]
+    pub user_account: Account<'info, UserAccount>,  // ✅ _account サフィックス必須
+
+    #[account(mut)]
+    pub plan_account: Account<'info, Plan>,         // ✅ _account サフィックス必須
+
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + Subscription::INIT_SPACE,
+        seeds = [b"subscription", plan.key().as_ref(), &user_commitment],
+        bump
+    )]
+    pub subscription_account: Account<'info, Subscription>,  // ✅ _account サフィックス必須
+
+    #[account(mut)]
+    pub authority: Signer<'info>,  // Signerは_accountサフィックス不要
+
+    pub system_program: Program<'info, System>,  // Programも不要
+}
+```
+
+**注意**: この規則はArciumのベストプラクティスに起因するもので、標準的なAnchorの命名規則とは異なる場合がある。
+
+### 関数・命令名の規則
+
+| 操作 | 命名パターン | 例 |
+|------|--------------|-----|
+| 作成 | `create_*` | `create_plan`, `create_subscription` |
+| 更新 | `update_*` | `update_plan` |
+| 削除/解約 | `cancel_*`, `delete_*` | `cancel_subscription`, `delete_plan` |
+| 検証 | `verify_*` | `verify_membership` |
+| 取得 | `get_*` | `get_plans`, `get_subscription_count` |
+
+### SDK関数名の規則
+
+TypeScript SDKでは、以下の命名規則を使用する。
+
+**@subly/membership-sdk**:
+
+| 関数名 | 説明 |
+|--------|------|
+| `getPlans()` | プラン一覧取得 |
+| `createSubscription()` | サブスクリプション契約 |
+| `cancelSubscription()` | サブスクリプション解約 |
+| `verifyMembership()` | 会員証明の検証 |
+| `getSubscriptionCount()` | アクティブ契約数取得 |
+
+**@subly/vault-sdk**:
+
+| 関数名 | 説明 |
+|--------|------|
+| `deposit()` | プライベート入金 |
+| `withdraw()` | プライベート出金 |
+| `getBalance()` | 残高取得 |
+| `getYieldInfo()` | 運用益情報取得 |
+| `setupRecurringPayment()` | 定期送金設定 |
+
+### 変数・フィールド名の規則
+
+| パターン | 用途 | 例 |
+|----------|------|-----|
+| `*_at` | タイムスタンプ | `created_at`, `subscribed_at` |
+| `is_*` | ブールフラグ | `is_active`, `sanctions_passed` |
+| `*_count` | 数量 | `subscription_count` |
+| `*_usdc` | USDC金額（6桁精度） | `price_usdc`, `balance_usdc` |
+| `*_seconds` | 秒単位の期間 | `billing_cycle_seconds` |
+| `encrypted_*` | 暗号化データ | `encrypted_user_commitment` |
+| `*_commitment` | コミットメント値 | `membership_commitment` |
+
+### 定数名の規則
+
+```rust
+// 定数はSCREAMING_SNAKE_CASEを使用
+pub const MAX_PLAN_NAME_LENGTH: usize = 32;
+pub const MAX_DESCRIPTION_LENGTH: usize = 256;
+pub const USDC_DECIMALS: u8 = 6;
+pub const MIN_BILLING_CYCLE_SECONDS: u32 = 3600;      // 1時間
+pub const MAX_BILLING_CYCLE_SECONDS: u32 = 31536000;  // 365日
+```
+
+---
+
+## UI/UX用語
+
+ユーザーインターフェースとユーザー体験に関する用語。
+
+### ウォレット接続 (Wallet Connect)
+
+**定義**: ユーザーがPhantomやBackpackなどのウォレットでアプリに認証すること
+
+**UI要素**: 「Connect Wallet」ボタン
+
+**フロー**:
+1. ユーザーが「Connect Wallet」をクリック
+2. ウォレット選択モーダルが表示
+3. ウォレットで承認
+4. 接続完了、アドレスがヘッダーに表示
+
+**関連用語**: [User](#user-ユーザー), [Business](#business-事業者)
+
+---
+
+### 契約ボタン (Subscribe Button)
+
+**定義**: ユーザーがプランへのサブスクリプション契約を開始するためのCTAボタン
+
+**UI要素**: 「Subscribe」「契約する」ボタン
+
+**状態**:
+- デフォルト: クリック可能
+- ローディング: トランザクション処理中
+- 成功: 契約完了表示
+- エラー: エラーメッセージ表示
+
+**関連用語**: [Subscription](#subscription-サブスクリプション), [Plan](#plan-プラン)
+
+---
+
+### プライベート残高表示 (Private Balance Display)
+
+**定義**: ユーザーのみが閲覧可能な暗号化された残高の表示コンポーネント
+
+**特徴**:
+- ユーザー本人のみが残高を確認可能
+- 第三者からは金額が見えない
+- リフレッシュボタンで最新残高を取得
+
+**表示内容**:
+- 現在の残高（USDC）
+- 運用中の金額
+- 累計運用益
+
+**関連用語**: [Shield Pool](#shield-pool-シールドプール), [User Dashboard](#user-dashboard-ユーザーダッシュボード)
+
+---
+
+### プラン一覧 (Plan List)
+
+**定義**: 事業者が提供するサブスクリプションプランの一覧表示
+
+**表示項目**:
+- プラン名
+- 説明
+- 価格（USDC/周期）
+- 課金周期
+- 契約ボタン
+
+**関連用語**: [Plan](#plan-プラン), [Business Dashboard](#business-dashboard-事業者ダッシュボード)
+
+---
+
+### 会員バッジ (Membership Badge)
+
+**定義**: ZK証明による会員認証が成功した際に表示されるインジケーター
+
+**用途**:
+- 会員限定コンテンツへのアクセス権表示
+- 会員ステータスの視覚的確認
+
+**関連用語**: [Membership Proof](#membership-proof-会員証明), [ZK Proof](#zk-proof-ゼロ知識証明)
+
+---
+
+### トランザクション確認モーダル (Transaction Confirmation Modal)
+
+**定義**: トランザクション送信前にユーザーに確認を求めるダイアログ
+
+**表示内容**:
+- 操作内容の説明
+- 予想されるガス代
+- 確認/キャンセルボタン
+
+**関連用語**: [Private Transfer](#private-transfer-プライベート送金)
+
+---
+
+### エラートースト (Error Toast)
+
+**定義**: エラー発生時に画面上部または下部に表示される通知
+
+**種類**:
+- ウォレット接続エラー
+- トランザクション失敗
+- ネットワークエラー
+- 残高不足
+
+---
+
 ## 索引
 
 ### あ行
 - [Arcis](#arcis) - 技術用語
 - [Arcium MPC](#arcium-mpc) - 技術用語
+- [ウォレット接続](#ウォレット接続-wallet-connect) - UI/UX用語
+- [エラートースト](#エラートースト-error-toast) - UI/UX用語
 
 ### か行
+- [会員バッジ](#会員バッジ-membership-badge) - UI/UX用語
 - [Kamino Lending](#kamino-lending) - 技術用語
 - [Clockwork](#clockwork) - 技術用語
+- [契約ボタン](#契約ボタン-subscribe-button) - UI/UX用語
 - [Commitment (コミットメント)](#commitment-コミットメント) - ドメイン用語
 
 ### さ行
@@ -741,6 +1002,9 @@ User Wallet → Privacy Cash → Shield Pool → Kamino
 - [Subscription (サブスクリプション)](#subscription-サブスクリプション) - ドメイン用語
 - [Subly](#subly) - ドメイン用語
 
+### た行
+- [トランザクション確認モーダル](#トランザクション確認モーダル-transaction-confirmation-modal) - UI/UX用語
+
 ### な行
 - [Nullifier (ナリファイア)](#nullifier-ナリファイア) - ドメイン用語
 
@@ -748,6 +1012,8 @@ User Wallet → Privacy Cash → Shield Pool → Kamino
 - [Billing Cycle (課金周期)](#billing-cycle-課金周期) - ドメイン用語
 - [Business (事業者)](#business-事業者) - ドメイン用語
 - [Plan (プラン)](#plan-プラン) - ドメイン用語
+- [プライベート残高表示](#プライベート残高表示-private-balance-display) - UI/UX用語
+- [プラン一覧](#プラン一覧-plan-list) - UI/UX用語
 - [Privacy Cash](#privacy-cash) - 技術用語
 - [Private Transfer (プライベート送金)](#private-transfer-プライベート送金) - ドメイン用語
 - [Protocol A (subly-membership)](#protocol-a-subly-membership) - ドメイン用語
@@ -762,6 +1028,7 @@ User Wallet → Privacy Cash → Shield Pool → Kamino
 ### や行
 - [Yield (利回り/運用益)](#yield-利回り運用益) - ドメイン用語
 - [User (ユーザー)](#user-ユーザー) - ドメイン用語
+- [User Dashboard (ユーザーダッシュボード)](#user-dashboard-ユーザーダッシュボード) - ドメイン用語
 
 ### ら行
 - [Light Protocol](#light-protocol) - 技術用語
@@ -770,6 +1037,7 @@ User Wallet → Privacy Cash → Shield Pool → Kamino
 ### A-Z
 - [Anchor Framework](#anchor-framework) - 技術用語
 - [APY](#apy) - 略語
+- [Business Dashboard](#business-dashboard-事業者ダッシュボード) - ドメイン用語
 - [CPI](#cpi) - 略語
 - [DeFi](#defi) - 略語
 - [MPC](#mpc) - 略語
@@ -780,3 +1048,12 @@ User Wallet → Privacy Cash → Shield Pool → Kamino
 - [USDC](#usdc) - 略語
 - [ZK](#zk) - 略語
 - [ZK Proof (ゼロ知識証明)](#zk-proof-ゼロ知識証明) - 技術用語
+
+---
+
+## 変更履歴
+
+| 日付 | 変更内容 |
+|------|----------|
+| 2026-01-26 | 初版作成 |
+| 2026-01-26 | UI/UX用語セクション追加、コード上の命名規則セクション追加、対象読者・前提知識追加 |

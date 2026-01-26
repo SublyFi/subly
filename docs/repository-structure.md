@@ -158,6 +158,26 @@ programs/subly-vault/
 └── Xargo.toml
 ```
 
+#### IDLファイルの出力先
+
+Anchor Programのビルド時に生成されるIDL（Interface Definition Language）ファイルは以下に出力される:
+
+```
+target/
+├── idl/
+│   ├── subly_membership.json       # Protocol A IDL
+│   └── subly_vault.json            # Protocol B IDL
+└── types/
+    ├── subly_membership.ts         # Protocol A 型定義
+    └── subly_vault.ts              # Protocol B 型定義
+```
+
+**用途**:
+- `target/idl/*.json`: クライアントSDKでのプログラム呼び出し、フロントエンドでの型生成
+- `target/types/*.ts`: SDKパッケージでの型定義インポート
+
+**注意**: `target/` ディレクトリはビルド成果物のため `.gitignore` で除外される。CI/CDでは都度ビルドして生成する。
+
 ---
 
 ### packages/ (共有パッケージ)
@@ -486,7 +506,7 @@ packages:
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env.*local"],
-  "pipeline": {
+  "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**"]
@@ -587,11 +607,14 @@ packages/membership-sdk  (会員証明用)
 | 種別 | 規則 | 例 |
 |------|------|-----|
 | Rust | snake_case.rs | `create_plan.rs`, `user_account.rs` |
-| TypeScript (クラス) | PascalCase.ts | `SublyMembershipClient.ts` |
+| TypeScript (モジュール/エントリー) | camelCase.ts | `client.ts`, `index.ts`, `pda.ts` |
 | TypeScript (関数) | camelCase.ts | `createPlan.ts`, `formatDate.ts` |
+| TypeScript (型定義) | camelCase.ts | `plan.ts`, `subscription.ts` |
 | React コンポーネント | PascalCase.tsx | `PlanCard.tsx`, `Header.tsx` |
 | React フック | camelCase.ts | `usePlans.ts`, `useVaultBalance.ts` |
 | テスト | *.test.ts / *.spec.ts | `client.test.ts`, `deposit-flow.spec.ts` |
+
+**補足**: TypeScriptファイルは基本的にcamelCaseを使用する。Reactコンポーネント（`.tsx`）のみPascalCaseを使用する。
 
 ---
 

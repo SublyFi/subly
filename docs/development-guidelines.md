@@ -875,9 +875,9 @@ const service = new MembershipService(mockArciumClient, mockLightProtocol);
 | ツール | バージョン | インストール方法 |
 |--------|-----------|-----------------|
 | Node.js | 24.x | `nvm install 24` |
-| Rust | 1.87+ | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
-| Solana CLI | 2.x | `sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"` |
-| Anchor CLI | 0.31+ | `cargo install --git https://github.com/coral-xyz/anchor anchor-cli` |
+| Rust | 1.93+ | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
+| Solana CLI | 3.x | `sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)"` |
+| Anchor CLI | 0.32.x | `cargo install --git https://github.com/coral-xyz/anchor anchor-cli` |
 | pnpm | 9.x | `npm install -g pnpm` |
 
 ### セットアップ手順
