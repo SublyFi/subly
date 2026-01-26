@@ -130,8 +130,8 @@ pub fn cpi_deposit_spl<'info>(
 pub fn cpi_withdraw_spl<'info>(
     ctx: CpiContext<'_, '_, '_, 'info, PrivacyCashWithdraw<'info>>,
     amount: u64,
-    _nullifier: [u8; 32],  // Nullifier to prevent double-spend
-    _proof: &[u8],          // ZK proof of ownership
+    _nullifier: [u8; 32], // Nullifier to prevent double-spend
+    _proof: &[u8],        // ZK proof of ownership
 ) -> Result<()> {
     // Build instruction data
     let mut data = Vec::with_capacity(8 + 8 + 32 + _proof.len());

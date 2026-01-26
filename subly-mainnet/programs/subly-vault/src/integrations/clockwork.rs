@@ -2,28 +2,20 @@ use anchor_lang::prelude::*;
 
 /// Clockwork Thread Program ID
 /// Note: This is the official Clockwork thread program on Mainnet
-pub const CLOCKWORK_THREAD_PROGRAM_ID: Pubkey = pubkey!("CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh");
+pub const CLOCKWORK_THREAD_PROGRAM_ID: Pubkey =
+    pubkey!("CLoCKyJ6DXBJqqu2VWx9RLbgnwwR6BMHHuyasVmfMzBh");
 
 /// Thread trigger types
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub enum Trigger {
     /// Cron-based trigger
-    Cron {
-        schedule: String,
-        skippable: bool,
-    },
+    Cron { schedule: String, skippable: bool },
     /// Timestamp-based trigger
-    Timestamp {
-        unix_ts: i64,
-    },
+    Timestamp { unix_ts: i64 },
     /// Slot-based trigger
-    Slot {
-        slot: u64,
-    },
+    Slot { slot: u64 },
     /// Epoch-based trigger
-    Epoch {
-        epoch: u64,
-    },
+    Epoch { epoch: u64 },
     /// Account change trigger
     Account {
         address: Pubkey,

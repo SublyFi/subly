@@ -1,7 +1,7 @@
-use anchor_lang::prelude::*;
 use crate::constants::*;
 use crate::errors::VaultError;
-use crate::state::{ShieldPool, UserShare, DepositHistory};
+use crate::state::{DepositHistory, ShieldPool, UserShare};
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 #[instruction(amount: u64, commitment: [u8; 32], encrypted_share: [u8; 64], deposit_index: u64)]

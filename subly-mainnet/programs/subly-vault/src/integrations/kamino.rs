@@ -2,7 +2,8 @@ use anchor_lang::prelude::*;
 
 /// Kamino Lending Program ID on Mainnet
 /// Note: This is the actual Kamino lending program ID
-pub const KAMINO_LENDING_PROGRAM_ID: Pubkey = pubkey!("KLend2g3cP87ber41VSz2cHu5M3mxzQS7pzLFz1UJwp");
+pub const KAMINO_LENDING_PROGRAM_ID: Pubkey =
+    pubkey!("KLend2g3cP87ber41VSz2cHu5M3mxzQS7pzLFz1UJwp");
 
 /// Kamino deposit instruction discriminator
 pub const KAMINO_DEPOSIT_DISCRIMINATOR: [u8; 8] = [0x00; 8]; // Placeholder

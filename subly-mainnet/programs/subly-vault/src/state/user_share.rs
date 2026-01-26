@@ -40,8 +40,8 @@ impl UserShare {
         + 32                       // user_commitment: [u8; 32]
         + 8                        // last_update: i64
         + 1                        // bump: u8
-        + 32;                      // _reserved: [u8; 32]
-    // Total: 209 bytes
+        + 32; // _reserved: [u8; 32]
+              // Total: 209 bytes
 }
 
 /// Deposit History - Records individual deposits for yield tracking
@@ -85,6 +85,6 @@ impl DepositHistory {
         + 8                        // pool_value_at_deposit: u64
         + 8                        // total_shares_at_deposit: u64
         + 8                        // deposited_at: i64
-        + 1;                       // bump: u8
-    // Total: 145 bytes
+        + 1; // bump: u8
+             // Total: 145 bytes
 }

@@ -65,8 +65,8 @@ impl ScheduledTransfer {
         + 8                        // created_at: i64
         + 32                       // clockwork_thread: Pubkey
         + 1                        // bump: u8
-        + 32;                      // _reserved: [u8; 32]
-    // Total: 215 bytes
+        + 32; // _reserved: [u8; 32]
+              // Total: 215 bytes
 
     /// Check if the transfer is due for execution
     pub fn is_due(&self, current_timestamp: i64) -> bool {
@@ -127,6 +127,6 @@ impl BatchProofStorage {
         + 1                        // is_used: bool
         + 8                        // pool_value_at_generation: u64
         + 2                        // pool_value_tolerance_bps: u16
-        + 1;                       // bump: u8
-    // Total: 672 bytes
+        + 1; // bump: u8
+             // Total: 672 bytes
 }

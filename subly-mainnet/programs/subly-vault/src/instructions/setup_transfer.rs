@@ -1,7 +1,7 @@
-use anchor_lang::prelude::*;
 use crate::constants::*;
 use crate::errors::VaultError;
-use crate::state::{ShieldPool, UserShare, ScheduledTransfer};
+use crate::state::{ScheduledTransfer, ShieldPool, UserShare};
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 #[instruction(recipient: Pubkey, amount: u64, interval_seconds: u32, transfer_nonce: u64)]

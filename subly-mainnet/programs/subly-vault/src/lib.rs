@@ -53,8 +53,14 @@ pub mod subly_vault {
         encrypted_share: [u8; 64],
         _deposit_index: u64,
     ) -> Result<()> {
-        require!(amount >= MIN_DEPOSIT_AMOUNT, VaultError::InsufficientDeposit);
-        require!(amount <= MAX_DEPOSIT_AMOUNT, VaultError::DepositExceedsMaximum);
+        require!(
+            amount >= MIN_DEPOSIT_AMOUNT,
+            VaultError::InsufficientDeposit
+        );
+        require!(
+            amount <= MAX_DEPOSIT_AMOUNT,
+            VaultError::DepositExceedsMaximum
+        );
 
         let pool = &mut ctx.accounts.shield_pool;
         let clock = Clock::get()?;
@@ -98,7 +104,10 @@ pub mod subly_vault {
             .total_shares
             .checked_add(shares_to_mint)
             .ok_or(VaultError::ArithmeticOverflow)?;
-        pool.nonce = pool.nonce.checked_add(1).ok_or(VaultError::ArithmeticOverflow)?;
+        pool.nonce = pool
+            .nonce
+            .checked_add(1)
+            .ok_or(VaultError::ArithmeticOverflow)?;
 
         emit!(Deposited {
             pool: pool.key(),
@@ -109,7 +118,11 @@ pub mod subly_vault {
             timestamp: clock.unix_timestamp,
         });
 
-        msg!("Deposited {} USDC, minted {} shares", amount, shares_to_mint);
+        msg!(
+            "Deposited {} USDC, minted {} shares",
+            amount,
+            shares_to_mint
+        );
         Ok(())
     }
 
@@ -128,14 +141,20 @@ pub mod subly_vault {
         let clock = Clock::get()?;
 
         require!(pool.is_active, VaultError::PoolNotInitialized);
-        require!(pool.total_pool_value >= amount, VaultError::InsufficientBalance);
+        require!(
+            pool.total_pool_value >= amount,
+            VaultError::InsufficientBalance
+        );
 
         let shares_to_burn = pool
             .calculate_shares_for_withdrawal(amount)
             .ok_or(VaultError::InvalidShareCalculation)?;
 
         require!(shares_to_burn > 0, VaultError::InvalidShareCalculation);
-        require!(shares_to_burn <= pool.total_shares, VaultError::InsufficientBalance);
+        require!(
+            shares_to_burn <= pool.total_shares,
+            VaultError::InsufficientBalance
+        );
 
         let nullifier = &mut ctx.accounts.nullifier;
         require!(!nullifier.is_used, VaultError::NullifierAlreadyUsed);
@@ -159,7 +178,10 @@ pub mod subly_vault {
             .total_shares
             .checked_sub(shares_to_burn)
             .ok_or(VaultError::ArithmeticOverflow)?;
-        pool.nonce = pool.nonce.checked_add(1).ok_or(VaultError::ArithmeticOverflow)?;
+        pool.nonce = pool
+            .nonce
+            .checked_add(1)
+            .ok_or(VaultError::ArithmeticOverflow)?;
 
         emit!(Withdrawn {
             pool: pool.key(),
@@ -240,7 +262,10 @@ pub mod subly_vault {
         let clock = Clock::get()?;
 
         require!(transfer.is_active, VaultError::TransferNotActive);
-        require!(transfer.is_due(clock.unix_timestamp), VaultError::TransferNotDue);
+        require!(
+            transfer.is_due(clock.unix_timestamp),
+            VaultError::TransferNotDue
+        );
 
         let commitment = transfer.user_commitment;
         let amount = transfer.amount;
@@ -260,13 +285,19 @@ pub mod subly_vault {
             .and_then(|v| v.checked_div(10000))
             .ok_or(VaultError::ArithmeticOverflow)? as u64;
 
-        require!(pool_value_diff <= tolerance_amount, VaultError::InvalidProof);
+        require!(
+            pool_value_diff <= tolerance_amount,
+            VaultError::InvalidProof
+        );
 
         let shares_to_burn = pool
             .calculate_shares_for_withdrawal(amount)
             .ok_or(VaultError::InvalidShareCalculation)?;
 
-        require!(pool.total_pool_value >= amount, VaultError::InsufficientBalance);
+        require!(
+            pool.total_pool_value >= amount,
+            VaultError::InsufficientBalance
+        );
 
         let nullifier = &mut ctx.accounts.nullifier;
         nullifier.nullifier = batch_proof.nullifier;

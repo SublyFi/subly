@@ -46,8 +46,8 @@ impl TransferHistory {
         + 8                        // executed_at: i64
         + 1                        // status: TransferStatus (enum = 1 byte)
         + 8                        // execution_index: u64
-        + 1;                       // bump: u8
-    // Total: 130 bytes
+        + 1; // bump: u8
+             // Total: 130 bytes
 }
 
 /// Kamino Position - Tracks the pool's DeFi position
@@ -87,6 +87,6 @@ impl KaminoPosition {
         + 8                        // current_value: u64
         + 8                        // apy_bps: u64
         + 8                        // last_update: i64
-        + 1;                       // bump: u8
-    // Total: 137 bytes
+        + 1; // bump: u8
+             // Total: 137 bytes
 }
