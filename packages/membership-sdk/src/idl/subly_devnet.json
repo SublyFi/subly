@@ -1,0 +1,1000 @@
+{
+  "address": "2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA",
+  "metadata": {
+    "name": "subly_devnet",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Arcium & Anchor"
+  },
+  "instructions": [
+    {
+      "name": "cancel_subscription",
+      "docs": [
+        "Cancel a subscription"
+      ],
+      "discriminator": [
+        60,
+        139,
+        189,
+        242,
+        191,
+        208,
+        143,
+        18
+      ],
+      "accounts": [
+        {
+          "name": "user_account",
+          "docs": [
+            "The user who owns the subscription"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "subscription_account",
+          "docs": [
+            "The subscription to cancel"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "subscription_account.plan",
+                "account": "Subscription"
+              },
+              {
+                "kind": "account",
+                "path": "subscription_account.membership_commitment",
+                "account": "Subscription"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_plan",
+      "docs": [
+        "Create a new subscription plan"
+      ],
+      "discriminator": [
+        77,
+        43,
+        141,
+        254,
+        212,
+        118,
+        41,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "authority_account",
+          "docs": [
+            "The authority (owner) of the business"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "business_account",
+          "docs": [
+            "The business account that owns this plan"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  115,
+                  105,
+                  110,
+                  101,
+                  115,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan_account",
+          "docs": [
+            "The plan account PDA to create"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "business_account"
+              },
+              {
+                "kind": "account",
+                "path": "business_account.plan_count",
+                "account": "BusinessAccount"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program for account creation"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "encrypted_name",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "encrypted_description",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "price_usdc",
+          "type": "u64"
+        },
+        {
+          "name": "billing_cycle_seconds",
+          "type": "u32"
+        },
+        {
+          "name": "nonce",
+          "type": "u128"
+        }
+      ]
+    },
+    {
+      "name": "deactivate_plan",
+      "docs": [
+        "Deactivate a plan (business owner only)"
+      ],
+      "discriminator": [
+        91,
+        38,
+        214,
+        232,
+        172,
+        21,
+        30,
+        93
+      ],
+      "accounts": [
+        {
+          "name": "authority_account",
+          "docs": [
+            "The authority (owner) of the business"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "business_account",
+          "docs": [
+            "The business account that owns this plan"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  115,
+                  105,
+                  110,
+                  101,
+                  115,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "plan_account",
+          "docs": [
+            "The plan to deactivate"
+          ],
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "get_subscription_count",
+      "docs": [
+        "Get the encrypted subscription count for a plan",
+        "Returns the encrypted count that can be decrypted by authorized parties"
+      ],
+      "discriminator": [
+        12,
+        149,
+        103,
+        233,
+        78,
+        193,
+        31,
+        116
+      ],
+      "accounts": [
+        {
+          "name": "plan_account",
+          "docs": [
+            "The plan to get subscription count for"
+          ]
+        }
+      ],
+      "args": [],
+      "returns": {
+        "array": [
+          "u8",
+          32
+        ]
+      }
+    },
+    {
+      "name": "register_business",
+      "docs": [
+        "Register a new business account"
+      ],
+      "discriminator": [
+        73,
+        228,
+        5,
+        59,
+        229,
+        67,
+        133,
+        82
+      ],
+      "accounts": [
+        {
+          "name": "authority_account",
+          "docs": [
+            "The authority (owner) of the business"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "business_account",
+          "docs": [
+            "The business account PDA to create"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  115,
+                  105,
+                  110,
+                  101,
+                  115,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "authority_account"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program for account creation"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "metadata_uri",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "subscribe",
+      "docs": [
+        "Subscribe to a plan"
+      ],
+      "discriminator": [
+        254,
+        28,
+        191,
+        138,
+        156,
+        179,
+        183,
+        53
+      ],
+      "accounts": [
+        {
+          "name": "user_account",
+          "docs": [
+            "The user subscribing to the plan"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "plan_account",
+          "docs": [
+            "The plan being subscribed to"
+          ],
+          "writable": true
+        },
+        {
+          "name": "subscription_account",
+          "docs": [
+            "The subscription account PDA to create"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "plan_account"
+              },
+              {
+                "kind": "arg",
+                "path": "membership_commitment"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program for account creation"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "encrypted_user_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "membership_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "nonce",
+          "type": "u128"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "BusinessAccount",
+      "discriminator": [
+        100,
+        69,
+        101,
+        155,
+        14,
+        22,
+        236,
+        75
+      ]
+    },
+    {
+      "name": "Plan",
+      "discriminator": [
+        161,
+        231,
+        251,
+        119,
+        2,
+        12,
+        162,
+        2
+      ]
+    },
+    {
+      "name": "Subscription",
+      "discriminator": [
+        64,
+        7,
+        26,
+        135,
+        102,
+        132,
+        98,
+        33
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "BusinessRegisteredEvent",
+      "discriminator": [
+        36,
+        176,
+        169,
+        7,
+        22,
+        245,
+        251,
+        56
+      ]
+    },
+    {
+      "name": "PlanCreatedEvent",
+      "discriminator": [
+        90,
+        228,
+        165,
+        118,
+        177,
+        85,
+        51,
+        192
+      ]
+    },
+    {
+      "name": "SubscriptionCountUpdatedEvent",
+      "discriminator": [
+        33,
+        158,
+        149,
+        107,
+        205,
+        143,
+        223,
+        139
+      ]
+    },
+    {
+      "name": "SubscriptionCreatedEvent",
+      "discriminator": [
+        247,
+        246,
+        115,
+        176,
+        253,
+        84,
+        244,
+        155
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "BusinessAlreadyExists",
+      "msg": "Business account already exists"
+    },
+    {
+      "code": 6001,
+      "name": "PlanNotFound",
+      "msg": "Plan not found"
+    },
+    {
+      "code": 6002,
+      "name": "PlanNotActive",
+      "msg": "Plan is not active"
+    },
+    {
+      "code": 6003,
+      "name": "SubscriptionAlreadyExists",
+      "msg": "Subscription already exists"
+    },
+    {
+      "code": 6004,
+      "name": "SubscriptionNotActive",
+      "msg": "Subscription is not active"
+    },
+    {
+      "code": 6005,
+      "name": "Unauthorized",
+      "msg": "Unauthorized access"
+    },
+    {
+      "code": 6006,
+      "name": "MxeComputationFailed",
+      "msg": "MXE computation failed"
+    },
+    {
+      "code": 6007,
+      "name": "InvalidComputationOutput",
+      "msg": "Invalid computation output"
+    },
+    {
+      "code": 6008,
+      "name": "ClusterNotSet",
+      "msg": "Cluster not set"
+    },
+    {
+      "code": 6009,
+      "name": "AbortedComputation",
+      "msg": "The computation was aborted"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidNameLength",
+      "msg": "Invalid name length"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidMetadataUriLength",
+      "msg": "Invalid metadata URI length"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidPrice",
+      "msg": "Invalid price"
+    },
+    {
+      "code": 6013,
+      "name": "InvalidBillingCycle",
+      "msg": "Invalid billing cycle"
+    }
+  ],
+  "types": [
+    {
+      "name": "BusinessAccount",
+      "docs": [
+        "Business Account - stores business information",
+        "PDA seeds: [\"business\", authority]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "docs": [
+              "Business owner's wallet address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "docs": [
+              "Business name (max 32 characters)"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "metadata_uri",
+            "docs": [
+              "Metadata URI (max 128 characters)"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "created_at",
+            "docs": [
+              "Account creation timestamp"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "is_active",
+            "docs": [
+              "Whether the business is active"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "plan_count",
+            "docs": [
+              "Number of plans created by this business"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BusinessRegisteredEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "business",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Plan",
+      "docs": [
+        "Plan - stores subscription plan information",
+        "PDA seeds: [\"plan\", business, plan_nonce]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan_id",
+            "docs": [
+              "Plan's own address (for reference)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "business",
+            "docs": [
+              "Reference to business account"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "encrypted_name",
+            "docs": [
+              "Encrypted plan name (Arcium encrypted)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "encrypted_description",
+            "docs": [
+              "Encrypted plan description (Arcium encrypted)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "price_usdc",
+            "docs": [
+              "Price in USDC (6 decimals, e.g., 10_000_000 = 10 USDC)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "billing_cycle_seconds",
+            "docs": [
+              "Billing cycle in seconds"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "created_at",
+            "docs": [
+              "Plan creation timestamp"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "is_active",
+            "docs": [
+              "Whether the plan is active"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "encrypted_subscription_count",
+            "docs": [
+              "Encrypted subscription count (Arcium encrypted, only count is known)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Nonce for encryption"
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "plan_nonce",
+            "docs": [
+              "Plan nonce (sequential number for this business)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlanCreatedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan",
+            "type": "pubkey"
+          },
+          {
+            "name": "business",
+            "type": "pubkey"
+          },
+          {
+            "name": "price_usdc",
+            "type": "u64"
+          },
+          {
+            "name": "billing_cycle_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Subscription",
+      "docs": [
+        "Subscription - stores subscription contract information",
+        "PDA seeds: [\"subscription\", plan, user_commitment]"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subscription_id",
+            "docs": [
+              "Subscription's own address (for reference)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "docs": [
+              "Reference to plan account"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "encrypted_user_commitment",
+            "docs": [
+              "Encrypted user commitment (Arcium encrypted)",
+              "user_commitment = hash(secret || plan_id)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "membership_commitment",
+            "docs": [
+              "Membership commitment for Light Protocol ZK proofs"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "subscribed_at",
+            "docs": [
+              "Subscription creation timestamp"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "cancelled_at",
+            "docs": [
+              "Cancellation timestamp (0 if not cancelled)"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "is_active",
+            "docs": [
+              "Whether the subscription is active"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Nonce for encryption"
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionCountUpdatedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "plan",
+            "type": "pubkey"
+          },
+          {
+            "name": "encrypted_count",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "nonce",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "SubscriptionCreatedEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subscription",
+            "type": "pubkey"
+          },
+          {
+            "name": "plan",
+            "type": "pubkey"
+          },
+          {
+            "name": "membership_commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}
