@@ -1,12 +1,12 @@
 [package]
-name = "subly-mainnet"
+name = "subly-vault"
 version = "0.1.0"
-description = "Created with Anchor"
+description = "Subly Vault - Privacy-first subscription payment protocol for Solana Mainnet"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "subly_mainnet"
+name = "subly_vault"
 
 [features]
 default = []
@@ -21,7 +21,7 @@ custom-panic = []
 
 
 [dependencies]
-anchor-lang = "0.32.1"
+anchor-lang = { version = "0.32.1", features = ["init-if-needed"] }
 
 
 [lints.rust]
