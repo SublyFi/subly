@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 /// Scheduled Transfer - Recurring payment configuration
 ///
 /// Enables automated subscription payments from the Shield Pool
-/// to business recipients. Executed by Clockwork automation.
+/// to business recipients. Executed by Tuk Tuk automation (or manual trigger).
 #[account]
 pub struct ScheduledTransfer {
     /// Unique identifier (PDA address)
@@ -40,8 +40,9 @@ pub struct ScheduledTransfer {
     /// Timestamp when transfer was created
     pub created_at: i64,
 
-    /// Clockwork thread address (for automation)
-    pub clockwork_thread: Pubkey,
+    /// Tuk Tuk cron job address (for automation)
+    /// Note: Clockwork was deprecated in Oct 2023, replaced by Tuk Tuk (Helium)
+    pub tuktuk_cron_job: Pubkey,
 
     /// PDA bump seed
     pub bump: u8,
@@ -63,7 +64,7 @@ impl ScheduledTransfer {
         + 8                        // execution_count: u64
         + 8                        // total_transferred: u64
         + 8                        // created_at: i64
-        + 32                       // clockwork_thread: Pubkey
+        + 32                       // tuktuk_cron_job: Pubkey
         + 1                        // bump: u8
         + 32; // _reserved: [u8; 32]
               // Total: 215 bytes

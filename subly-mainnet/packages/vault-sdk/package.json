@@ -20,7 +20,11 @@
     "@coral-xyz/anchor": "^0.32.0",
     "@solana/web3.js": "^1.95.0",
     "tweetnacl": "^1.0.3",
-    "bs58": "^6.0.0"
+    "bs58": "^6.0.0",
+    "privacycash": "^1.1.7",
+    "@helium/cron-sdk": "^0.0.1",
+    "@helium/tuktuk-sdk": "^0.0.1",
+    "@kamino-finance/klend-sdk": "^3.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -32,7 +36,7 @@
     "@solana/web3.js": "^1.95.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.0.0"
   },
   "keywords": [
     "solana",

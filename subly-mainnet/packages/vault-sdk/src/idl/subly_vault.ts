@@ -4,36 +4,48 @@
  */
 import { Idl } from "@coral-xyz/anchor";
 
+// Define the SublyVault IDL type
+// In production, use the generated types from anchor build
 export type SublyVault = Idl;
+
+// Program address
+export const PROGRAM_ADDRESS = "BRU5ubQjz7DjF6wWzs16SmEzPgfHTe6u8iYNpoMuAVPL";
 
 /**
  * Load the IDL from JSON
- * In production, import the generated IDL JSON file
+ * In production, import the generated IDL JSON file from target/idl/subly_vault.json
  */
 export function getIdl(): SublyVault {
   // This would normally be imported from the generated IDL file
-  // For now, we return a minimal IDL structure
+  // For now, we return a minimal IDL structure compatible with Anchor 0.32+
   return {
-    version: "0.1.0",
-    name: "subly_vault",
+    address: PROGRAM_ADDRESS,
+    metadata: {
+      name: "subly_vault",
+      version: "0.1.0",
+      spec: "0.1.0",
+      description: "Subly Vault - Privacy-first subscription payment protocol for Solana Mainnet",
+    },
     instructions: [
       {
         name: "initialize",
+        discriminator: [],
         accounts: [
-          { name: "authority", isMut: true, isSigner: true },
-          { name: "shieldPool", isMut: true, isSigner: false },
-          { name: "systemProgram", isMut: false, isSigner: false },
+          { name: "authority", writable: true, signer: true },
+          { name: "shieldPool", writable: true },
+          { name: "systemProgram" },
         ],
         args: [],
       },
       {
         name: "deposit",
+        discriminator: [],
         accounts: [
-          { name: "depositor", isMut: true, isSigner: true },
-          { name: "shieldPool", isMut: true, isSigner: false },
-          { name: "userShare", isMut: true, isSigner: false },
-          { name: "depositHistory", isMut: true, isSigner: false },
-          { name: "systemProgram", isMut: false, isSigner: false },
+          { name: "depositor", writable: true, signer: true },
+          { name: "shieldPool", writable: true },
+          { name: "userShare", writable: true },
+          { name: "depositHistory", writable: true },
+          { name: "systemProgram" },
         ],
         args: [
           { name: "amount", type: "u64" },
@@ -44,12 +56,13 @@ export function getIdl(): SublyVault {
       },
       {
         name: "withdraw",
+        discriminator: [],
         accounts: [
-          { name: "withdrawer", isMut: true, isSigner: true },
-          { name: "shieldPool", isMut: true, isSigner: false },
-          { name: "userShare", isMut: true, isSigner: false },
-          { name: "nullifier", isMut: true, isSigner: false },
-          { name: "systemProgram", isMut: false, isSigner: false },
+          { name: "withdrawer", writable: true, signer: true },
+          { name: "shieldPool", writable: true },
+          { name: "userShare", writable: true },
+          { name: "nullifier", writable: true },
+          { name: "systemProgram" },
         ],
         args: [
           { name: "amount", type: "u64" },
@@ -61,15 +74,16 @@ export function getIdl(): SublyVault {
       },
       {
         name: "setupTransfer",
+        discriminator: [],
         accounts: [
-          { name: "payer", isMut: true, isSigner: true },
-          { name: "shieldPool", isMut: false, isSigner: false },
-          { name: "userShare", isMut: false, isSigner: false },
-          { name: "scheduledTransfer", isMut: true, isSigner: false },
-          { name: "systemProgram", isMut: false, isSigner: false },
+          { name: "payer", writable: true, signer: true },
+          { name: "shieldPool" },
+          { name: "userShare" },
+          { name: "scheduledTransfer", writable: true },
+          { name: "systemProgram" },
         ],
         args: [
-          { name: "recipient", type: "publicKey" },
+          { name: "recipient", type: "pubkey" },
           { name: "amount", type: "u64" },
           { name: "intervalSeconds", type: "u32" },
           { name: "_transferNonce", type: "u64" },
@@ -77,39 +91,42 @@ export function getIdl(): SublyVault {
       },
       {
         name: "executeTransfer",
+        discriminator: [],
         accounts: [
-          { name: "executor", isMut: true, isSigner: true },
-          { name: "shieldPool", isMut: true, isSigner: false },
-          { name: "scheduledTransfer", isMut: true, isSigner: false },
-          { name: "userShare", isMut: true, isSigner: false },
-          { name: "batchProof", isMut: true, isSigner: false },
-          { name: "nullifier", isMut: true, isSigner: false },
-          { name: "transferHistory", isMut: true, isSigner: false },
-          { name: "systemProgram", isMut: false, isSigner: false },
+          { name: "executor", writable: true, signer: true },
+          { name: "shieldPool", writable: true },
+          { name: "scheduledTransfer", writable: true },
+          { name: "userShare", writable: true },
+          { name: "batchProof", writable: true },
+          { name: "nullifier", writable: true },
+          { name: "transferHistory", writable: true },
+          { name: "systemProgram" },
         ],
         args: [{ name: "executionIndex", type: "u32" }],
       },
       {
         name: "cancelTransfer",
+        discriminator: [],
         accounts: [
-          { name: "authority", isMut: true, isSigner: true },
-          { name: "shieldPool", isMut: false, isSigner: false },
-          { name: "userShare", isMut: false, isSigner: false },
-          { name: "scheduledTransfer", isMut: true, isSigner: false },
-          { name: "systemProgram", isMut: false, isSigner: false },
+          { name: "authority", writable: true, signer: true },
+          { name: "shieldPool" },
+          { name: "userShare" },
+          { name: "scheduledTransfer", writable: true },
+          { name: "systemProgram" },
         ],
         args: [],
       },
     ],
     accounts: [
-      { name: "ShieldPool", type: { kind: "struct", fields: [] } },
-      { name: "UserShare", type: { kind: "struct", fields: [] } },
-      { name: "DepositHistory", type: { kind: "struct", fields: [] } },
-      { name: "Nullifier", type: { kind: "struct", fields: [] } },
-      { name: "ScheduledTransfer", type: { kind: "struct", fields: [] } },
-      { name: "TransferHistory", type: { kind: "struct", fields: [] } },
-      { name: "BatchProofStorage", type: { kind: "struct", fields: [] } },
+      { name: "ShieldPool", discriminator: [] },
+      { name: "UserShare", discriminator: [] },
+      { name: "DepositHistory", discriminator: [] },
+      { name: "Nullifier", discriminator: [] },
+      { name: "ScheduledTransfer", discriminator: [] },
+      { name: "TransferHistory", discriminator: [] },
+      { name: "BatchProofStorage", discriminator: [] },
     ],
     errors: [],
-  } as SublyVault;
+    types: [],
+  } as unknown as SublyVault;
 }

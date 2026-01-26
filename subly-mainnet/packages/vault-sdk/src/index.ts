@@ -77,3 +77,37 @@ export {
 // IDL utilities
 export { getIdl } from "./idl/subly_vault";
 export type { SublyVault } from "./idl/subly_vault";
+
+// External protocol integrations
+export {
+  PrivacyCashIntegration,
+  createPrivacyCashIntegration,
+  PrivacyCashError,
+  USDC_MINT as PRIVACY_CASH_USDC_MINT,
+  PRIVACY_CASH_PROGRAM_ID,
+} from "./integrations/privacy-cash";
+export type { PrivacyCashConfig, WithdrawResult } from "./integrations/privacy-cash";
+
+export {
+  TukTukIntegration,
+  createTukTukIntegration,
+  TukTukError,
+  TUKTUK_PROGRAM_ID,
+  TUKTUK_CRON_PROGRAM_ID,
+  intervalToCronSchedule,
+} from "./integrations/tuktuk";
+export type { TukTukConfig, CronJobResult, PendingTransfer } from "./integrations/tuktuk";
+
+export {
+  KaminoIntegration,
+  createKaminoIntegration,
+  KaminoError,
+  KAMINO_LENDING_PROGRAM_ID,
+  KAMINO_MAIN_MARKET,
+} from "./integrations/kamino";
+export type {
+  KaminoConfig,
+  KaminoYieldInfo,
+  KaminoDepositResult,
+  KaminoWithdrawResult,
+} from "./integrations/kamino";

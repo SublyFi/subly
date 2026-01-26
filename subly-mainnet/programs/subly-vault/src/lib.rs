@@ -208,7 +208,7 @@ pub mod subly_vault {
     ) -> Result<()> {
         require!(amount > 0, VaultError::InvalidWithdrawalAmount);
         require!(
-            interval_seconds >= MIN_TRANSFER_INTERVAL && interval_seconds <= MAX_TRANSFER_INTERVAL,
+            (MIN_TRANSFER_INTERVAL..=MAX_TRANSFER_INTERVAL).contains(&interval_seconds),
             VaultError::InvalidInterval
         );
 
@@ -232,7 +232,7 @@ pub mod subly_vault {
         transfer.execution_count = 0;
         transfer.total_transferred = 0;
         transfer.created_at = clock.unix_timestamp;
-        transfer.clockwork_thread = Pubkey::default();
+        transfer.tuktuk_cron_job = Pubkey::default();
         transfer.bump = ctx.bumps.scheduled_transfer;
         transfer._reserved = [0u8; 32];
 
@@ -274,11 +274,9 @@ pub mod subly_vault {
         let batch_proof = &ctx.accounts.batch_proof;
         require!(!batch_proof.is_used, VaultError::NullifierAlreadyUsed);
 
-        let pool_value_diff = if pool.total_pool_value > batch_proof.pool_value_at_generation {
-            pool.total_pool_value - batch_proof.pool_value_at_generation
-        } else {
-            batch_proof.pool_value_at_generation - pool.total_pool_value
-        };
+        let pool_value_diff = pool
+            .total_pool_value
+            .abs_diff(batch_proof.pool_value_at_generation);
 
         let tolerance_amount = (batch_proof.pool_value_at_generation as u128)
             .checked_mul(batch_proof.pool_value_tolerance_bps as u128)
