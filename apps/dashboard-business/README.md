@@ -1,36 +1,102 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Subly Business Dashboard
+
+Business dashboard for managing subscription plans on the Subly Membership Protocol.
+
+## Features
+
+- Wallet connection (Phantom, Solflare, etc.)
+- Business registration
+- Subscription plan creation and management
+- Subscriber count display (privacy-preserving)
+
+## Tech Stack
+
+- Next.js 16 (App Router)
+- React 19
+- TailwindCSS
+- @solana/wallet-adapter-react
+- @subly/membership-sdk
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 20+
+- pnpm 9+
+- Solana wallet (Phantom recommended)
+
+### Installation
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# From the monorepo root
+pnpm install
+
+# Or from this directory
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Development
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Learn More
+### Build
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+pnpm build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Type Check
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+pnpm tsc --noEmit
+```
 
-## Deploy on Vercel
+## Project Structure
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+apps/dashboard-business/
+├── app/                    # Next.js App Router pages
+│   ├── layout.tsx          # Root layout
+│   ├── page.tsx            # Home (dashboard)
+│   └── plans/
+│       └── new/
+│           └── page.tsx    # Create plan page
+├── components/
+│   ├── Header.tsx          # Header with wallet connection
+│   └── plans/
+│       └── PlanCard.tsx    # Plan card with subscriber count
+├── hooks/
+│   └── useSubscriptionCount.ts  # Subscription count hook
+├── lib/
+│   └── solana.ts           # Solana connection config
+└── providers/
+    ├── WalletProvider.tsx  # Wallet adapter provider
+    ├── MembershipProvider.tsx  # SDK client provider
+    └── index.tsx           # Combined providers
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Environment Variables
+
+No environment variables required for Devnet. The app connects to Solana Devnet by default.
+
+For custom RPC endpoints, you can modify `lib/solana.ts`.
+
+## Usage
+
+1. **Connect Wallet**: Click "Select Wallet" and connect your Solana wallet
+2. **Register Business**: Enter your business name and optional metadata URI
+3. **Create Plans**: Click "Create Plan" and fill in plan details
+4. **View Subscribers**: Each plan card shows the number of active subscribers
+
+## Network
+
+- **Network**: Solana Devnet
+- **Program ID**: `2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA`
+
+## License
+
+MIT

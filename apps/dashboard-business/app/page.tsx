@@ -5,6 +5,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useMembership } from "@/providers/MembershipProvider";
 import type { Business, Plan } from "@subly/membership-sdk";
 import Link from "next/link";
+import { PlanCard } from "@/components/plans/PlanCard";
 
 export default function DashboardPage() {
   const { connected, publicKey } = useWallet();
@@ -180,28 +181,7 @@ export default function DashboardPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {plans.map((plan) => (
-            <div key={plan.publicKey.toBase58()} className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-gray-900">{plan.name || "Unnamed Plan"}</h3>
-                <span
-                  className={`text-xs px-2 py-1 rounded ${
-                    plan.isActive
-                      ? "bg-green-100 text-green-800"
-                      : "bg-gray-100 text-gray-600"
-                  }`}
-                >
-                  {plan.isActive ? "Active" : "Inactive"}
-                </span>
-              </div>
-              <p className="text-sm text-gray-500 mb-4 line-clamp-2">
-                {plan.description || "No description"}
-              </p>
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium text-gray-900">
-                  ${plan.priceUsdc.toFixed(2)} / {plan.billingCycleDays} days
-                </span>
-              </div>
-            </div>
+            <PlanCard key={plan.publicKey.toBase58()} plan={plan} />
           ))}
         </div>
       )}
