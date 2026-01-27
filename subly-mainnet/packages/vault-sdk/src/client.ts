@@ -12,6 +12,7 @@ import {
   ShieldPool,
   UserShare,
   DepositParams,
+  RegisterDepositParams,
   WithdrawParams,
   SetupRecurringPaymentParams,
   BalanceResult,
@@ -28,6 +29,7 @@ import {
   getDepositHistoryPda,
   getScheduledTransferPda,
   getNullifierPda,
+  getNoteCommitmentRegistryPda,
 } from "./utils/pda";
 import { generateCommitment, generateSecret, generateNullifier } from "./utils/commitment";
 import {
@@ -35,6 +37,12 @@ import {
   readPlaceholderShares,
   KEY_DERIVATION_MESSAGE,
 } from "./utils/encryption";
+import {
+  LocalStorageManager,
+  LocalTransferData,
+  encryptTransferData,
+  decryptTransferData,
+} from "./utils/local-storage";
 
 // External protocol integrations
 import {
@@ -75,10 +83,13 @@ export class SublyVaultClient {
   private programId: PublicKey;
   private config: VaultSdkConfig;
 
-  // External protocol integrations
+  // External protocol integrations (Privacy Cash is REQUIRED)
   private privacyCash: PrivacyCashIntegration | null = null;
   private tuktuk: TukTukIntegration | null = null;
   private kamino: KaminoIntegration | null = null;
+
+  // Local storage for privacy-sensitive data (recipient addresses)
+  private localStorage: LocalStorageManager;
 
   // Cached data
   private userSecret: Uint8Array | null = null;
@@ -96,24 +107,33 @@ export class SublyVaultClient {
     this.config = {
       commitment: config.commitment ?? "confirmed",
       skipPreflight: config.skipPreflight ?? false,
+      storageKey: config.storageKey ?? "subly-vault",
     };
+
+    // Initialize local storage for privacy-sensitive data
+    this.localStorage = new LocalStorageManager(this.config.storageKey!);
   }
 
   /**
    * Initialize the SDK with the program IDL
    * Must be called before using other methods
    *
+   * IMPORTANT: Privacy Cash is REQUIRED for privacy-preserving operations.
+   * All deposits and transfers must go through Privacy Cash to protect user privacy.
+   *
    * @param idl - Program IDL
-   * @param options - Optional initialization options for external integrations
+   * @param options - Initialization options for external integrations
    */
   async initialize(
     idl: Idl,
-    options?: {
-      privacyCashPrivateKey?: string | Uint8Array | Keypair;
+    options: {
+      /** REQUIRED: Private key for Privacy Cash operations */
+      privacyCashPrivateKey: string | Uint8Array | Keypair;
       rpcUrl?: string;
-      enablePrivacyCash?: boolean;
       enableTukTuk?: boolean;
       enableKamino?: boolean;
+      /** Encryption password for local storage (default: derived from wallet) */
+      storagePassword?: string;
     }
   ): Promise<void> {
     const provider = new AnchorProvider(this.connection, this.wallet, {
@@ -123,18 +143,19 @@ export class SublyVaultClient {
 
     this.program = new Program(idl as SublyVault, provider) as Program<SublyVault>;
 
-    // Initialize external integrations if requested
-    const rpcUrl = options?.rpcUrl ?? this.connection.rpcEndpoint;
+    // Initialize local storage with encryption
+    const storagePassword = options.storagePassword ?? this.wallet.publicKey.toBase58();
+    await this.localStorage.initialize(storagePassword);
 
-    if (options?.enablePrivacyCash && options.privacyCashPrivateKey) {
-      this.privacyCash = await createPrivacyCashIntegration({
-        rpcUrl,
-        privateKey: options.privacyCashPrivateKey,
-        enableDebug: false,
-      });
-    }
+    // Initialize Privacy Cash (REQUIRED for privacy)
+    const rpcUrl = options.rpcUrl ?? this.connection.rpcEndpoint;
+    this.privacyCash = await createPrivacyCashIntegration({
+      rpcUrl,
+      privateKey: options.privacyCashPrivateKey,
+      enableDebug: false,
+    });
 
-    if (options?.enableTukTuk) {
+    if (options.enableTukTuk) {
       const poolAuthority = this.getShieldPoolAddress();
       // Note: Tuk Tuk requires a Keypair for signing, would need to be provided
       // For now, we'll create a placeholder that can be updated
@@ -145,7 +166,7 @@ export class SublyVaultClient {
       });
     }
 
-    if (options?.enableKamino) {
+    if (options.enableKamino) {
       const poolAuthority = this.getShieldPoolAddress();
       this.kamino = await createKaminoIntegration({
         connection: this.connection,
@@ -204,22 +225,25 @@ export class SublyVaultClient {
   }
 
   /**
-   * Deposit USDC into the Shield Pool
+   * Register a private deposit from Privacy Cash
    *
-   * @param params - Deposit parameters
-   * @param options - Optional configuration
+   * This is the PREFERRED method for deposits as it preserves privacy.
+   * The deposit flow is:
+   * 1. User deposits USDC to Privacy Cash (separate transaction)
+   * 2. Privacy Cash returns a note_commitment as proof
+   * 3. User calls registerDeposit with the note_commitment
+   * 4. The registrar (relayer or user) registers without exposing the user's wallet
+   *
+   * @param params - Register deposit parameters
    * @returns Transaction result
    */
-  async deposit(
-    params: DepositParams,
-    options?: {
-      /** Use Privacy Cash for private deposit */
-      usePrivacyCash?: boolean;
-    }
-  ): Promise<TransactionResult> {
+  async registerDeposit(params: RegisterDepositParams): Promise<TransactionResult> {
     if (!this.program) throw new Error("SDK not initialized. Call initialize() first.");
     if (!this.userSecret || !this.userCommitment) {
       throw new Error("User not initialized. Call initializeUser() first.");
+    }
+    if (!this.privacyCash) {
+      throw new Error("Privacy Cash is required for privacy-preserving deposits.");
     }
 
     const pool = await this.getShieldPool();
@@ -228,18 +252,6 @@ export class SublyVaultClient {
     }
 
     const amount = typeof params.amount === "number" ? new BN(params.amount) : params.amount;
-    const amountUsdc = Number(amount.toString()) / 1e6; // Convert to human-readable USDC
-
-    // If Privacy Cash is enabled and requested, deposit through Privacy Cash first
-    if (options?.usePrivacyCash && this.privacyCash) {
-      try {
-        const privacyResult = await this.privacyCash.depositPrivateUSDC(amountUsdc);
-        console.log("Privacy Cash deposit completed:", privacyResult.tx);
-      } catch (error) {
-        console.error("Privacy Cash deposit failed:", error);
-        throw new Error(`Privacy Cash deposit failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    }
 
     // Calculate shares
     const shares = this.calculateSharesForDeposit(
@@ -251,56 +263,57 @@ export class SublyVaultClient {
     // Create encrypted share (placeholder for now)
     const encryptedShare = createPlaceholderEncryptedShare(shares);
 
-    // Get deposit index (based on pool nonce)
-    const depositIndex = pool.nonce;
-
     // Build accounts
     const poolAddress = this.getShieldPoolAddress();
     const [userSharePda] = getUserSharePda(poolAddress, this.userCommitment, this.programId);
-    const [depositHistoryPda] = getDepositHistoryPda(
-      this.userCommitment,
-      BigInt(depositIndex.toString()),
+    const [noteCommitmentRegistryPda] = getNoteCommitmentRegistryPda(
+      params.noteCommitment,
       this.programId
     );
 
     try {
       const signature = await this.program.methods
-        .deposit(amount, Array.from(this.userCommitment), Array.from(encryptedShare), depositIndex)
+        .registerDeposit(
+          Array.from(params.noteCommitment),
+          Array.from(this.userCommitment),
+          Array.from(encryptedShare),
+          amount
+        )
         .accounts({
-          depositor: this.wallet.publicKey,
+          registrar: this.wallet.publicKey,
           shieldPool: poolAddress,
+          noteCommitmentRegistry: noteCommitmentRegistryPda,
           userShare: userSharePda,
-          depositHistory: depositHistoryPda,
           systemProgram: SystemProgram.programId,
         })
         .rpc();
 
       return { signature, success: true };
     } catch (error) {
-      console.error("Deposit failed:", error);
+      console.error("Register deposit failed:", error);
       throw error;
     }
   }
 
   /**
-   * Withdraw USDC from the Shield Pool
+   * Deposit USDC into the Shield Pool via Privacy Cash
    *
-   * @param params - Withdrawal parameters
-   * @param options - Optional configuration
-   * @returns Transaction result with optional Privacy Cash info
+   * This method performs a complete privacy-preserving deposit:
+   * 1. Deposits USDC to Privacy Cash
+   * 2. Gets the note_commitment from Privacy Cash
+   * 3. Registers the deposit on-chain
+   *
+   * @deprecated For more control, use depositToPrivacyCash() + registerDeposit() separately
+   * @param params - Deposit parameters
+   * @returns Transaction result with Privacy Cash info
    */
-  async withdraw(
-    params: WithdrawParams,
-    options?: {
-      /** Use Privacy Cash for private withdrawal */
-      usePrivacyCash?: boolean;
-      /** Recipient address (for Privacy Cash withdrawal) */
-      recipient?: string;
-    }
-  ): Promise<TransactionResult & { privacyCashTx?: string; privacyCashFee?: number }> {
+  async deposit(params: DepositParams): Promise<TransactionResult & { noteCommitment?: Uint8Array }> {
     if (!this.program) throw new Error("SDK not initialized. Call initialize() first.");
     if (!this.userSecret || !this.userCommitment) {
       throw new Error("User not initialized. Call initializeUser() first.");
+    }
+    if (!this.privacyCash) {
+      throw new Error("Privacy Cash is required. Initialize with privacyCashPrivateKey.");
     }
 
     const pool = await this.getShieldPool();
@@ -309,6 +322,63 @@ export class SublyVaultClient {
     }
 
     const amount = typeof params.amount === "number" ? new BN(params.amount) : params.amount;
+    const amountUsdc = Number(amount.toString()) / 1e6; // Convert to human-readable USDC
+
+    // Step 1: Deposit to Privacy Cash (REQUIRED for privacy)
+    let noteCommitment: Uint8Array;
+    try {
+      const privacyResult = await this.privacyCash.depositPrivateUSDC(amountUsdc);
+      console.log("Privacy Cash deposit completed:", privacyResult.tx);
+      // Note: In production, noteCommitment would be extracted from Privacy Cash response
+      // For now, use a placeholder based on the transaction signature
+      noteCommitment = new Uint8Array(32);
+      const txBytes = Buffer.from(privacyResult.tx, "base64");
+      noteCommitment.set(txBytes.slice(0, 32));
+    } catch (error) {
+      console.error("Privacy Cash deposit failed:", error);
+      throw new Error(`Privacy Cash deposit failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+
+    // Step 2: Register the deposit on-chain
+    const registerResult = await this.registerDeposit({
+      noteCommitment,
+      amount,
+    });
+
+    return {
+      ...registerResult,
+      noteCommitment,
+    };
+  }
+
+  /**
+   * Withdraw USDC from the Shield Pool via Privacy Cash
+   *
+   * All withdrawals go through Privacy Cash to preserve privacy.
+   *
+   * @param params - Withdrawal parameters
+   * @param recipient - Optional recipient address (defaults to self via Privacy Cash)
+   * @returns Transaction result with Privacy Cash info
+   */
+  async withdraw(
+    params: WithdrawParams,
+    recipient?: string
+  ): Promise<TransactionResult & { privacyCashTx: string; privacyCashFee: number }> {
+    if (!this.program) throw new Error("SDK not initialized. Call initialize() first.");
+    if (!this.userSecret || !this.userCommitment) {
+      throw new Error("User not initialized. Call initializeUser() first.");
+    }
+    if (!this.privacyCash) {
+      throw new Error("Privacy Cash is required. Initialize with privacyCashPrivateKey.");
+    }
+
+    const pool = await this.getShieldPool();
+    if (!pool) {
+      throw new Error("Shield Pool not initialized");
+    }
+
+    const amount = typeof params.amount === "number" ? new BN(params.amount) : params.amount;
+    const amountUsdc = Number(amount.toString()) / 1e6;
 
     // Generate nullifier for this withdrawal
     const nullifier = generateNullifier(this.userSecret, "withdraw", BigInt(pool.nonce.toString()));
@@ -352,27 +422,16 @@ export class SublyVaultClient {
         })
         .rpc();
 
-      let result: TransactionResult & { privacyCashTx?: string; privacyCashFee?: number } = {
+      // Withdraw through Privacy Cash (REQUIRED for privacy)
+      const privacyResult = await this.privacyCash.withdrawPrivateUSDC(amountUsdc, recipient);
+      console.log("Privacy Cash withdrawal completed:", privacyResult.tx);
+
+      return {
         signature,
         success: true,
+        privacyCashTx: privacyResult.tx,
+        privacyCashFee: privacyResult.feeInBaseUnits / 1e6,
       };
-
-      // If Privacy Cash is enabled and requested, withdraw through Privacy Cash
-      if (options?.usePrivacyCash && this.privacyCash) {
-        const amountUsdc = Number(amount.toString()) / 1e6; // Convert to human-readable USDC
-        try {
-          const privacyResult = await this.privacyCash.withdrawPrivateUSDC(amountUsdc, options.recipient);
-          result.privacyCashTx = privacyResult.tx;
-          result.privacyCashFee = privacyResult.feeInBaseUnits / 1e6;
-          console.log("Privacy Cash withdrawal completed:", privacyResult.tx);
-        } catch (error) {
-          console.error("Privacy Cash withdrawal failed:", error);
-          // Note: The vault withdrawal succeeded, but Privacy Cash failed
-          // The funds are in the user's wallet but not privately withdrawn
-        }
-      }
-
-      return result;
     } catch (error) {
       console.error("Withdraw failed:", error);
       throw error;
@@ -406,11 +465,15 @@ export class SublyVaultClient {
   }
 
   /**
-   * Set up a recurring payment
+   * Set up a privacy-preserving recurring payment
+   *
+   * The recipient address is encrypted and stored locally - NOT on-chain.
+   * On-chain only stores encrypted_transfer_data that cannot reveal the recipient.
+   * At execution time, the recipient is loaded from local storage and sent via Privacy Cash.
    *
    * @param params - Recurring payment parameters
    * @param options - Optional configuration
-   * @returns Transaction result with optional Tuk Tuk cron job info
+   * @returns Transaction result with transfer ID and optional Tuk Tuk cron job info
    */
   async setupRecurringPayment(
     params: SetupRecurringPaymentParams,
@@ -420,7 +483,7 @@ export class SublyVaultClient {
       /** Amount of SOL to fund the cron job (default: 0.1 SOL) */
       cronJobFundingSol?: number;
     }
-  ): Promise<TransactionResult & { cronJobPda?: string; cronJobTx?: string }> {
+  ): Promise<TransactionResult & { transferId: string; cronJobPda?: string; cronJobTx?: string }> {
     if (!this.program) throw new Error("SDK not initialized. Call initialize() first.");
     if (!this.userCommitment) {
       throw new Error("User not initialized. Call initializeUser() first.");
@@ -446,9 +509,24 @@ export class SublyVaultClient {
       this.programId
     );
 
+    // Derive encryption key from user secret (first 32 bytes)
+    const encryptionKey = this.userSecret!.slice(0, 32);
+
+    // Encrypt recipient for on-chain storage (privacy protection)
+    const encryptedTransferData = await encryptTransferData(
+      params.recipientAddress.toBase58(),
+      encryptionKey,
+      params.memo
+    );
+
     try {
       const signature = await this.program.methods
-        .setupTransfer(params.recipientAddress, amount, intervalSeconds, transferNonce)
+        .setupTransfer(
+          Array.from(encryptedTransferData),
+          amount,
+          intervalSeconds,
+          transferNonce
+        )
         .accounts({
           payer: this.wallet.publicKey,
           shieldPool: poolAddress,
@@ -458,9 +536,22 @@ export class SublyVaultClient {
         })
         .rpc();
 
-      let result: TransactionResult & { cronJobPda?: string; cronJobTx?: string } = {
+      // Save recipient to local storage (NOT on-chain)
+      const transferId = scheduledTransferPda.toBase58();
+      const localTransferData: LocalTransferData = {
+        transferId,
+        recipient: params.recipientAddress.toBase58(),
+        amount: params.amountUsdc,
+        intervalSeconds,
+        createdAt: Date.now(),
+        memo: params.memo,
+      };
+      await this.localStorage.saveTransfer(localTransferData);
+
+      let result: TransactionResult & { transferId: string; cronJobPda?: string; cronJobTx?: string } = {
         signature,
         success: true,
+        transferId,
       };
 
       // If Tuk Tuk automation is enabled, create a cron job
@@ -475,7 +566,7 @@ export class SublyVaultClient {
 
           // Build execute_transfer instruction for the cron job
           const executeTransferIx = await this.program.methods
-            .executeTransfer()
+            .executeTransfer(0) // execution_index will be updated on each execution
             .accounts({
               executor: this.wallet.publicKey,
               shieldPool: poolAddress,
@@ -506,6 +597,71 @@ export class SublyVaultClient {
       console.error("Setup recurring payment failed:", error);
       throw error;
     }
+  }
+
+  /**
+   * Get the recipient address for a scheduled transfer from local storage
+   *
+   * @param transferId - The scheduled transfer PDA address
+   * @returns Recipient address or null if not found
+   */
+  async getTransferRecipient(transferId: string): Promise<string | null> {
+    const transfer = await this.localStorage.getTransfer(transferId);
+    return transfer?.recipient ?? null;
+  }
+
+  /**
+   * Get all scheduled transfers from local storage
+   *
+   * @returns List of transfer data stored locally
+   */
+  async getAllLocalTransfers(): Promise<LocalTransferData[]> {
+    return this.localStorage.getAllTransfers();
+  }
+
+  /**
+   * Execute a scheduled transfer via Privacy Cash
+   *
+   * This method loads the recipient from local storage and sends via Privacy Cash.
+   * On-chain, no recipient information is stored.
+   *
+   * @param transferId - The scheduled transfer PDA address
+   * @param executionIndex - The execution index for tracking
+   * @returns Transaction result with Privacy Cash info
+   */
+  async executeScheduledTransfer(
+    transferId: PublicKey,
+    executionIndex: number
+  ): Promise<TransactionResult & { privacyCashTx: string }> {
+    if (!this.program) throw new Error("SDK not initialized. Call initialize() first.");
+    if (!this.privacyCash) {
+      throw new Error("Privacy Cash is required. Initialize with privacyCashPrivateKey.");
+    }
+
+    // Load recipient from local storage
+    const localTransfer = await this.localStorage.getTransfer(transferId.toBase58());
+    if (!localTransfer) {
+      throw new Error(`Transfer not found in local storage: ${transferId.toBase58()}. Cannot execute without recipient.`);
+    }
+
+    // TODO: In production, this would involve batch proofs and the full execute_transfer flow
+    // For now, this demonstrates the privacy-preserving pattern:
+    // 1. Load recipient from local storage (not from chain)
+    // 2. Execute transfer via Privacy Cash
+    const privacyResult = await this.privacyCash.withdrawPrivateUSDC(
+      localTransfer.amount,
+      localTransfer.recipient
+    );
+
+    // Update local storage with execution info
+    localTransfer.lastExecuted = Date.now();
+    await this.localStorage.saveTransfer(localTransfer);
+
+    return {
+      signature: privacyResult.tx, // Use Privacy Cash tx as signature
+      success: true,
+      privacyCashTx: privacyResult.tx,
+    };
   }
 
   /**

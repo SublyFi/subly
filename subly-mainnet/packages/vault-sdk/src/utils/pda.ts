@@ -11,6 +11,7 @@ export const SCHEDULED_TRANSFER_SEED = Buffer.from("transfer");
 export const TRANSFER_HISTORY_SEED = Buffer.from("history");
 export const NULLIFIER_SEED = Buffer.from("nullifier");
 export const BATCH_PROOF_SEED = Buffer.from("batch_proof");
+export const NOTE_COMMITMENT_REGISTRY_SEED = Buffer.from("note_registry");
 
 /**
  * Derive the Shield Pool PDA address
@@ -121,6 +122,21 @@ export function getBatchProofPda(
 
   return PublicKey.findProgramAddressSync(
     [BATCH_PROOF_SEED, scheduledTransfer.toBuffer(), indexBuffer],
+    programId
+  );
+}
+
+/**
+ * Derive the Note Commitment Registry PDA address
+ * Used for Privacy Cash deposit proofs to prevent double-registration
+ * @param noteCommitment - Note commitment from Privacy Cash (32 bytes)
+ */
+export function getNoteCommitmentRegistryPda(
+  noteCommitment: Uint8Array,
+  programId: PublicKey = PROGRAM_ID
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [NOTE_COMMITMENT_REGISTRY_SEED, Buffer.from(noteCommitment)],
     programId
   );
 }

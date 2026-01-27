@@ -65,6 +65,7 @@ export {
   getTransferHistoryPda,
   getNullifierPda,
   getBatchProofPda,
+  getNoteCommitmentRegistryPda,
   SHIELD_POOL_SEED,
   USER_SHARE_SEED,
   DEPOSIT_HISTORY_SEED,
@@ -72,7 +73,16 @@ export {
   TRANSFER_HISTORY_SEED,
   NULLIFIER_SEED,
   BATCH_PROOF_SEED,
+  NOTE_COMMITMENT_REGISTRY_SEED,
 } from "./utils/pda";
+
+// Local storage for privacy-sensitive data
+export {
+  LocalStorageManager,
+  encryptTransferData,
+  decryptTransferData,
+} from "./utils/local-storage";
+export type { LocalTransferData, LocalVaultData } from "./utils/local-storage";
 
 // IDL utilities
 export { getIdl } from "./idl/subly_vault";

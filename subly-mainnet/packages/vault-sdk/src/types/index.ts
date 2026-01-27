@@ -45,11 +45,14 @@ export interface DepositHistory {
 
 /**
  * Scheduled transfer configuration
+ * Note: recipient is NOT stored on-chain - it's encrypted in encryptedTransferData
+ * and stored locally for privacy
  */
 export interface ScheduledTransfer {
   transferId: PublicKey;
   userCommitment: Uint8Array;
-  recipient: PublicKey;
+  /** Encrypted transfer data (recipient is encrypted within this) */
+  encryptedTransferData: Uint8Array;
   amount: BN;
   intervalSeconds: number;
   nextExecution: BN;
@@ -58,7 +61,20 @@ export interface ScheduledTransfer {
   executionCount: BN;
   totalTransferred: BN;
   createdAt: BN;
-  clockworkThread: PublicKey;
+  /** Tuk Tuk cron job (replaces deprecated Clockwork) */
+  tuktukCronJob: PublicKey;
+  bump: number;
+}
+
+/**
+ * Note Commitment Registry - tracks Privacy Cash deposits
+ */
+export interface NoteCommitmentRegistry {
+  noteCommitment: Uint8Array;
+  userCommitment: Uint8Array;
+  amount: BN;
+  registeredAt: BN;
+  pool: PublicKey;
   bump: number;
 }
 
@@ -106,13 +122,25 @@ export enum OperationType {
 }
 
 /**
- * Deposit parameters
+ * Deposit parameters (DEPRECATED - use RegisterDepositParams)
+ * @deprecated Use registerDeposit with Privacy Cash for privacy-preserving deposits
  */
 export interface DepositParams {
   /** Amount in USDC (6 decimals) */
   amount: number | BN;
   /** Optional user secret for commitment generation */
   secret?: Uint8Array;
+}
+
+/**
+ * Register deposit parameters for Privacy Cash integration
+ * This is the preferred privacy-preserving deposit method
+ */
+export interface RegisterDepositParams {
+  /** Note commitment from Privacy Cash deposit proof */
+  noteCommitment: Uint8Array;
+  /** Amount in USDC (6 decimals) */
+  amount: number | BN;
 }
 
 /**
@@ -127,14 +155,17 @@ export interface WithdrawParams {
 
 /**
  * Setup recurring payment parameters
+ * Note: recipient is encrypted and stored locally for privacy
  */
 export interface SetupRecurringPaymentParams {
-  /** Recipient address (business) */
+  /** Recipient address (business) - stored locally, NOT on-chain */
   recipientAddress: PublicKey;
   /** Amount per transfer in USDC */
   amountUsdc: number;
   /** Transfer interval */
   interval: "hourly" | "daily" | "weekly" | "monthly";
+  /** Optional memo for local reference */
+  memo?: string;
 }
 
 /**
@@ -173,6 +204,8 @@ export interface VaultSdkConfig {
   commitment?: "processed" | "confirmed" | "finalized";
   /** Skip preflight simulation */
   skipPreflight?: boolean;
+  /** Storage key for local encrypted storage (default: 'subly-vault') */
+  storageKey?: string;
 }
 
 /**

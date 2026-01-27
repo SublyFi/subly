@@ -1,0 +1,2495 @@
+{
+  "address": "BRU5ubQjz7DjF6wWzs16SmEzPgfHTe6u8iYNpoMuAVPL",
+  "metadata": {
+    "name": "subly_vault",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Subly Vault - Privacy-first subscription payment protocol for Solana Mainnet"
+  },
+  "instructions": [
+    {
+      "name": "cancel_transfer",
+      "docs": [
+        "Cancel a scheduled transfer"
+      ],
+      "discriminator": [
+        50,
+        32,
+        70,
+        130,
+        142,
+        41,
+        111,
+        175
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "The user cancelling the transfer"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "shield_pool",
+          "docs": [
+            "The Shield Pool"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  105,
+                  101,
+                  108,
+                  100,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_share",
+          "docs": [
+            "User's share account (proves ownership via commitment)"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "shield_pool"
+              },
+              {
+                "kind": "account",
+                "path": "user_share.user_commitment",
+                "account": "UserShare"
+              }
+            ]
+          }
+        },
+        {
+          "name": "scheduled_transfer",
+          "docs": [
+            "The scheduled transfer to cancel"
+          ],
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "deposit",
+      "docs": [
+        "Deposit USDC into the Shield Pool",
+        "DEPRECATED: Use register_deposit for privacy-preserving deposits"
+      ],
+      "discriminator": [
+        242,
+        35,
+        198,
+        137,
+        82,
+        225,
+        242,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "depositor",
+          "docs": [
+            "The depositor"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "shield_pool",
+          "docs": [
+            "The Shield Pool"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  105,
+                  101,
+                  108,
+                  100,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_share",
+          "docs": [
+            "User's share account"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "shield_pool"
+              },
+              {
+                "kind": "arg",
+                "path": "commitment"
+              }
+            ]
+          }
+        },
+        {
+          "name": "deposit_history",
+          "docs": [
+            "Deposit history record"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  95,
+                  104,
+                  105,
+                  115,
+                  116,
+                  111,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "commitment"
+              },
+              {
+                "kind": "arg",
+                "path": "deposit_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "encrypted_share",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "_deposit_index",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "execute_transfer",
+      "docs": [
+        "Record a transfer execution (privacy-preserving)",
+        "",
+        "This records that a transfer has been executed, without revealing",
+        "the recipient. The actual transfer is done via Privacy Cash off-chain."
+      ],
+      "discriminator": [
+        233,
+        126,
+        160,
+        184,
+        235,
+        206,
+        31,
+        119
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "docs": [
+            "The executor (can be Clockwork thread or manual caller)"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "shield_pool",
+          "docs": [
+            "The Shield Pool"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  105,
+                  101,
+                  108,
+                  100,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "scheduled_transfer",
+          "docs": [
+            "The scheduled transfer"
+          ],
+          "writable": true
+        },
+        {
+          "name": "user_share",
+          "docs": [
+            "User's share account"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "shield_pool"
+              },
+              {
+                "kind": "account",
+                "path": "scheduled_transfer.user_commitment",
+                "account": "ScheduledTransfer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "batch_proof",
+          "docs": [
+            "Pre-generated batch proof for this execution"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  99,
+                  104,
+                  95,
+                  112,
+                  114,
+                  111,
+                  111,
+                  102
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "scheduled_transfer"
+              },
+              {
+                "kind": "arg",
+                "path": "execution_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "nullifier",
+          "docs": [
+            "Nullifier account"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  117,
+                  108,
+                  108,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "batch_proof.nullifier",
+                "account": "BatchProofStorage"
+              }
+            ]
+          }
+        },
+        {
+          "name": "transfer_history",
+          "docs": [
+            "Transfer history record"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  105,
+                  115,
+                  116,
+                  111,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "scheduled_transfer"
+              },
+              {
+                "kind": "arg",
+                "path": "execution_index"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "execution_index",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "Initialize the Shield Pool"
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "The authority that will manage the pool"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "shield_pool",
+          "docs": [
+            "The Shield Pool account to be created"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  105,
+                  101,
+                  108,
+                  100,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program for account creation"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "register_deposit",
+      "docs": [
+        "Register a private deposit from Privacy Cash",
+        "",
+        "This is the preferred method for deposits as it preserves privacy.",
+        "The registrar (relayer or pool authority) registers the deposit",
+        "without exposing the user's wallet address."
+      ],
+      "discriminator": [
+        127,
+        222,
+        170,
+        135,
+        103,
+        118,
+        98,
+        236
+      ],
+      "accounts": [
+        {
+          "name": "registrar",
+          "docs": [
+            "The relayer or pool authority registering the deposit",
+            "This is NOT the user's wallet - maintaining privacy"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "shield_pool",
+          "docs": [
+            "The Shield Pool"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  105,
+                  101,
+                  108,
+                  100,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "note_commitment_registry",
+          "docs": [
+            "Note Commitment Registry - prevents double registration",
+            "Initialized fresh for each unique note_commitment"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  111,
+                  116,
+                  101,
+                  95,
+                  99,
+                  111,
+                  109,
+                  109,
+                  105,
+                  116,
+                  109,
+                  101,
+                  110,
+                  116,
+                  95,
+                  114,
+                  101,
+                  103,
+                  105,
+                  115,
+                  116,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "note_commitment"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_share",
+          "docs": [
+            "User's share account - created or updated"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "shield_pool"
+              },
+              {
+                "kind": "arg",
+                "path": "user_commitment"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "note_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "user_commitment",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "encrypted_share",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "setup_transfer",
+      "docs": [
+        "Set up a privacy-preserving recurring transfer",
+        "",
+        "The recipient address is encrypted and stored in `encrypted_transfer_data`.",
+        "The actual recipient is known only to the user and stored locally.",
+        "At execution time, the user provides the recipient to Privacy Cash."
+      ],
+      "discriminator": [
+        9,
+        38,
+        50,
+        226,
+        145,
+        64,
+        160,
+        239
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "docs": [
+            "The user setting up the transfer (or relayer on behalf of user)"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "shield_pool",
+          "docs": [
+            "The Shield Pool"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  105,
+                  101,
+                  108,
+                  100,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_share",
+          "docs": [
+            "User's share account"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "shield_pool"
+              },
+              {
+                "kind": "account",
+                "path": "user_share.user_commitment",
+                "account": "UserShare"
+              }
+            ]
+          }
+        },
+        {
+          "name": "scheduled_transfer",
+          "docs": [
+            "The scheduled transfer account to be created"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  97,
+                  110,
+                  115,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user_share.user_commitment",
+                "account": "UserShare"
+              },
+              {
+                "kind": "arg",
+                "path": "transfer_nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "encrypted_transfer_data",
+          "type": {
+            "array": [
+              "u8",
+              128
+            ]
+          }
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "interval_seconds",
+          "type": "u32"
+        },
+        {
+          "name": "_transfer_nonce",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "docs": [
+        "Withdraw USDC from the Shield Pool"
+      ],
+      "discriminator": [
+        183,
+        18,
+        70,
+        156,
+        148,
+        109,
+        161,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "withdrawer",
+          "docs": [
+            "The withdrawer (provides proof of ownership)"
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "shield_pool",
+          "docs": [
+            "The Shield Pool"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  105,
+                  101,
+                  108,
+                  100,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_share",
+          "docs": [
+            "User's share account"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  104,
+                  97,
+                  114,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "shield_pool"
+              },
+              {
+                "kind": "account",
+                "path": "user_share.user_commitment",
+                "account": "UserShare"
+              }
+            ]
+          }
+        },
+        {
+          "name": "nullifier",
+          "docs": [
+            "Nullifier account (prevents double-spend)"
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  110,
+                  117,
+                  108,
+                  108,
+                  105,
+                  102,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "nullifier_hash"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "docs": [
+            "System program"
+          ],
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "nullifier_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "new_encrypted_share",
+          "type": {
+            "array": [
+              "u8",
+              64
+            ]
+          }
+        },
+        {
+          "name": "_proof",
+          "type": "bytes"
+        },
+        {
+          "name": "_public_inputs",
+          "type": {
+            "vec": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "BatchProofStorage",
+      "discriminator": [
+        37,
+        144,
+        210,
+        48,
+        172,
+        104,
+        209,
+        234
+      ]
+    },
+    {
+      "name": "DepositHistory",
+      "discriminator": [
+        244,
+        219,
+        55,
+        88,
+        104,
+        228,
+        65,
+        89
+      ]
+    },
+    {
+      "name": "NoteCommitmentRegistry",
+      "discriminator": [
+        77,
+        156,
+        62,
+        160,
+        130,
+        79,
+        67,
+        168
+      ]
+    },
+    {
+      "name": "Nullifier",
+      "discriminator": [
+        18,
+        56,
+        142,
+        165,
+        181,
+        158,
+        187,
+        133
+      ]
+    },
+    {
+      "name": "ScheduledTransfer",
+      "discriminator": [
+        56,
+        143,
+        35,
+        12,
+        164,
+        184,
+        212,
+        156
+      ]
+    },
+    {
+      "name": "ShieldPool",
+      "discriminator": [
+        231,
+        111,
+        148,
+        23,
+        210,
+        87,
+        153,
+        10
+      ]
+    },
+    {
+      "name": "TransferHistory",
+      "discriminator": [
+        176,
+        29,
+        176,
+        194,
+        5,
+        211,
+        146,
+        45
+      ]
+    },
+    {
+      "name": "UserShare",
+      "discriminator": [
+        188,
+        217,
+        29,
+        106,
+        184,
+        222,
+        208,
+        101
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "Deposited",
+      "discriminator": [
+        111,
+        141,
+        26,
+        45,
+        161,
+        35,
+        100,
+        57
+      ]
+    },
+    {
+      "name": "PoolInitialized",
+      "discriminator": [
+        100,
+        118,
+        173,
+        87,
+        12,
+        198,
+        254,
+        229
+      ]
+    },
+    {
+      "name": "PoolValueUpdated",
+      "discriminator": [
+        13,
+        123,
+        158,
+        59,
+        84,
+        57,
+        125,
+        194
+      ]
+    },
+    {
+      "name": "PrivateDepositRegistered",
+      "discriminator": [
+        70,
+        156,
+        161,
+        132,
+        122,
+        76,
+        8,
+        217
+      ]
+    },
+    {
+      "name": "PrivateTransferScheduled",
+      "discriminator": [
+        245,
+        216,
+        75,
+        61,
+        225,
+        137,
+        130,
+        82
+      ]
+    },
+    {
+      "name": "TransferCancelled",
+      "discriminator": [
+        117,
+        98,
+        70,
+        151,
+        137,
+        80,
+        144,
+        86
+      ]
+    },
+    {
+      "name": "TransferExecuted",
+      "discriminator": [
+        8,
+        128,
+        224,
+        132,
+        112,
+        216,
+        192,
+        35
+      ]
+    },
+    {
+      "name": "TransferExecutionRecorded",
+      "discriminator": [
+        108,
+        211,
+        230,
+        175,
+        208,
+        96,
+        77,
+        35
+      ]
+    },
+    {
+      "name": "TransferScheduled",
+      "discriminator": [
+        153,
+        159,
+        83,
+        83,
+        68,
+        39,
+        164,
+        164
+      ]
+    },
+    {
+      "name": "Withdrawn",
+      "discriminator": [
+        20,
+        89,
+        223,
+        198,
+        194,
+        124,
+        219,
+        13
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "PoolNotInitialized",
+      "msg": "Shield pool is not initialized"
+    },
+    {
+      "code": 6001,
+      "name": "PoolAlreadyInitialized",
+      "msg": "Shield pool is already initialized"
+    },
+    {
+      "code": 6002,
+      "name": "InvalidPoolAuthority",
+      "msg": "Invalid pool authority"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidCommitment",
+      "msg": "Invalid commitment"
+    },
+    {
+      "code": 6004,
+      "name": "CommitmentAlreadyExists",
+      "msg": "Commitment already exists"
+    },
+    {
+      "code": 6005,
+      "name": "InsufficientDeposit",
+      "msg": "Deposit amount must be greater than zero"
+    },
+    {
+      "code": 6006,
+      "name": "DepositExceedsMaximum",
+      "msg": "Deposit amount exceeds maximum allowed"
+    },
+    {
+      "code": 6007,
+      "name": "InsufficientBalance",
+      "msg": "Insufficient balance for withdrawal"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidWithdrawalAmount",
+      "msg": "Withdrawal amount must be greater than zero"
+    },
+    {
+      "code": 6009,
+      "name": "NullifierAlreadyUsed",
+      "msg": "Nullifier has already been used"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidNullifier",
+      "msg": "Invalid nullifier"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidShareCalculation",
+      "msg": "Invalid share calculation"
+    },
+    {
+      "code": 6012,
+      "name": "ShareOverflow",
+      "msg": "Share amount overflow"
+    },
+    {
+      "code": 6013,
+      "name": "TransferNotActive",
+      "msg": "Transfer is not active"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidInterval",
+      "msg": "Invalid transfer interval"
+    },
+    {
+      "code": 6015,
+      "name": "TransferNotDue",
+      "msg": "Transfer not yet due"
+    },
+    {
+      "code": 6016,
+      "name": "TransferAlreadyCancelled",
+      "msg": "Transfer already cancelled"
+    },
+    {
+      "code": 6017,
+      "name": "PrivacyCashError",
+      "msg": "Privacy Cash operation failed"
+    },
+    {
+      "code": 6018,
+      "name": "KaminoError",
+      "msg": "Kamino lending operation failed"
+    },
+    {
+      "code": 6019,
+      "name": "ClockworkError",
+      "msg": "Clockwork automation error"
+    },
+    {
+      "code": 6020,
+      "name": "InvalidProof",
+      "msg": "Invalid ZK proof"
+    },
+    {
+      "code": 6021,
+      "name": "ProofVerificationFailed",
+      "msg": "Proof verification failed"
+    },
+    {
+      "code": 6022,
+      "name": "DecryptionFailed",
+      "msg": "Decryption failed"
+    },
+    {
+      "code": 6023,
+      "name": "InvalidEncryptedData",
+      "msg": "Invalid encrypted data"
+    },
+    {
+      "code": 6024,
+      "name": "ArithmeticOverflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6025,
+      "name": "InvalidAccount",
+      "msg": "Invalid account"
+    },
+    {
+      "code": 6026,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    }
+  ],
+  "types": [
+    {
+      "name": "BatchProofStorage",
+      "docs": [
+        "Batch Proof Storage - Pre-generated proofs for recurring transfers",
+        "",
+        "Allows users to pre-generate ZK proofs for multiple future transfers,",
+        "enabling seamless automated execution without user interaction."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "transfer_id",
+            "docs": [
+              "Reference to the scheduled transfer"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "index",
+            "docs": [
+              "Index of this proof in the batch"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "proof",
+            "docs": [
+              "The ZK proof data"
+            ],
+            "type": "bytes"
+          },
+          {
+            "name": "public_inputs",
+            "docs": [
+              "Public inputs for the proof"
+            ],
+            "type": {
+              "vec": {
+                "array": [
+                  "u8",
+                  32
+                ]
+              }
+            }
+          },
+          {
+            "name": "new_encrypted_share",
+            "docs": [
+              "New encrypted share amount after this transfer"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "nullifier",
+            "docs": [
+              "Nullifier for this specific transfer execution"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "is_used",
+            "docs": [
+              "Whether this proof has been used"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "pool_value_at_generation",
+            "docs": [
+              "Pool value at time of proof generation"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "pool_value_tolerance_bps",
+            "docs": [
+              "Tolerance for pool value changes (basis points)"
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DepositHistory",
+      "docs": [
+        "Deposit History - Records individual deposits for yield tracking"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "history_id",
+            "docs": [
+              "Unique identifier (PDA address)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "docs": [
+              "Reference to the Shield Pool"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "user_commitment",
+            "docs": [
+              "User commitment (links to UserShare)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Deposit amount in USDC"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "shares_received",
+            "docs": [
+              "Shares received for this deposit"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "pool_value_at_deposit",
+            "docs": [
+              "Pool value at time of deposit"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_shares_at_deposit",
+            "docs": [
+              "Total shares at time of deposit"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "deposited_at",
+            "docs": [
+              "Timestamp of deposit"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Deposited",
+      "docs": [
+        "Emitted when a user deposits into the Shield Pool"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "shares_minted",
+            "type": "u64"
+          },
+          {
+            "name": "pool_value_after",
+            "type": "u64"
+          },
+          {
+            "name": "total_shares_after",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "NoteCommitmentRegistry",
+      "docs": [
+        "Note Commitment Registry - Tracks Privacy Cash deposit proofs",
+        "",
+        "This account prevents double-registration of the same Privacy Cash deposit.",
+        "When a user deposits through Privacy Cash and then transfers to the Shield Pool,",
+        "the note_commitment serves as a unique identifier for that deposit."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "note_commitment",
+            "docs": [
+              "The note commitment from Privacy Cash (unique identifier for the deposit)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "user_commitment",
+            "docs": [
+              "User's commitment (anonymous identifier within the vault)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Amount deposited (in USDC base units, 6 decimals)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "registered_at",
+            "docs": [
+              "Timestamp when this deposit was registered"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "pool",
+            "docs": [
+              "The Shield Pool this deposit belongs to"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "docs": [
+              "Reserved space for future upgrades"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                31
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Nullifier",
+      "docs": [
+        "Nullifier - Prevents double-spending of funds",
+        "",
+        "Each withdrawal or transfer operation requires a unique nullifier.",
+        "Once a nullifier is used, it cannot be reused, preventing replay attacks."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "nullifier",
+            "docs": [
+              "The nullifier hash: hash(secret || operation_type || nonce)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "is_used",
+            "docs": [
+              "Whether this nullifier has been used"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "used_at",
+            "docs": [
+              "Timestamp when the nullifier was used"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "operation_type",
+            "docs": [
+              "Type of operation this nullifier was used for"
+            ],
+            "type": {
+              "defined": {
+                "name": "OperationType"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OperationType",
+      "docs": [
+        "Operation type for nullifier tracking"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Withdraw"
+          },
+          {
+            "name": "Transfer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolInitialized",
+      "docs": [
+        "Emitted when the Shield Pool is initialized"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolValueUpdated",
+      "docs": [
+        "Emitted when pool value is updated (e.g., yield accrual)"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "old_value",
+            "type": "u64"
+          },
+          {
+            "name": "new_value",
+            "type": "u64"
+          },
+          {
+            "name": "yield_amount",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PrivateDepositRegistered",
+      "docs": [
+        "Emitted when a private deposit is registered via Privacy Cash"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "note_commitment",
+            "docs": [
+              "Note: user_commitment is NOT emitted to preserve privacy"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "shares_minted",
+            "type": "u64"
+          },
+          {
+            "name": "pool_value_after",
+            "type": "u64"
+          },
+          {
+            "name": "total_shares_after",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PrivateTransferScheduled",
+      "docs": [
+        "Emitted when a private transfer is scheduled (privacy-preserving)",
+        "Note: recipient is stored encrypted, not emitted in clear"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "transfer_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "interval_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "first_execution",
+            "type": "i64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ScheduledTransfer",
+      "docs": [
+        "Scheduled Transfer - Recurring payment configuration (Privacy-Preserving)",
+        "",
+        "Enables automated subscription payments from the Shield Pool.",
+        "The recipient address is stored encrypted to preserve privacy.",
+        "Actual recipient is stored in the user's local storage and provided",
+        "at execution time via Privacy Cash."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "transfer_id",
+            "docs": [
+              "Unique identifier (PDA address)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "user_commitment",
+            "docs": [
+              "User commitment (links to UserShare)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "encrypted_transfer_data",
+            "docs": [
+              "Encrypted transfer data (contains recipient, memo, etc.)",
+              "Encrypted with user's derived key - only user can decrypt",
+              "Format: AES-256-GCM encrypted { recipient: Pubkey, memo: String }"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                128
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Transfer amount in USDC per interval"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "interval_seconds",
+            "docs": [
+              "Transfer interval in seconds"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "next_execution",
+            "docs": [
+              "Next scheduled execution timestamp"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "is_active",
+            "docs": [
+              "Whether the transfer is active"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "skip_count",
+            "docs": [
+              "Number of consecutive skipped transfers (insufficient balance)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "execution_count",
+            "docs": [
+              "Total number of successful transfers"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_transferred",
+            "docs": [
+              "Total amount transferred"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "docs": [
+              "Timestamp when transfer was created"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "tuktuk_cron_job",
+            "docs": [
+              "Tuk Tuk cron job address (for automation)",
+              "Note: Clockwork was deprecated in Oct 2023, replaced by Tuk Tuk (Helium)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "docs": [
+              "Reserved space for future upgrades"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ShieldPool",
+      "docs": [
+        "Shield Pool - Aggregates all user funds for privacy",
+        "",
+        "The Shield Pool is the core component that enables privacy by mixing",
+        "all user funds together. Individual users hold \"shares\" in the pool",
+        "rather than direct token balances, breaking the link between users",
+        "and their DeFi positions."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool_id",
+            "docs": [
+              "Unique identifier for this pool (PDA address)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "authority",
+            "docs": [
+              "Authority that can perform admin operations"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "total_pool_value",
+            "docs": [
+              "Total value of all assets in the pool (in USDC, 6 decimals)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_shares",
+            "docs": [
+              "Total number of shares issued to all users"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "kamino_obligation",
+            "docs": [
+              "Kamino obligation account (for yield generation)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "last_yield_update",
+            "docs": [
+              "Timestamp of last yield update"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Operation nonce for replay protection"
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "is_active",
+            "docs": [
+              "Whether the pool is active"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "_reserved",
+            "docs": [
+              "Reserved space for future upgrades"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransferCancelled",
+      "docs": [
+        "Emitted when a scheduled transfer is cancelled"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "transfer_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransferExecuted",
+      "docs": [
+        "Emitted when a scheduled transfer is executed"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "transfer_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "execution_index",
+            "type": "u64"
+          },
+          {
+            "name": "next_execution",
+            "type": "i64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransferExecutionRecorded",
+      "docs": [
+        "Emitted when a transfer execution is recorded (privacy-preserving)",
+        "Note: recipient is NOT emitted to preserve privacy"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "transfer_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "execution_index",
+            "type": "u64"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransferHistory",
+      "docs": [
+        "Transfer History - Records executed transfers"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "history_id",
+            "docs": [
+              "Unique identifier (PDA address)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "scheduled_transfer",
+            "docs": [
+              "Reference to the scheduled transfer"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "privacy_cash_tx",
+            "docs": [
+              "Privacy Cash transaction reference (for tracking)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Transfer amount in USDC"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "executed_at",
+            "docs": [
+              "Timestamp when transfer was executed"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "status",
+            "docs": [
+              "Transfer status"
+            ],
+            "type": {
+              "defined": {
+                "name": "TransferStatus"
+              }
+            }
+          },
+          {
+            "name": "execution_index",
+            "docs": [
+              "Execution index (nth execution of this scheduled transfer)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransferScheduled",
+      "docs": [
+        "Emitted when a scheduled transfer is created"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "transfer_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "interval_seconds",
+            "type": "u32"
+          },
+          {
+            "name": "first_execution",
+            "type": "i64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransferStatus",
+      "docs": [
+        "Transfer Status"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Pending"
+          },
+          {
+            "name": "Completed"
+          },
+          {
+            "name": "Failed"
+          },
+          {
+            "name": "Skipped"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UserShare",
+      "docs": [
+        "User Share - Represents a user's stake in the Shield Pool",
+        "",
+        "The user's identity is protected through a commitment scheme.",
+        "The actual share amount is encrypted using ECIES, so only the",
+        "user (with their wallet) can decrypt and know their balance."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "share_id",
+            "docs": [
+              "Unique identifier for this share account (PDA address)"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "docs": [
+              "Reference to the Shield Pool"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "encrypted_share_amount",
+            "docs": [
+              "ECIES-encrypted share amount",
+              "Format: [32 bytes nonce] + [32 bytes ciphertext]",
+              "Only the user can decrypt this using their wallet signature"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          },
+          {
+            "name": "user_commitment",
+            "docs": [
+              "User commitment: hash(secret || pool_id)",
+              "This links the user to their share without revealing identity"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "last_update",
+            "docs": [
+              "Timestamp of last update"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump seed"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "_reserved",
+            "docs": [
+              "Reserved space for future upgrades"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Withdrawn",
+      "docs": [
+        "Emitted when a user withdraws from the Shield Pool"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "commitment",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "shares_burned",
+            "type": "u64"
+          },
+          {
+            "name": "nullifier",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "pool_value_after",
+            "type": "u64"
+          },
+          {
+            "name": "total_shares_after",
+            "type": "u64"
+          },
+          {
+            "name": "timestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}
