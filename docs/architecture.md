@@ -243,6 +243,149 @@
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
+### Protocol B: プライバシー保護の実装詳細
+
+Protocol B（subly-vault）では、以下の設計により完全なプライバシーを実現する。
+
+#### オンチェーンデータ構造
+
+**UserShare（ユーザーシェア）**
+```rust
+pub struct UserShare {
+    pub encrypted_share_amount: [u8; 64], // ECIES暗号化されたシェア量
+    pub user_commitment: [u8; 32],        // hash(secret || pool_id)
+    // depositor フィールドは存在しない → 入金者を特定不可
+}
+```
+
+**ScheduledTransfer（定期送金）**
+```rust
+pub struct ScheduledTransfer {
+    pub user_commitment: [u8; 32],          // ハッシュのみ
+    pub encrypted_transfer_data: [u8; 128], // 暗号化された送金先
+    // recipient フィールドは存在しない → 事業者を特定不可
+}
+```
+
+#### プライベート入金フロー
+
+```
+                    ┌──────────────────┐
+                    │   ユーザー       │
+                    │  (ウォレット)    │
+                    └────────┬─────────┘
+                             │ 1. depositSPL(amount)
+                             │    ※ 署名はPrivacy Cashのみ
+                             ▼
+                    ┌──────────────────┐
+                    │  Privacy Cash    │
+                    │  (プライベート残高)│
+                    └────────┬─────────┘
+                             │ 2. withdrawSPL(Shield Pool ATA)
+                             │    ※ 送金元は秘匿
+                             ▼
+                    ┌──────────────────┐
+                    │  Shield Pool ATA │ ← 入金元不明の匿名入金
+                    └────────┬─────────┘
+                             │ 3. registerDeposit(noteCommitment)
+                             │    ※ リレーヤーが実行、ユーザー署名なし
+                             ▼
+                    ┌──────────────────┐
+                    │  Vault Program   │
+                    │  (シェア登録)    │
+                    └──────────────────┘
+
+オンチェーンに記録される情報:
+  ✓ note_commitment (Privacy Cashの証明)
+  ✓ user_commitment (匿名識別子)
+  ✓ encrypted_share_amount (暗号化シェア量)
+  ✗ 入金元アドレスは記録されない
+  ✗ 金額は平文で記録されない
+```
+
+**紐付け不可能な理由:**
+1. ユーザーはShield Poolに直接署名しない
+2. `registrar`（リレーヤー）が`registerDeposit`を呼び出す
+3. `user_commitment = hash(secret || pool_id)` はウォレットアドレスから逆算不可
+
+#### プライベート定期送金フロー
+
+```
+                    ┌──────────────────┐
+                    │   ユーザー       │
+                    │ (ローカルに送金先)│
+                    └────────┬─────────┘
+                             │ 1. setupRecurringPayment()
+                             │    ├─ オンチェーン: encrypted_transfer_data のみ
+                             │    └─ ローカル: recipient を暗号化保存
+                             ▼
+                    ┌──────────────────┐
+                    │  Vault Program   │
+                    │  (送金設定保存)  │
+                    │  ※recipientなし │
+                    └──────────────────┘
+
+            === 送金実行時 ===
+
+                    ┌──────────────────┐
+                    │   ユーザー       │
+                    │  or Tuk Tuk      │
+                    └────────┬─────────┘
+                             │ 2. executeScheduledTransfer()
+                             │    ├─ ローカルから recipient 取得
+                             │    └─ Privacy Cash 経由で送金
+                             ▼
+                    ┌──────────────────┐
+                    │  Privacy Cash    │
+                    │  withdrawSPL()   │
+                    └────────┬─────────┘
+                             │ 3. プライベート送金
+                             │    ※ 送金元・金額は秘匿
+                             ▼
+                    ┌──────────────────┐
+                    │   事業者         │ ← 送金元不明で受領
+                    └──────────────────┘
+
+オンチェーンに記録される情報:
+  ✓ user_commitment (匿名識別子)
+  ✓ encrypted_transfer_data (暗号化送金先)
+  ✓ 実行カウント・タイムスタンプ
+  ✗ 送金先アドレスは記録されない
+  ✗ ユーザーのウォレットアドレスは記録されない
+```
+
+**紐付け不可能な理由:**
+1. オンチェーンに`recipient`フィールドが存在しない
+2. 送金先はユーザーのローカルストレージに暗号化保存
+3. 実行時はPrivacy Cash経由で匿名送金
+
+#### ローカルストレージの暗号化
+
+```typescript
+// 暗号化方式: NaCl secretbox (XSalsa20-Poly1305)
+// 鍵導出: SHA256(wallet_signature) または SHA256(password)
+
+interface LocalVaultData {
+  userSecret: string;       // 暗号化保存
+  userCommitment: string;   // 暗号化保存
+  transfers: [{
+    recipient: string;      // 事業者アドレス（暗号化保存）
+    amount: number;
+    intervalSeconds: number;
+  }];
+}
+```
+
+#### プライバシー保護の検証ポイント
+
+| 検証項目 | オンチェーン | ローカル | 状態 |
+|----------|------------|---------|------|
+| 入金者アドレス | 記録なし | - | ✅ 保護済 |
+| 入金額 | 暗号化 | - | ✅ 保護済 |
+| 送金先アドレス | 記録なし | 暗号化 | ✅ 保護済 |
+| 送金額 | 暗号化 | 暗号化 | ✅ 保護済 |
+| ユーザー識別 | コミットメント | 秘密値 | ✅ 保護済 |
+
 ### 暗号化方式
 
 | 用途                   | 方式                               | 鍵管理                  |
