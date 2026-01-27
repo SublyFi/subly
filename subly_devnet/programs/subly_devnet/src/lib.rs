@@ -181,6 +181,9 @@ pub mod subly_devnet {
         subscription_account.is_active = true;
         subscription_account.nonce = nonce;
         subscription_account.bump = ctx.bumps.subscription_account;
+        // Initialize encrypted status fields (will be updated via MXE callback)
+        subscription_account.encrypted_status = [0u8; 64];
+        subscription_account.status_nonce = [0u8; 16];
 
         // Emit event
         emit!(SubscriptionCreatedEvent {
@@ -279,6 +282,56 @@ pub mod subly_devnet {
             plan: plan_account.key(),
             encrypted_count,
             nonce,
+            timestamp: clock.unix_timestamp,
+        });
+
+        Ok(())
+    }
+
+    // ============================================
+    // Subscription Status Encryption Callbacks
+    // ============================================
+    // These callbacks update the encrypted subscription status
+    // (is_active, subscribed_at, cancelled_at) on the Subscription account.
+
+    /// Callback for set_subscription_active MXE computation
+    /// Called by Arcium when the encrypted status is ready after subscription
+    pub fn subscribe_status_callback(
+        ctx: Context<SubscribeStatusCallback>,
+        encrypted_status: [u8; 64],
+        status_nonce: [u8; 16],
+    ) -> Result<()> {
+        let subscription_account = &mut ctx.accounts.subscription_account;
+        subscription_account.encrypted_status = encrypted_status;
+        subscription_account.status_nonce = status_nonce;
+
+        let clock = Clock::get()?;
+        emit!(SubscriptionStatusEncryptedEvent {
+            subscription: subscription_account.key(),
+            encrypted_status,
+            status_nonce,
+            timestamp: clock.unix_timestamp,
+        });
+
+        Ok(())
+    }
+
+    /// Callback for set_subscription_cancelled MXE computation
+    /// Called by Arcium when the encrypted cancellation status is ready
+    pub fn cancel_status_callback(
+        ctx: Context<CancelStatusCallback>,
+        encrypted_status: [u8; 64],
+        status_nonce: [u8; 16],
+    ) -> Result<()> {
+        let subscription_account = &mut ctx.accounts.subscription_account;
+        subscription_account.encrypted_status = encrypted_status;
+        subscription_account.status_nonce = status_nonce;
+
+        let clock = Clock::get()?;
+        emit!(SubscriptionStatusEncryptedEvent {
+            subscription: subscription_account.key(),
+            encrypted_status,
+            status_nonce,
             timestamp: clock.unix_timestamp,
         });
 
@@ -461,6 +514,32 @@ pub struct DecrementCountCallback<'info> {
     /// The plan to update
     #[account(mut)]
     pub plan_account: Account<'info, Plan>,
+
+    /// CHECK: Arcium cluster account for verification
+    pub cluster_account: AccountInfo<'info>,
+
+    /// CHECK: Arcium computation account for verification
+    pub computation_account: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+pub struct SubscribeStatusCallback<'info> {
+    /// The subscription to update
+    #[account(mut)]
+    pub subscription_account: Account<'info, Subscription>,
+
+    /// CHECK: Arcium cluster account for verification
+    pub cluster_account: AccountInfo<'info>,
+
+    /// CHECK: Arcium computation account for verification
+    pub computation_account: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+pub struct CancelStatusCallback<'info> {
+    /// The subscription to update
+    #[account(mut)]
+    pub subscription_account: Account<'info, Subscription>,
 
     /// CHECK: Arcium cluster account for verification
     pub cluster_account: AccountInfo<'info>,

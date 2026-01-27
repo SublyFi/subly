@@ -45,3 +45,11 @@ pub struct ComputationQueuedEvent {
     pub operation: String,
     pub timestamp: i64,
 }
+
+#[event]
+pub struct SubscriptionStatusEncryptedEvent {
+    pub subscription: Pubkey,
+    pub encrypted_status: [u8; 64],
+    pub status_nonce: [u8; 16],
+    pub timestamp: i64,
+}

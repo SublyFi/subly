@@ -13,16 +13,21 @@ pub struct Subscription {
     pub encrypted_user_commitment: [u8; 32],
     /// Membership commitment for Light Protocol ZK proofs
     pub membership_commitment: [u8; 32],
-    /// Subscription creation timestamp
+    /// Subscription creation timestamp (plaintext - for backward compatibility, will be deprecated)
     pub subscribed_at: i64,
-    /// Cancellation timestamp (0 if not cancelled)
+    /// Cancellation timestamp (0 if not cancelled) (plaintext - for backward compatibility, will be deprecated)
     pub cancelled_at: i64,
-    /// Whether the subscription is active
+    /// Whether the subscription is active (plaintext - for backward compatibility, will be deprecated)
     pub is_active: bool,
     /// Nonce for encryption
     pub nonce: u128,
     /// PDA bump
     pub bump: u8,
+    /// Encrypted subscription status (Arcium MXE encrypted)
+    /// Contains: is_active (u8), subscribed_at (i64), cancelled_at (i64)
+    pub encrypted_status: [u8; 64],
+    /// Nonce for status encryption
+    pub status_nonce: [u8; 16],
 }
 
 impl Subscription {
@@ -36,6 +41,8 @@ impl Subscription {
         + 8                        // cancelled_at: i64
         + 1                        // is_active: bool
         + 16                       // nonce: u128
-        + 1;                       // bump: u8
-    // Total: 170 bytes
+        + 1                        // bump: u8
+        + 64                       // encrypted_status: [u8; 64]
+        + 16;                      // status_nonce: [u8; 16]
+    // Total: 250 bytes
 }

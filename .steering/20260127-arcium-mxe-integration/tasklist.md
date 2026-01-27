@@ -174,3 +174,11 @@
    - `queue_computation_accounts`マクロの使用
 2. **#[arcium_callback]マクロ統合**: callbackを正式なArciumコールバックとして実装
 3. **エンドツーエンドテスト**: 実際のMXE計算を含むテスト
+
+---
+
+## 関連ステアリング
+
+- **次フェーズ**: `.steering/20260127-arcium-subscription-privacy/` - サブスクリプションステータス暗号化（完了）
+- **将来フェーズ**: `.steering/20260127-light-protocol-zk-integration/` - Light Protocol ZK証明統合
+- **実装状況**: `docs/privacy-implementation-status.md` - プライバシー実装状況
