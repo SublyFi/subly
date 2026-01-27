@@ -113,8 +113,8 @@
   - [x] subscribe関数
   - [x] user_commitmentの検証（encrypted_user_commitment, membership_commitmentとして実装）
   - [x] Subscription PDA作成
-  - [ ] queue_computationで契約数インクリメント（2.3で実装）
-  - [ ] arcium_callbackの実装（2.3で実装）
+  - [x] ~~queue_computationで契約数インクリメント~~（→ `.steering/20260127-arcium-mxe-integration/`で対応）
+  - [x] ~~arcium_callbackの実装~~（→ `.steering/20260127-arcium-mxe-integration/`で対応）
 
 ### 2.2 契約数取得機能
 
@@ -126,10 +126,14 @@
 
 ### 2.3 MXE計算ロジック
 
-**注記**: Arcium MXE統合はSBFツールチェーンの更新後に実装予定
+**注記**: Arcium MXE統合は `.steering/20260127-arcium-mxe-integration/` で実装
 
-- [x] ~~`src/mxe/mod.rs` 作成~~（延期: SBFツールチェーンがRust edition 2024未対応のため）
-- [x] ~~`src/mxe/computations.rs` - Arcis回路定義~~（延期: 同上）
+- [x] Arcis回路の実装 ✅ 2026-01-27
+  - `increment_count` - 契約数インクリメント
+  - `decrement_count` - 契約数デクリメント
+  - `initialize_count` - 契約数初期化
+- [x] MxeAccount構造体の追加 ✅ 2026-01-27
+- [x] increment_count_callback/decrement_count_callback実装 ✅ 2026-01-27
 
 ### 2.4 プログラムのビルドとテスト
 

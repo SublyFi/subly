@@ -53,5 +53,6 @@ export const CONSTANTS = {
     BUSINESS: "business",
     PLAN: "plan",
     SUBSCRIPTION: "subscription",
+    MXE: "mxe",
   },
 } as const;

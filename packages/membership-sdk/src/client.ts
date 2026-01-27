@@ -23,6 +23,7 @@ import {
   deriveBusinessPda,
   derivePlanPda,
   deriveSubscriptionPda,
+  deriveMxePda,
 } from "./utils/pda";
 import {
   generateNonce,
@@ -532,6 +533,63 @@ export class SublyMembershipClient {
     } catch {
       return null;
     }
+  }
+
+  // ============================================
+  // MXE Operations (Arcium Integration)
+  // ============================================
+
+  /**
+   * Initialize the MXE account for Arcium integration
+   * This should be called once after program deployment
+   * @returns Transaction result with signature
+   */
+  async initializeMxe(): Promise<TransactionResult> {
+    try {
+      const [mxePda] = deriveMxePda(this.programId);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const signature = await (this.program.methods as any)
+        .initializeMxe()
+        .accounts({
+          payer: this.wallet.publicKey,
+          mxeAccount: mxePda,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+
+      return { signature, success: true };
+    } catch (error) {
+      return {
+        signature: "",
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  /**
+   * Check if MXE account is initialized
+   * @returns True if MXE account exists
+   */
+  async isMxeInitialized(): Promise<boolean> {
+    try {
+      const [mxePda] = deriveMxePda(this.programId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (this.program.account as any).mxeAccount.fetch(mxePda);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get the MXE account PDA
+   * @returns MXE account PDA
+   */
+  getMxePda(): PublicKey {
+    const [mxePda] = deriveMxePda(this.programId);
+    return mxePda;
   }
 
   // ============================================

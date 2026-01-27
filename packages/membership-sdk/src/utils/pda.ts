@@ -73,3 +73,16 @@ export function getBusinessPdaForAuthority(
   const [pda] = deriveBusinessPda(authority, programId);
   return pda;
 }
+
+/**
+ * Derive the MXE account PDA
+ * Used for Arcium MXE integration
+ * @param programId - The program ID
+ * @returns The MXE PDA and bump
+ */
+export function deriveMxePda(programId: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(CONSTANTS.SEEDS.MXE)],
+    programId
+  );
+}
