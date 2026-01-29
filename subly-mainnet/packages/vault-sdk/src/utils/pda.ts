@@ -11,7 +11,9 @@ export const SCHEDULED_TRANSFER_SEED = Buffer.from("transfer");
 export const TRANSFER_HISTORY_SEED = Buffer.from("history");
 export const NULLIFIER_SEED = Buffer.from("nullifier");
 export const BATCH_PROOF_SEED = Buffer.from("batch_proof");
-export const NOTE_COMMITMENT_REGISTRY_SEED = Buffer.from("note_registry");
+export const NOTE_COMMITMENT_REGISTRY_SEED = Buffer.from("note_commitment_registry");
+export const POOL_TOKEN_ACCOUNT_SEED = Buffer.from("pool_token");
+export const POOL_CTOKEN_ACCOUNT_SEED = Buffer.from("pool_ctoken");
 
 /**
  * Derive the Shield Pool PDA address
@@ -138,5 +140,49 @@ export function getNoteCommitmentRegistryPda(
   return PublicKey.findProgramAddressSync(
     [NOTE_COMMITMENT_REGISTRY_SEED, Buffer.from(noteCommitment)],
     programId
+  );
+}
+
+/**
+ * Derive the Pool Token Account PDA (for USDC)
+ * @param pool - Shield Pool address
+ */
+export function getPoolTokenAccountPda(
+  pool: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [POOL_TOKEN_ACCOUNT_SEED, pool.toBuffer()],
+    programId
+  );
+}
+
+/**
+ * Derive the Pool cToken Account PDA (for Kamino cUSDC)
+ * @param pool - Shield Pool address
+ */
+export function getPoolCtokenAccountPda(
+  pool: PublicKey,
+  programId: PublicKey = PROGRAM_ID
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [POOL_CTOKEN_ACCOUNT_SEED, pool.toBuffer()],
+    programId
+  );
+}
+
+/**
+ * Derive the Kamino Lending Market Authority PDA
+ * @param market - Kamino lending market address
+ * @param kaminoProgramId - Kamino program ID
+ */
+export function getKaminoLendingMarketAuthorityPda(
+  market: PublicKey,
+  kaminoProgramId: PublicKey
+): [PublicKey, number] {
+  // Kamino uses ["lma", market] seeds for the lending market authority
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("lma"), market.toBuffer()],
+    kaminoProgramId
   );
 }

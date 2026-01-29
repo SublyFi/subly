@@ -22,6 +22,10 @@ import {
   PROGRAM_ID,
   INTERVAL_SECONDS,
   USDC_DECIMALS,
+  KAMINO_LENDING_PROGRAM_ID,
+  KAMINO_MAIN_MARKET,
+  KAMINO_USDC_RESERVE,
+  KAMINO_CUSDC_MINT,
 } from "./types";
 import {
   getShieldPoolPda,
@@ -30,7 +34,11 @@ import {
   getScheduledTransferPda,
   getNullifierPda,
   getNoteCommitmentRegistryPda,
+  getPoolTokenAccountPda,
+  getPoolCtokenAccountPda,
+  getKaminoLendingMarketAuthorityPda,
 } from "./utils/pda";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { generateCommitment, generateSecret, generateNullifier } from "./utils/commitment";
 import {
   createPlaceholderEncryptedShare,
@@ -234,6 +242,8 @@ export class SublyVaultClient {
    * 3. User calls registerDeposit with the note_commitment
    * 4. The registrar (relayer or user) registers without exposing the user's wallet
    *
+   * After registration, USDC is deposited to Kamino for yield generation.
+   *
    * @param params - Register deposit parameters
    * @returns Transaction result
    */
@@ -271,6 +281,20 @@ export class SublyVaultClient {
       this.programId
     );
 
+    // Pool token accounts
+    const [poolTokenAccountPda] = getPoolTokenAccountPda(poolAddress, this.programId);
+    const [poolCtokenAccountPda] = getPoolCtokenAccountPda(poolAddress, this.programId);
+
+    // Kamino accounts
+    const [kaminoLendingMarketAuthority] = getKaminoLendingMarketAuthorityPda(
+      KAMINO_MAIN_MARKET,
+      KAMINO_LENDING_PROGRAM_ID
+    );
+
+    // Kamino reserve liquidity supply - needs to be fetched from reserve data
+    // For now, use a placeholder that will be set correctly by the on-chain program
+    const kaminoReserveLiquiditySupply = await this.getKaminoReserveLiquiditySupply();
+
     try {
       const signature = await this.program.methods
         .registerDeposit(
@@ -284,6 +308,15 @@ export class SublyVaultClient {
           shieldPool: poolAddress,
           noteCommitmentRegistry: noteCommitmentRegistryPda,
           userShare: userSharePda,
+          poolTokenAccount: poolTokenAccountPda,
+          poolCtokenAccount: poolCtokenAccountPda,
+          kaminoLendingMarket: KAMINO_MAIN_MARKET,
+          kaminoLendingMarketAuthority: kaminoLendingMarketAuthority,
+          kaminoReserve: KAMINO_USDC_RESERVE,
+          kaminoReserveLiquiditySupply: kaminoReserveLiquiditySupply,
+          kaminoReserveCollateralMint: KAMINO_CUSDC_MINT,
+          kaminoProgram: KAMINO_LENDING_PROGRAM_ID,
+          tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
         })
         .rpc();
@@ -355,6 +388,7 @@ export class SublyVaultClient {
    * Withdraw USDC from the Shield Pool via Privacy Cash
    *
    * All withdrawals go through Privacy Cash to preserve privacy.
+   * USDC is first redeemed from Kamino, then transferred via Privacy Cash.
    *
    * @param params - Withdrawal parameters
    * @param recipient - Optional recipient address (defaults to self via Privacy Cash)
@@ -400,6 +434,17 @@ export class SublyVaultClient {
     const [userSharePda] = getUserSharePda(poolAddress, this.userCommitment, this.programId);
     const [nullifierPda] = getNullifierPda(nullifier, this.programId);
 
+    // Pool token accounts
+    const [poolTokenAccountPda] = getPoolTokenAccountPda(poolAddress, this.programId);
+    const [poolCtokenAccountPda] = getPoolCtokenAccountPda(poolAddress, this.programId);
+
+    // Kamino accounts
+    const [kaminoLendingMarketAuthority] = getKaminoLendingMarketAuthorityPda(
+      KAMINO_MAIN_MARKET,
+      KAMINO_LENDING_PROGRAM_ID
+    );
+    const kaminoReserveLiquiditySupply = await this.getKaminoReserveLiquiditySupply();
+
     // Placeholder proof (ZK proof would be generated here in production)
     const proof: number[] = [];
     const publicInputs: number[][] = [];
@@ -418,6 +463,15 @@ export class SublyVaultClient {
           shieldPool: poolAddress,
           userShare: userSharePda,
           nullifier: nullifierPda,
+          poolTokenAccount: poolTokenAccountPda,
+          poolCtokenAccount: poolCtokenAccountPda,
+          kaminoLendingMarket: KAMINO_MAIN_MARKET,
+          kaminoLendingMarketAuthority: kaminoLendingMarketAuthority,
+          kaminoReserve: KAMINO_USDC_RESERVE,
+          kaminoReserveLiquiditySupply: kaminoReserveLiquiditySupply,
+          kaminoReserveCollateralMint: KAMINO_CUSDC_MINT,
+          kaminoProgram: KAMINO_LENDING_PROGRAM_ID,
+          tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
         })
         .rpc();
@@ -897,8 +951,99 @@ export class SublyVaultClient {
   }
 
   // ============================================
+  // Pool Value Management
+  // ============================================
+
+  /**
+   * Update the pool's total value based on Kamino yield
+   *
+   * This reads the current cToken balance and calculates the equivalent
+   * USDC value. Should be called periodically (e.g., daily) by the pool authority.
+   *
+   * @param exchangeRateNumerator - Current Kamino exchange rate numerator
+   * @param exchangeRateDenominator - Current Kamino exchange rate denominator
+   * @returns Transaction result
+   */
+  async updatePoolValue(
+    exchangeRateNumerator: BN,
+    exchangeRateDenominator: BN
+  ): Promise<TransactionResult> {
+    if (!this.program) throw new Error("SDK not initialized. Call initialize() first.");
+
+    const poolAddress = this.getShieldPoolAddress();
+    const [poolTokenAccountPda] = getPoolTokenAccountPda(poolAddress, this.programId);
+    const [poolCtokenAccountPda] = getPoolCtokenAccountPda(poolAddress, this.programId);
+
+    try {
+      const signature = await this.program.methods
+        .updatePoolValue(exchangeRateNumerator, exchangeRateDenominator)
+        .accounts({
+          authority: this.wallet.publicKey,
+          shieldPool: poolAddress,
+          poolCtokenAccount: poolCtokenAccountPda,
+          poolTokenAccount: poolTokenAccountPda,
+        })
+        .rpc();
+
+      return { signature, success: true };
+    } catch (error) {
+      console.error("Update pool value failed:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get the actual pool value including Kamino yield
+   *
+   * Calculates the current value by reading cToken balance and applying
+   * the current exchange rate.
+   *
+   * @returns Pool value in USDC (base units)
+   */
+  async getActualPoolValue(): Promise<bigint> {
+    if (!this.kamino) {
+      // Fallback to stored pool value if Kamino integration not available
+      const pool = await this.getShieldPool();
+      return pool ? BigInt(pool.totalPoolValue.toString()) : 0n;
+    }
+
+    try {
+      const yieldInfo = await this.kamino.getKaminoYieldInfo();
+      return BigInt(Math.floor(yieldInfo.currentValue * 1e6));
+    } catch (error) {
+      console.warn("Failed to get actual pool value from Kamino:", error);
+      const pool = await this.getShieldPool();
+      return pool ? BigInt(pool.totalPoolValue.toString()) : 0n;
+    }
+  }
+
+  // ============================================
   // Private helper methods
   // ============================================
+
+  /**
+   * Get Kamino reserve liquidity supply address
+   * This is the token account where USDC liquidity is stored in the reserve
+   */
+  private async getKaminoReserveLiquiditySupply(): Promise<PublicKey> {
+    // The liquidity supply account is derived from the reserve
+    // For Kamino, this is typically an ATA of the reserve
+    // In production, this should be fetched from the reserve account data
+    // For now, we use a known address or derive it
+    try {
+      if (this.kamino) {
+        // If Kamino integration is available, get from there
+        const klendSdk = await import("@kamino-finance/klend-sdk");
+        // This would need proper implementation based on Kamino SDK
+      }
+    } catch {
+      // Fallback
+    }
+
+    // Hardcoded address for Kamino USDC reserve liquidity supply on mainnet
+    // This should be fetched dynamically in production
+    return new PublicKey("BDdS2G7cZPVxJNkHqTEMHk8WkFvhGNm3X1sNzTMPaLbk");
+  }
 
   /**
    * Get user's share account

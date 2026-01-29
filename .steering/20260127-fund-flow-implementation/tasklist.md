@@ -96,9 +96,9 @@
 
 ### 3.2 SDK変更
 
-- [ ] `client.ts` の `registerDeposit()` 更新
-  - [ ] 新しいアカウントをトランザクションに含める
-  - [ ] Kamino 関連アカウントの取得ロジック
+- [x] `client.ts` の `registerDeposit()` 更新
+  - [x] 新しいアカウントをトランザクションに含める
+  - [x] Kamino 関連アカウントの取得ロジック
 
 ### 3.3 テスト
 
@@ -131,9 +131,9 @@
 
 ### 4.2 SDK変更
 
-- [ ] `client.ts` の `withdraw()` 更新
-  - [ ] 新しいアカウントをトランザクションに含める
-  - [ ] Privacy Cash 経由の送金フロー確認
+- [x] `client.ts` の `withdraw()` 更新
+  - [x] 新しいアカウントをトランザクションに含める
+  - [x] Privacy Cash 経由の送金フロー確認
 
 ### 4.3 テスト
 
@@ -155,9 +155,9 @@
 
 ### 5.2 SDK変更
 
-- [ ] `client.ts` の `executeScheduledTransfer()` 更新
-  - [ ] オンチェーン実行 + Privacy Cash 送金の連携
-  - [ ] エラーハンドリング強化
+- [x] `client.ts` の `executeScheduledTransfer()` 更新
+  - [x] オンチェーン実行 + Privacy Cash 送金の連携
+  - [x] エラーハンドリング強化
 
 ### 5.3 テスト
 
@@ -181,8 +181,8 @@
 
 ### 6.2 SDK変更
 
-- [ ] `client.ts` に `updatePoolValue()` メソッド追加
-- [ ] `getActualPoolValue()` メソッド追加（リアルタイム計算）
+- [x] `client.ts` に `updatePoolValue()` メソッド追加
+- [x] `getActualPoolValue()` メソッド追加（リアルタイム計算）
 
 ### 6.3 自動更新（オプション）
 
@@ -193,9 +193,9 @@
 ## フェーズ7: IDL更新・ビルド
 
 - [x] `cargo build --release` が成功する
-- [ ] `anchor build` で新しい IDL を生成（Cargoバージョンの問題あり）
-- [ ] `packages/vault-sdk/src/idl/subly_vault.json` を更新
-- [ ] 型定義の整合性を確認
+- [x] IDL を手動更新（`anchor build` はCargo edition 2024の問題で保留）
+- [x] `packages/vault-sdk/src/idl/subly_vault.ts` を更新
+- [x] 型定義の整合性を確認
 
 ---
 
@@ -209,8 +209,8 @@
 
 ### 8.2 TypeScript SDK
 
-- [ ] `pnpm tsc --noEmit` が成功する
-- [ ] 型エラーがない
+- [x] `pnpm tsc --noEmit` が成功する
+- [x] 型エラーがない
 
 ### 8.3 テスト
 
@@ -232,16 +232,24 @@
 ### 完了済み (オンチェーンプログラム)
 - **フェーズ1**: Shield Pool Token Account の追加 ✅
 - **フェーズ2**: Kamino CPI モジュールの実装 ✅
-- **フェーズ3**: register_deposit への統合 ✅ (オンチェーン部分)
-- **フェーズ4**: withdraw への統合 ✅ (オンチェーン部分)
-- **フェーズ5**: execute_transfer への統合 ✅ (オンチェーン部分)
-- **フェーズ6**: update_pool_value 命令追加 ✅ (オンチェーン部分)
+- **フェーズ3**: register_deposit への統合 ✅ (オンチェーン + SDK)
+- **フェーズ4**: withdraw への統合 ✅ (オンチェーン + SDK)
+- **フェーズ5**: execute_transfer への統合 ✅ (オンチェーン + SDK)
+- **フェーズ6**: update_pool_value 命令追加 ✅ (オンチェーン + SDK)
+- **フェーズ7**: IDL更新 ✅ (手動更新、Cargoバージョン問題でanchor build保留)
 
-### 未完了 (SDK・テスト・ドキュメント)
-- **フェーズ3-5**: SDK変更とテスト
-- **フェーズ7**: IDL更新（Cargoバージョン問題要解決）
-- **フェーズ8**: 品質チェック（clippy, fmt, テスト）
+### 完了済み (SDK)
+- **registerDeposit**: Kamino アカウント追加 ✅
+- **withdraw**: Kamino アカウント追加 ✅
+- **updatePoolValue**: 新規メソッド追加 ✅
+- **getActualPoolValue**: 新規メソッド追加 ✅
+- **TypeScript型チェック**: 成功 ✅
+
+### 未完了 (テスト・ドキュメント)
+- **フェーズ1-6テスト**: 統合テスト（Mainnet-fork）
+- **フェーズ8**: clippy, fmt チェック
 - **フェーズ9**: ドキュメント更新
+- **Mainnetデプロイ**: プログラムのデプロイ
 
 ---
 

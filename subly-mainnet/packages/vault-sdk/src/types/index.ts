@@ -224,3 +224,25 @@ export const INTERVAL_SECONDS: Record<SetupRecurringPaymentParams["interval"], n
 export const PROGRAM_ID = new PublicKey("BRU5ubQjz7DjF6wWzs16SmEzPgfHTe6u8iYNpoMuAVPL");
 export const USDC_MINT_MAINNET = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 export const USDC_DECIMALS = 6;
+
+/**
+ * Kamino Lending constants (Mainnet)
+ */
+export const KAMINO_LENDING_PROGRAM_ID = new PublicKey("KLend2g3cP87ber41VSz2cHu5M3mxzQS7pzLFz1UJwp");
+export const KAMINO_MAIN_MARKET = new PublicKey("7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF");
+export const KAMINO_USDC_RESERVE = new PublicKey("d4A2prbA2whSmMHHaHmRNKRpvqH8UgFfGzTqZGKfJxB");
+export const KAMINO_CUSDC_MINT = new PublicKey("BNBUwNTkDEYgYfFg8sVB6S9gqTfzfj2uYPBYfRAJYr7u");
+
+/**
+ * PDA Seeds
+ */
+export const SHIELD_POOL_SEED = Buffer.from("shield_pool");
+export const USER_SHARE_SEED = Buffer.from("share");
+export const POOL_TOKEN_ACCOUNT_SEED = Buffer.from("pool_token");
+export const POOL_CTOKEN_ACCOUNT_SEED = Buffer.from("pool_ctoken");
+export const NOTE_COMMITMENT_REGISTRY_SEED = Buffer.from("note_commitment_registry");
+export const NULLIFIER_SEED = Buffer.from("nullifier");
+export const SCHEDULED_TRANSFER_SEED = Buffer.from("transfer");
+export const DEPOSIT_HISTORY_SEED = Buffer.from("deposit_history");
+export const TRANSFER_HISTORY_SEED = Buffer.from("history");
+export const BATCH_PROOF_SEED = Buffer.from("batch_proof");
