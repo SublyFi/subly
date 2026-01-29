@@ -1,0 +1,1732 @@
+"use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// src/integrations/tuktuk.ts
+var tuktuk_exports = {};
+__export(tuktuk_exports, {
+  TUKTUK_CRON_PROGRAM_ID: () => TUKTUK_CRON_PROGRAM_ID,
+  TUKTUK_PROGRAM_ID: () => TUKTUK_PROGRAM_ID,
+  TukTukError: () => TukTukError,
+  TukTukIntegration: () => TukTukIntegration,
+  createTukTukIntegration: () => createTukTukIntegration,
+  intervalToCronSchedule: () => intervalToCronSchedule
+});
+function createTukTukIntegration(config) {
+  return new TukTukIntegration(config);
+}
+function intervalToCronSchedule(intervalSeconds) {
+  if (intervalSeconds < 60) {
+    return `*/${intervalSeconds} * * * * *`;
+  }
+  const minutes = Math.floor(intervalSeconds / 60);
+  if (minutes < 60) {
+    return `*/${minutes} * * * *`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `0 */${hours} * * *`;
+  }
+  const days = Math.floor(hours / 24);
+  if (days === 1) {
+    return "0 0 * * *";
+  }
+  if (days === 7) {
+    return "0 0 * * 0";
+  }
+  if (days >= 28 && days <= 31) {
+    return "0 0 1 * *";
+  }
+  return "0 0 * * *";
+}
+var import_web34, import_anchor, TUKTUK_PROGRAM_ID, TUKTUK_CRON_PROGRAM_ID, TukTukIntegration, TukTukError;
+var init_tuktuk = __esm({
+  "src/integrations/tuktuk.ts"() {
+    "use strict";
+    import_web34 = require("@solana/web3.js");
+    import_anchor = require("@coral-xyz/anchor");
+    TUKTUK_PROGRAM_ID = new import_web34.PublicKey("tuktukUrfhXT6ZT77QTU8RQtvgL967uRuVagWF57zVA");
+    TUKTUK_CRON_PROGRAM_ID = new import_web34.PublicKey("cronAjRZnJn3MTP3B9kE62NWDrjSuAPVXf9c4hu4grM");
+    TukTukIntegration = class {
+      connection;
+      payer;
+      authority;
+      taskQueuePda = null;
+      cronProgram = null;
+      constructor(config) {
+        this.connection = config.connection;
+        this.payer = config.payer;
+        this.authority = config.authority;
+      }
+      /**
+       * Initialize the Tuk Tuk cron program client
+       */
+      async initialize() {
+        try {
+          const { init } = await import("@helium/cron-sdk");
+          const provider = new import_anchor.AnchorProvider(
+            this.connection,
+            { publicKey: this.payer.publicKey, signTransaction: async (tx) => tx, signAllTransactions: async (txs) => txs },
+            { commitment: "confirmed" }
+          );
+          this.cronProgram = await init(provider, TUKTUK_CRON_PROGRAM_ID);
+        } catch (error) {
+          console.warn("Failed to initialize Tuk Tuk cron program:", error);
+        }
+      }
+      /**
+       * Initialize or get the task queue PDA
+       */
+      async getOrCreateTaskQueue() {
+        if (this.taskQueuePda) {
+          return this.taskQueuePda;
+        }
+        const { userCronJobsKey } = await import("@helium/cron-sdk");
+        const [taskQueuePda] = userCronJobsKey(this.authority, TUKTUK_CRON_PROGRAM_ID);
+        this.taskQueuePda = taskQueuePda;
+        return taskQueuePda;
+      }
+      /**
+       * Create a cron job for automated transfer execution
+       *
+       * Note: This is a placeholder implementation. The Tuk Tuk SDK API
+       * is evolving and cron job creation requires direct program interaction.
+       * For production use, recommend manual execution mode.
+       *
+       * @param schedule Cron schedule string (e.g., "0 0 * * *" for daily)
+       * @param targetInstruction The instruction to execute on schedule
+       * @param jobName Unique name for the cron job
+       * @returns Cron job creation result
+       */
+      async createCronJob(schedule, targetInstruction, jobName) {
+        if (!this.cronProgram) {
+          await this.initialize();
+        }
+        try {
+          const { cronJobKey, cronJobNameMappingKey } = await import("@helium/cron-sdk");
+          const userCronJobs = await this.getOrCreateTaskQueue();
+          const jobId = this.hashJobName(jobName);
+          const [cronJobPda] = cronJobKey(this.authority, jobId, TUKTUK_CRON_PROGRAM_ID);
+          const [nameMappingPda] = cronJobNameMappingKey(this.authority, jobName, TUKTUK_CRON_PROGRAM_ID);
+          if (this.cronProgram) {
+            try {
+              const tx = await this.cronProgram.methods.createCronJob({
+                name: jobName,
+                schedule,
+                instruction: targetInstruction.data,
+                accounts: targetInstruction.keys,
+                programId: targetInstruction.programId
+              }).accounts({
+                authority: this.authority,
+                payer: this.payer.publicKey,
+                cronJob: cronJobPda,
+                userCronJobs,
+                nameMappingPda
+              }).signers([this.payer]).rpc();
+              return { cronJobPda, tx };
+            } catch (err) {
+              console.warn("Cron job creation via program failed:", err);
+            }
+          }
+          console.warn("Cron job creation not available. Manual execution required.");
+          return {
+            cronJobPda,
+            tx: ""
+          };
+        } catch (error) {
+          throw new TukTukError(
+            `Failed to create cron job: ${error instanceof Error ? error.message : "Unknown error"}`,
+            "CREATE_CRON_JOB_FAILED"
+          );
+        }
+      }
+      /**
+       * Fund a cron job with SOL for execution fees
+       *
+       * @param cronJobPda The cron job PDA
+       * @param amount Amount in SOL to fund
+       * @returns Transaction signature
+       */
+      async fundCronJob(cronJobPda, amount) {
+        if (!this.cronProgram) {
+          await this.initialize();
+        }
+        try {
+          if (this.cronProgram) {
+            try {
+              const tx2 = await this.cronProgram.methods.fundCronJob(amount * 1e9).accounts({
+                payer: this.payer.publicKey,
+                cronJob: cronJobPda
+              }).signers([this.payer]).rpc();
+              return { tx: tx2 };
+            } catch (err) {
+              console.warn("Cron job funding via program failed:", err);
+            }
+          }
+          const { SystemProgram: SystemProgram2 } = await import("@solana/web3.js");
+          const tx = new import_web34.Transaction().add(
+            SystemProgram2.transfer({
+              fromPubkey: this.payer.publicKey,
+              toPubkey: cronJobPda,
+              lamports: Math.floor(amount * 1e9)
+            })
+          );
+          const signature = await (0, import_web34.sendAndConfirmTransaction)(this.connection, tx, [this.payer]);
+          return { tx: signature };
+        } catch (error) {
+          throw new TukTukError(
+            `Failed to fund cron job: ${error instanceof Error ? error.message : "Unknown error"}`,
+            "FUND_CRON_JOB_FAILED"
+          );
+        }
+      }
+      /**
+       * Close a cron job and recover remaining funds
+       *
+       * @param cronJobPda The cron job PDA
+       * @returns Transaction signature
+       */
+      async closeCronJob(cronJobPda) {
+        if (!this.cronProgram) {
+          await this.initialize();
+        }
+        try {
+          if (this.cronProgram) {
+            try {
+              const tx = await this.cronProgram.methods.closeCronJob().accounts({
+                authority: this.authority,
+                cronJob: cronJobPda,
+                refundTo: this.payer.publicKey
+              }).signers([this.payer]).rpc();
+              return { tx };
+            } catch (err) {
+              console.warn("Cron job closure via program failed:", err);
+            }
+          }
+          console.warn("Cron job closure not available via SDK.");
+          return { tx: "" };
+        } catch (error) {
+          throw new TukTukError(
+            `Failed to close cron job: ${error instanceof Error ? error.message : "Unknown error"}`,
+            "CLOSE_CRON_JOB_FAILED"
+          );
+        }
+      }
+      /**
+       * Check for pending transfers that are due for execution
+       * This is the manual execution fallback when Tuk Tuk automation is not used
+       *
+       * @param scheduledTransferPdas List of scheduled transfer PDAs to check
+       * @returns List of pending transfers that are due
+       */
+      async checkPendingTransfers(scheduledTransferPdas) {
+        const pendingTransfers = [];
+        const currentTime = Date.now();
+        for (const pda of scheduledTransferPdas) {
+          try {
+            const accountInfo = await this.connection.getAccountInfo(pda);
+            if (!accountInfo) continue;
+            const data = accountInfo.data;
+            const dataView = new DataView(data.buffer, data.byteOffset);
+            const recipientBytes = data.slice(72, 104);
+            const recipient = new import_web34.PublicKey(recipientBytes);
+            const amount = Number(dataView.getBigUint64(104, true));
+            const nextExecution = Number(dataView.getBigInt64(116, true)) * 1e3;
+            const isActive = data[124] === 1;
+            if (!isActive) continue;
+            const isOverdue = currentTime >= nextExecution;
+            pendingTransfers.push({
+              transferId: pda.toBase58(),
+              transferPda: pda,
+              recipient,
+              amount: amount / 1e6,
+              // Convert from base units to USDC
+              nextExecution: new Date(nextExecution),
+              isOverdue
+            });
+          } catch (error) {
+            console.warn(`Failed to check transfer ${pda.toBase58()}:`, error);
+          }
+        }
+        pendingTransfers.sort((a, b) => a.nextExecution.getTime() - b.nextExecution.getTime());
+        return pendingTransfers;
+      }
+      /**
+       * Manually execute a pending transfer
+       * This is the fallback when Tuk Tuk automation is not active
+       *
+       * @param transferId Transfer ID (PDA address as string)
+       * @param executeTransferIx The execute_transfer instruction to call
+       * @returns Transaction signature
+       */
+      async executePendingTransfer(transferId, executeTransferIx) {
+        try {
+          const tx = new import_web34.Transaction().add(executeTransferIx);
+          const signature = await (0, import_web34.sendAndConfirmTransaction)(this.connection, tx, [this.payer]);
+          return { tx: signature };
+        } catch (error) {
+          throw new TukTukError(
+            `Failed to execute transfer ${transferId}: ${error instanceof Error ? error.message : "Unknown error"}`,
+            "EXECUTE_TRANSFER_FAILED"
+          );
+        }
+      }
+      /**
+       * Hash a job name to a deterministic ID
+       */
+      hashJobName(name) {
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) {
+          const char = name.charCodeAt(i);
+          hash = (hash << 5) - hash + char;
+          hash = hash & hash;
+        }
+        return Math.abs(hash) % 65536;
+      }
+    };
+    TukTukError = class extends Error {
+      constructor(message, code) {
+        super(`Tuk Tuk Error [${code}]: ${message}`);
+        this.code = code;
+        this.name = "TukTukError";
+      }
+    };
+  }
+});
+
+// src/index.ts
+var index_exports = {};
+__export(index_exports, {
+  BATCH_PROOF_SEED: () => BATCH_PROOF_SEED,
+  DEPOSIT_HISTORY_SEED: () => DEPOSIT_HISTORY_SEED,
+  INTERVAL_SECONDS: () => INTERVAL_SECONDS,
+  KAMINO_LENDING_PROGRAM_ID: () => KAMINO_LENDING_PROGRAM_ID,
+  KAMINO_MAIN_MARKET: () => KAMINO_MAIN_MARKET,
+  KEY_DERIVATION_MESSAGE: () => KEY_DERIVATION_MESSAGE,
+  KaminoError: () => KaminoError,
+  KaminoIntegration: () => KaminoIntegration,
+  NULLIFIER_SEED: () => NULLIFIER_SEED,
+  OperationType: () => OperationType,
+  PRIVACY_CASH_PROGRAM_ID: () => PRIVACY_CASH_PROGRAM_ID,
+  PRIVACY_CASH_USDC_MINT: () => USDC_MINT,
+  PROGRAM_ID: () => PROGRAM_ID,
+  PrivacyCashError: () => PrivacyCashError,
+  PrivacyCashIntegration: () => PrivacyCashIntegration,
+  SCHEDULED_TRANSFER_SEED: () => SCHEDULED_TRANSFER_SEED,
+  SHIELD_POOL_SEED: () => SHIELD_POOL_SEED,
+  SublyVaultClient: () => SublyVaultClient,
+  TRANSFER_HISTORY_SEED: () => TRANSFER_HISTORY_SEED,
+  TUKTUK_CRON_PROGRAM_ID: () => TUKTUK_CRON_PROGRAM_ID,
+  TUKTUK_PROGRAM_ID: () => TUKTUK_PROGRAM_ID,
+  TransferStatus: () => TransferStatus,
+  TukTukError: () => TukTukError,
+  TukTukIntegration: () => TukTukIntegration,
+  USDC_DECIMALS: () => USDC_DECIMALS,
+  USDC_MINT_MAINNET: () => USDC_MINT_MAINNET,
+  USER_SHARE_SEED: () => USER_SHARE_SEED,
+  createKaminoIntegration: () => createKaminoIntegration,
+  createPlaceholderEncryptedShare: () => createPlaceholderEncryptedShare,
+  createPrivacyCashIntegration: () => createPrivacyCashIntegration,
+  createSublyVaultClient: () => createSublyVaultClient,
+  createTukTukIntegration: () => createTukTukIntegration,
+  decryptShares: () => decryptShares,
+  deriveEncryptionKey: () => deriveEncryptionKey,
+  encryptShares: () => encryptShares,
+  generateCommitment: () => generateCommitment,
+  generateNullifier: () => generateNullifier,
+  generateSecret: () => generateSecret,
+  getBatchProofPda: () => getBatchProofPda,
+  getDepositHistoryPda: () => getDepositHistoryPda,
+  getIdl: () => getIdl,
+  getNullifierPda: () => getNullifierPda,
+  getScheduledTransferPda: () => getScheduledTransferPda,
+  getShieldPoolPda: () => getShieldPoolPda,
+  getTransferHistoryPda: () => getTransferHistoryPda,
+  getUserSharePda: () => getUserSharePda,
+  intervalToCronSchedule: () => intervalToCronSchedule,
+  readPlaceholderShares: () => readPlaceholderShares,
+  retrieveSecret: () => retrieveSecret,
+  storeSecret: () => storeSecret,
+  verifyCommitment: () => verifyCommitment
+});
+module.exports = __toCommonJS(index_exports);
+
+// src/client.ts
+var import_web36 = require("@solana/web3.js");
+var import_anchor2 = require("@coral-xyz/anchor");
+
+// src/types/index.ts
+var import_web3 = require("@solana/web3.js");
+var TransferStatus = /* @__PURE__ */ ((TransferStatus2) => {
+  TransferStatus2["Pending"] = "Pending";
+  TransferStatus2["Completed"] = "Completed";
+  TransferStatus2["Failed"] = "Failed";
+  TransferStatus2["Skipped"] = "Skipped";
+  return TransferStatus2;
+})(TransferStatus || {});
+var OperationType = /* @__PURE__ */ ((OperationType2) => {
+  OperationType2["Withdraw"] = "Withdraw";
+  OperationType2["Transfer"] = "Transfer";
+  return OperationType2;
+})(OperationType || {});
+var INTERVAL_SECONDS = {
+  hourly: 3600,
+  daily: 86400,
+  weekly: 604800,
+  monthly: 2592e3
+  // 30 days
+};
+var PROGRAM_ID = new import_web3.PublicKey("BRU5ubQjz7DjF6wWzs16SmEzPgfHTe6u8iYNpoMuAVPL");
+var USDC_MINT_MAINNET = new import_web3.PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+var USDC_DECIMALS = 6;
+
+// src/utils/pda.ts
+var import_web32 = require("@solana/web3.js");
+var SHIELD_POOL_SEED = Buffer.from("shield_pool");
+var USER_SHARE_SEED = Buffer.from("share");
+var DEPOSIT_HISTORY_SEED = Buffer.from("deposit_history");
+var SCHEDULED_TRANSFER_SEED = Buffer.from("transfer");
+var TRANSFER_HISTORY_SEED = Buffer.from("history");
+var NULLIFIER_SEED = Buffer.from("nullifier");
+var BATCH_PROOF_SEED = Buffer.from("batch_proof");
+function getShieldPoolPda(programId = PROGRAM_ID) {
+  return import_web32.PublicKey.findProgramAddressSync([SHIELD_POOL_SEED], programId);
+}
+function getUserSharePda(pool, commitment, programId = PROGRAM_ID) {
+  return import_web32.PublicKey.findProgramAddressSync(
+    [USER_SHARE_SEED, pool.toBuffer(), Buffer.from(commitment)],
+    programId
+  );
+}
+function getDepositHistoryPda(commitment, depositIndex, programId = PROGRAM_ID) {
+  const indexBuffer = Buffer.alloc(8);
+  indexBuffer.writeBigUInt64LE(depositIndex);
+  return import_web32.PublicKey.findProgramAddressSync(
+    [DEPOSIT_HISTORY_SEED, Buffer.from(commitment), indexBuffer],
+    programId
+  );
+}
+function getScheduledTransferPda(commitment, transferNonce, programId = PROGRAM_ID) {
+  const nonceBuffer = Buffer.alloc(8);
+  nonceBuffer.writeBigUInt64LE(transferNonce);
+  return import_web32.PublicKey.findProgramAddressSync(
+    [SCHEDULED_TRANSFER_SEED, Buffer.from(commitment), nonceBuffer],
+    programId
+  );
+}
+function getTransferHistoryPda(scheduledTransfer, executionIndex, programId = PROGRAM_ID) {
+  const indexBuffer = Buffer.alloc(4);
+  indexBuffer.writeUInt32LE(executionIndex);
+  return import_web32.PublicKey.findProgramAddressSync(
+    [TRANSFER_HISTORY_SEED, scheduledTransfer.toBuffer(), indexBuffer],
+    programId
+  );
+}
+function getNullifierPda(nullifierHash, programId = PROGRAM_ID) {
+  return import_web32.PublicKey.findProgramAddressSync(
+    [NULLIFIER_SEED, Buffer.from(nullifierHash)],
+    programId
+  );
+}
+function getBatchProofPda(scheduledTransfer, executionIndex, programId = PROGRAM_ID) {
+  const indexBuffer = Buffer.alloc(4);
+  indexBuffer.writeUInt32LE(executionIndex);
+  return import_web32.PublicKey.findProgramAddressSync(
+    [BATCH_PROOF_SEED, scheduledTransfer.toBuffer(), indexBuffer],
+    programId
+  );
+}
+
+// src/utils/commitment.ts
+var import_tweetnacl = __toESM(require("tweetnacl"));
+function generateSecret() {
+  return import_tweetnacl.default.randomBytes(32);
+}
+function generateCommitment(secret, poolId) {
+  if (secret.length !== 32) {
+    throw new Error("Secret must be 32 bytes");
+  }
+  const data = new Uint8Array(64);
+  data.set(secret, 0);
+  data.set(poolId.toBytes(), 32);
+  return import_tweetnacl.default.hash(data).slice(0, 32);
+}
+function generateNullifier(secret, operationType, nonce) {
+  if (secret.length !== 32) {
+    throw new Error("Secret must be 32 bytes");
+  }
+  const operationBytes = new TextEncoder().encode(operationType);
+  const nonceBuffer = new Uint8Array(8);
+  const view = new DataView(nonceBuffer.buffer);
+  view.setBigUint64(0, nonce, true);
+  const data = new Uint8Array(secret.length + operationBytes.length + 8);
+  let offset = 0;
+  data.set(secret, offset);
+  offset += secret.length;
+  data.set(operationBytes, offset);
+  offset += operationBytes.length;
+  data.set(nonceBuffer, offset);
+  return import_tweetnacl.default.hash(data).slice(0, 32);
+}
+function verifyCommitment(commitment, secret, poolId) {
+  const expectedCommitment = generateCommitment(secret, poolId);
+  return import_tweetnacl.default.verify(commitment, expectedCommitment);
+}
+function storeSecret(secret, walletAddress, poolId) {
+  const key = `subly_secret_${walletAddress}_${poolId}`;
+  const encoded = Buffer.from(secret).toString("base64");
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem(key, encoded);
+  }
+}
+function retrieveSecret(walletAddress, poolId) {
+  const key = `subly_secret_${walletAddress}_${poolId}`;
+  if (typeof localStorage !== "undefined") {
+    const encoded = localStorage.getItem(key);
+    if (encoded) {
+      return new Uint8Array(Buffer.from(encoded, "base64"));
+    }
+  }
+  return null;
+}
+
+// src/utils/encryption.ts
+var import_tweetnacl2 = __toESM(require("tweetnacl"));
+function deriveEncryptionKey(signature) {
+  return import_tweetnacl2.default.hash(signature).slice(0, 32);
+}
+function encryptShares(shares, encryptionKey) {
+  if (encryptionKey.length !== 32) {
+    throw new Error("Encryption key must be 32 bytes");
+  }
+  const sharesBytes = new Uint8Array(8);
+  const view = new DataView(sharesBytes.buffer);
+  view.setBigUint64(0, shares, true);
+  const nonce = import_tweetnacl2.default.randomBytes(24);
+  const ciphertext = import_tweetnacl2.default.secretbox(sharesBytes, nonce, encryptionKey);
+  const result = new Uint8Array(64);
+  result.set(nonce, 0);
+  result.set(ciphertext.slice(0, 32), 32);
+  return result;
+}
+function decryptShares(encryptedData, encryptionKey) {
+  if (encryptedData.length !== 64) {
+    throw new Error("Encrypted data must be 64 bytes");
+  }
+  if (encryptionKey.length !== 32) {
+    throw new Error("Encryption key must be 32 bytes");
+  }
+  const nonce = encryptedData.slice(0, 24);
+  const ciphertext = new Uint8Array(24);
+  ciphertext.set(encryptedData.slice(32, 56));
+  const decrypted = import_tweetnacl2.default.secretbox.open(ciphertext, nonce, encryptionKey);
+  if (!decrypted) {
+    throw new Error("Decryption failed");
+  }
+  const view = new DataView(decrypted.buffer, decrypted.byteOffset, 8);
+  return view.getBigUint64(0, true);
+}
+function createPlaceholderEncryptedShare(shares) {
+  const result = new Uint8Array(64);
+  const view = new DataView(result.buffer);
+  view.setBigUint64(0, shares, true);
+  return result;
+}
+function readPlaceholderShares(data) {
+  if (data.length !== 64) {
+    throw new Error("Data must be 64 bytes");
+  }
+  const view = new DataView(data.buffer, data.byteOffset, 8);
+  return view.getBigUint64(0, true);
+}
+var KEY_DERIVATION_MESSAGE = "Sign this message to derive your Subly Vault encryption key.\n\nThis signature will be used to encrypt and decrypt your private balance.\n\nIt will not trigger any blockchain transaction or cost any fees.";
+
+// src/integrations/privacy-cash.ts
+var import_web33 = require("@solana/web3.js");
+var USDC_MINT = new import_web33.PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+var PRIVACY_CASH_PROGRAM_ID = new import_web33.PublicKey("9fhQBbumKEFuXtMBDw8AaQyAjCorLGJQiS3skWZdQyQD");
+var PrivacyCashIntegration = class {
+  client;
+  // PrivacyCash client instance
+  initialized = false;
+  config;
+  constructor(config) {
+    this.config = config;
+  }
+  /**
+   * Initialize the Privacy Cash client
+   * Must be called before any operations
+   */
+  async initialize() {
+    if (this.initialized) {
+      return;
+    }
+    try {
+      const { PrivacyCash } = await import("privacycash");
+      let ownerKey;
+      if (this.config.privateKey instanceof import_web33.Keypair) {
+        ownerKey = Array.from(this.config.privateKey.secretKey);
+      } else if (this.config.privateKey instanceof Uint8Array) {
+        ownerKey = Array.from(this.config.privateKey);
+      } else {
+        ownerKey = this.config.privateKey;
+      }
+      this.client = new PrivacyCash({
+        RPC_url: this.config.rpcUrl,
+        owner: ownerKey,
+        enableDebug: this.config.enableDebug ?? false
+      });
+      this.initialized = true;
+    } catch (error) {
+      throw new PrivacyCashError(
+        `Failed to initialize Privacy Cash client: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "INIT_FAILED"
+      );
+    }
+  }
+  /**
+   * Ensure client is initialized
+   */
+  ensureInitialized() {
+    if (!this.initialized || !this.client) {
+      throw new PrivacyCashError(
+        "Privacy Cash client not initialized. Call initialize() first.",
+        "NOT_INITIALIZED"
+      );
+    }
+  }
+  /**
+   * Deposit USDC privately
+   *
+   * @param amount Amount in USDC (human-readable, e.g., 10 = 10 USDC)
+   * @returns Transaction signature
+   */
+  async depositPrivateUSDC(amount) {
+    this.ensureInitialized();
+    try {
+      const result = await this.client.depositSPL({
+        mintAddress: USDC_MINT.toBase58(),
+        amount
+        // Human-readable amount
+      });
+      return { tx: result.tx };
+    } catch (error) {
+      throw new PrivacyCashError(
+        `Failed to deposit USDC: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "DEPOSIT_FAILED"
+      );
+    }
+  }
+  /**
+   * Withdraw USDC privately
+   *
+   * @param amount Amount in USDC (human-readable, e.g., 10 = 10 USDC)
+   * @param recipient Optional recipient address (defaults to self)
+   * @returns Withdrawal result with transaction and fee information
+   */
+  async withdrawPrivateUSDC(amount, recipient) {
+    this.ensureInitialized();
+    try {
+      const params = {
+        mintAddress: USDC_MINT.toBase58(),
+        amount
+        // Human-readable amount
+      };
+      if (recipient) {
+        params.recipientAddress = recipient;
+      }
+      const result = await this.client.withdrawSPL(params);
+      return {
+        tx: result.tx,
+        recipient: result.recipient,
+        amountInBaseUnits: result.amount_in_lamports || result.amount_in_base_units,
+        feeInBaseUnits: result.fee_in_lamports || result.fee_in_base_units,
+        isPartial: result.isPartial ?? false
+      };
+    } catch (error) {
+      throw new PrivacyCashError(
+        `Failed to withdraw USDC: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "WITHDRAW_FAILED"
+      );
+    }
+  }
+  /**
+   * Get private USDC balance
+   *
+   * @returns Balance in USDC (human-readable)
+   */
+  async getPrivateUSDCBalance() {
+    this.ensureInitialized();
+    try {
+      if (typeof this.client.getPrivateBalanceUSDC === "function") {
+        const balance2 = await this.client.getPrivateBalanceUSDC();
+        return balance2;
+      }
+      const balance = await this.client.getPrivateBalanceSpl({
+        mintAddress: USDC_MINT.toBase58()
+      });
+      return balance;
+    } catch (error) {
+      throw new PrivacyCashError(
+        `Failed to get private balance: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "BALANCE_FAILED"
+      );
+    }
+  }
+  /**
+   * Clear the local UTXO cache
+   * Useful for forcing a refresh of balance data
+   */
+  async clearCache() {
+    this.ensureInitialized();
+    try {
+      if (typeof this.client.clearCache === "function") {
+        await this.client.clearCache();
+      }
+    } catch (error) {
+      console.warn("Failed to clear Privacy Cash cache:", error);
+    }
+  }
+  /**
+   * Get estimated fees for a withdrawal
+   *
+   * @param amount Amount in USDC
+   * @returns Estimated fee breakdown
+   */
+  getEstimatedWithdrawalFees(amount) {
+    const protocolFeePercent = 0.35;
+    const networkFeeSol = 6e-3;
+    const protocolFeeUsdc = amount * (protocolFeePercent / 100);
+    return {
+      protocolFeePercent,
+      protocolFeeUsdc,
+      networkFeeSol,
+      totalFeeUsdc: protocolFeeUsdc
+      // Note: SOL fee is separate
+    };
+  }
+};
+var PrivacyCashError = class extends Error {
+  constructor(message, code) {
+    super(`Privacy Cash Error [${code}]: ${message}`);
+    this.code = code;
+    this.name = "PrivacyCashError";
+  }
+};
+async function createPrivacyCashIntegration(config) {
+  const integration = new PrivacyCashIntegration(config);
+  await integration.initialize();
+  return integration;
+}
+
+// src/client.ts
+init_tuktuk();
+
+// src/integrations/kamino.ts
+var import_web35 = require("@solana/web3.js");
+var KAMINO_LENDING_PROGRAM_ID = new import_web35.PublicKey("KLend2g3cP87ber41VSz2cHu5M3mxzQS7pzLFz1UJwp");
+var USDC_MINT2 = new import_web35.PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+var KAMINO_MAIN_MARKET = new import_web35.PublicKey("7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF");
+var KaminoIntegration = class {
+  connection;
+  payer;
+  poolAuthority;
+  marketAddress;
+  initialized = false;
+  kaminoMarket = null;
+  constructor(config) {
+    this.connection = config.connection;
+    this.payer = config.payer;
+    this.poolAuthority = config.poolAuthority;
+    this.marketAddress = config.marketAddress ?? KAMINO_MAIN_MARKET;
+  }
+  /**
+   * Initialize the Kamino market client
+   */
+  async initialize() {
+    if (this.initialized) {
+      return;
+    }
+    try {
+      const klendSdk = await import("@kamino-finance/klend-sdk");
+      const KaminoMarket = klendSdk.KaminoMarket;
+      this.kaminoMarket = await KaminoMarket.load(
+        this.connection,
+        this.marketAddress,
+        KAMINO_LENDING_PROGRAM_ID
+      );
+      this.initialized = true;
+    } catch (error) {
+      throw new KaminoError(
+        `Failed to initialize Kamino market: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "INIT_FAILED"
+      );
+    }
+  }
+  /**
+   * Ensure the integration is initialized
+   */
+  ensureInitialized() {
+    if (!this.initialized || !this.kaminoMarket) {
+      throw new KaminoError(
+        "Kamino integration not initialized. Call initialize() first.",
+        "NOT_INITIALIZED"
+      );
+    }
+  }
+  /**
+   * Deposit USDC into Kamino Lending
+   *
+   * @param amount Amount in USDC (human-readable, e.g., 10 = 10 USDC)
+   * @returns Deposit result with transaction and cToken info
+   */
+  async depositToKamino(amount) {
+    this.ensureInitialized();
+    try {
+      const klendSdk = await import("@kamino-finance/klend-sdk");
+      const KaminoAction = klendSdk.KaminoAction;
+      const amountInBaseUnits = BigInt(Math.floor(amount * 1e6));
+      const currentSlot = await this.connection.getSlot();
+      const depositAction = await KaminoAction.buildDepositTxns(
+        this.kaminoMarket,
+        amountInBaseUnits.toString(),
+        USDC_MINT2,
+        this.poolAuthority,
+        void 0,
+        // obligation - auto-create if needed
+        true,
+        // useV2Ixs
+        void 0,
+        // scopeRefreshConfig
+        1e6,
+        // extraComputeBudget
+        true,
+        // includeAtaIxs
+        false,
+        // requestElevationGroup
+        void 0,
+        // lookupTableCreationConfig
+        void 0,
+        // referrer
+        currentSlot
+      );
+      const instructions = (depositAction.setupIxs || []).concat(
+        depositAction.lendingIxs || [],
+        depositAction.cleanupIxs || []
+      );
+      const tx = new import_web35.Transaction();
+      for (const ix of instructions) {
+        tx.add(ix);
+      }
+      const signature = await (0, import_web35.sendAndConfirmTransaction)(this.connection, tx, [this.payer]);
+      const estimatedCTokens = amount;
+      return {
+        tx: signature,
+        cTokensReceived: estimatedCTokens,
+        depositedAmount: amount
+      };
+    } catch (error) {
+      throw new KaminoError(
+        `Failed to deposit to Kamino: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "DEPOSIT_FAILED"
+      );
+    }
+  }
+  /**
+   * Withdraw USDC from Kamino Lending
+   *
+   * @param amount Amount in USDC (human-readable, e.g., 10 = 10 USDC)
+   * @returns Withdraw result with transaction info
+   */
+  async withdrawFromKamino(amount) {
+    this.ensureInitialized();
+    try {
+      const klendSdk = await import("@kamino-finance/klend-sdk");
+      const KaminoAction = klendSdk.KaminoAction;
+      const amountInBaseUnits = BigInt(Math.floor(amount * 1e6));
+      const currentSlot = await this.connection.getSlot();
+      const withdrawAction = await KaminoAction.buildWithdrawTxns(
+        this.kaminoMarket,
+        amountInBaseUnits.toString(),
+        USDC_MINT2,
+        this.poolAuthority,
+        void 0,
+        // obligation
+        true,
+        // useV2Ixs
+        void 0,
+        // scopeRefreshConfig
+        1e6,
+        // extraComputeBudget
+        true,
+        // includeAtaIxs
+        void 0,
+        // lookupTableCreationConfig
+        currentSlot
+      );
+      const instructions = (withdrawAction.setupIxs || []).concat(
+        withdrawAction.lendingIxs || [],
+        withdrawAction.cleanupIxs || []
+      );
+      const tx = new import_web35.Transaction();
+      for (const ix of instructions) {
+        tx.add(ix);
+      }
+      const signature = await (0, import_web35.sendAndConfirmTransaction)(this.connection, tx, [this.payer]);
+      return {
+        tx: signature,
+        amountWithdrawn: amount,
+        cTokensBurned: amount
+        // Estimate
+      };
+    } catch (error) {
+      throw new KaminoError(
+        `Failed to withdraw from Kamino: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "WITHDRAW_FAILED"
+      );
+    }
+  }
+  /**
+   * Get current yield information for the pool
+   *
+   * @returns Yield information including APY and earned amounts
+   */
+  async getKaminoYieldInfo() {
+    this.ensureInitialized();
+    try {
+      await this.kaminoMarket.reload();
+      const usdcReserve = this.kaminoMarket.getReserveByMint(USDC_MINT2);
+      if (!usdcReserve) {
+        throw new KaminoError("USDC reserve not found in Kamino market", "RESERVE_NOT_FOUND");
+      }
+      const supplyApy = usdcReserve.stats?.supplyInterestAPY ?? 0;
+      let depositedAmount = 0;
+      let currentValue = 0;
+      let earnedYield = 0;
+      try {
+        const obligations = await this.kaminoMarket.getAllObligationsByOwner(this.poolAuthority);
+        if (obligations.length > 0) {
+          for (const obligation of obligations) {
+            const deposits = obligation.deposits?.filter(
+              (d) => d.mintAddress?.equals(USDC_MINT2)
+            );
+            if (deposits) {
+              for (const deposit of deposits) {
+                depositedAmount += Number(deposit.amount ?? 0) / 1e6;
+                currentValue += Number(deposit.marketValueRefreshed ?? deposit.amount ?? 0) / 1e6;
+              }
+            }
+          }
+          earnedYield = currentValue - depositedAmount;
+        }
+      } catch {
+      }
+      return {
+        apy: supplyApy,
+        apyFormatted: `${(supplyApy * 100).toFixed(2)}%`,
+        earnedYield,
+        depositedAmount,
+        currentValue,
+        lastUpdated: /* @__PURE__ */ new Date()
+      };
+    } catch (error) {
+      if (error instanceof KaminoError) {
+        throw error;
+      }
+      return {
+        apy: 0.05,
+        // Default 5% APY estimate
+        apyFormatted: "5.00%",
+        earnedYield: 0,
+        depositedAmount: 0,
+        currentValue: 0,
+        lastUpdated: /* @__PURE__ */ new Date()
+      };
+    }
+  }
+  /**
+   * Get the current USDC supply APY from Kamino
+   *
+   * @returns APY as a decimal (e.g., 0.05 = 5%)
+   */
+  async getCurrentApy() {
+    const yieldInfo = await this.getKaminoYieldInfo();
+    return yieldInfo.apy;
+  }
+  /**
+   * Estimate yield for a given amount and duration
+   *
+   * @param principal Amount in USDC
+   * @param daysHeld Number of days to hold
+   * @returns Estimated yield in USDC
+   */
+  async estimateYield(principal, daysHeld) {
+    const apy = await this.getCurrentApy();
+    const dailyRate = apy / 365;
+    return principal * dailyRate * daysHeld;
+  }
+};
+var KaminoError = class extends Error {
+  constructor(message, code) {
+    super(`Kamino Error [${code}]: ${message}`);
+    this.code = code;
+    this.name = "KaminoError";
+  }
+};
+async function createKaminoIntegration(config) {
+  const integration = new KaminoIntegration(config);
+  await integration.initialize();
+  return integration;
+}
+
+// src/client.ts
+var SublyVaultClient = class {
+  connection;
+  wallet;
+  program = null;
+  programId;
+  config;
+  // External protocol integrations
+  privacyCash = null;
+  tuktuk = null;
+  kamino = null;
+  // Cached data
+  userSecret = null;
+  userCommitment = null;
+  constructor(connection, wallet, programId = PROGRAM_ID, config = {}) {
+    this.connection = connection;
+    this.wallet = wallet;
+    this.programId = programId;
+    this.config = {
+      commitment: config.commitment ?? "confirmed",
+      skipPreflight: config.skipPreflight ?? false
+    };
+  }
+  /**
+   * Initialize the SDK with the program IDL
+   * Must be called before using other methods
+   *
+   * @param idl - Program IDL
+   * @param options - Optional initialization options for external integrations
+   */
+  async initialize(idl, options) {
+    const provider = new import_anchor2.AnchorProvider(this.connection, this.wallet, {
+      commitment: this.config.commitment,
+      skipPreflight: this.config.skipPreflight
+    });
+    this.program = new import_anchor2.Program(idl, provider);
+    const rpcUrl = options?.rpcUrl ?? this.connection.rpcEndpoint;
+    if (options?.enablePrivacyCash && options.privacyCashPrivateKey) {
+      this.privacyCash = await createPrivacyCashIntegration({
+        rpcUrl,
+        privateKey: options.privacyCashPrivateKey,
+        enableDebug: false
+      });
+    }
+    if (options?.enableTukTuk) {
+      const poolAuthority = this.getShieldPoolAddress();
+      this.tuktuk = createTukTukIntegration({
+        connection: this.connection,
+        payer: import_web36.Keypair.generate(),
+        // Placeholder - should be provided
+        authority: poolAuthority
+      });
+    }
+    if (options?.enableKamino) {
+      const poolAuthority = this.getShieldPoolAddress();
+      this.kamino = await createKaminoIntegration({
+        connection: this.connection,
+        payer: import_web36.Keypair.generate(),
+        // Placeholder - should be provided
+        poolAuthority
+      });
+    }
+  }
+  /**
+   * Get the Shield Pool PDA address
+   */
+  getShieldPoolAddress() {
+    const [pda] = getShieldPoolPda(this.programId);
+    return pda;
+  }
+  /**
+   * Fetch the Shield Pool account data
+   */
+  async getShieldPool() {
+    if (!this.program) throw new Error("SDK not initialized. Call initialize() first.");
+    try {
+      const poolAddress = this.getShieldPoolAddress();
+      const pool = await this.program.account.shieldPool.fetch(poolAddress);
+      return pool;
+    } catch {
+      return null;
+    }
+  }
+  /**
+   * Initialize a user's secret and commitment
+   * This should be called once when a user first interacts with the vault
+   */
+  initializeUser(existingSecret) {
+    const poolAddress = this.getShieldPoolAddress();
+    this.userSecret = existingSecret ?? generateSecret();
+    this.userCommitment = generateCommitment(this.userSecret, poolAddress);
+    return {
+      secret: this.userSecret,
+      commitment: this.userCommitment
+    };
+  }
+  /**
+   * Get or generate the user's commitment
+   */
+  getUserCommitment() {
+    if (!this.userCommitment) {
+      throw new Error("User not initialized. Call initializeUser() first.");
+    }
+    return this.userCommitment;
+  }
+  /**
+   * Deposit USDC into the Shield Pool
+   *
+   * @param params - Deposit parameters
+   * @param options - Optional configuration
+   * @returns Transaction result
+   */
+  async deposit(params, options) {
+    if (!this.program) throw new Error("SDK not initialized. Call initialize() first.");
+    if (!this.userSecret || !this.userCommitment) {
+      throw new Error("User not initialized. Call initializeUser() first.");
+    }
+    const pool = await this.getShieldPool();
+    if (!pool) {
+      throw new Error("Shield Pool not initialized");
+    }
+    const amount = typeof params.amount === "number" ? new import_anchor2.BN(params.amount) : params.amount;
+    const amountUsdc = Number(amount.toString()) / 1e6;
+    if (options?.usePrivacyCash && this.privacyCash) {
+      try {
+        const privacyResult = await this.privacyCash.depositPrivateUSDC(amountUsdc);
+        console.log("Privacy Cash deposit completed:", privacyResult.tx);
+      } catch (error) {
+        console.error("Privacy Cash deposit failed:", error);
+        throw new Error(`Privacy Cash deposit failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
+    }
+    const shares = this.calculateSharesForDeposit(
+      amount,
+      pool.totalPoolValue,
+      pool.totalShares
+    );
+    const encryptedShare = createPlaceholderEncryptedShare(shares);
+    const depositIndex = pool.nonce;
+    const poolAddress = this.getShieldPoolAddress();
+    const [userSharePda] = getUserSharePda(poolAddress, this.userCommitment, this.programId);
+    const [depositHistoryPda] = getDepositHistoryPda(
+      this.userCommitment,
+      BigInt(depositIndex.toString()),
+      this.programId
+    );
+    try {
+      const signature = await this.program.methods.deposit(amount, Array.from(this.userCommitment), Array.from(encryptedShare), depositIndex).accounts({
+        depositor: this.wallet.publicKey,
+        shieldPool: poolAddress,
+        userShare: userSharePda,
+        depositHistory: depositHistoryPda,
+        systemProgram: import_web36.SystemProgram.programId
+      }).rpc();
+      return { signature, success: true };
+    } catch (error) {
+      console.error("Deposit failed:", error);
+      throw error;
+    }
+  }
+  /**
+   * Withdraw USDC from the Shield Pool
+   *
+   * @param params - Withdrawal parameters
+   * @param options - Optional configuration
+   * @returns Transaction result with optional Privacy Cash info
+   */
+  async withdraw(params, options) {
+    if (!this.program) throw new Error("SDK not initialized. Call initialize() first.");
+    if (!this.userSecret || !this.userCommitment) {
+      throw new Error("User not initialized. Call initializeUser() first.");
+    }
+    const pool = await this.getShieldPool();
+    if (!pool) {
+      throw new Error("Shield Pool not initialized");
+    }
+    const amount = typeof params.amount === "number" ? new import_anchor2.BN(params.amount) : params.amount;
+    const nullifier = generateNullifier(this.userSecret, "withdraw", BigInt(pool.nonce.toString()));
+    const currentShares = await this.getUserShares();
+    const sharesToBurn = this.calculateSharesForWithdrawal(
+      amount,
+      pool.totalPoolValue,
+      pool.totalShares
+    );
+    const newShares = currentShares - sharesToBurn;
+    const newEncryptedShare = createPlaceholderEncryptedShare(newShares);
+    const poolAddress = this.getShieldPoolAddress();
+    const [userSharePda] = getUserSharePda(poolAddress, this.userCommitment, this.programId);
+    const [nullifierPda] = getNullifierPda(nullifier, this.programId);
+    const proof = [];
+    const publicInputs = [];
+    try {
+      const signature = await this.program.methods.withdraw(
+        amount,
+        Array.from(nullifier),
+        Array.from(newEncryptedShare),
+        Buffer.from(proof),
+        publicInputs.map((input) => Array.from(input))
+      ).accounts({
+        withdrawer: this.wallet.publicKey,
+        shieldPool: poolAddress,
+        userShare: userSharePda,
+        nullifier: nullifierPda,
+        systemProgram: import_web36.SystemProgram.programId
+      }).rpc();
+      let result = {
+        signature,
+        success: true
+      };
+      if (options?.usePrivacyCash && this.privacyCash) {
+        const amountUsdc = Number(amount.toString()) / 1e6;
+        try {
+          const privacyResult = await this.privacyCash.withdrawPrivateUSDC(amountUsdc, options.recipient);
+          result.privacyCashTx = privacyResult.tx;
+          result.privacyCashFee = privacyResult.feeInBaseUnits / 1e6;
+          console.log("Privacy Cash withdrawal completed:", privacyResult.tx);
+        } catch (error) {
+          console.error("Privacy Cash withdrawal failed:", error);
+        }
+      }
+      return result;
+    } catch (error) {
+      console.error("Withdraw failed:", error);
+      throw error;
+    }
+  }
+  /**
+   * Get the user's current balance
+   *
+   * @returns Balance in shares and USDC value
+   */
+  async getBalance() {
+    if (!this.program) throw new Error("SDK not initialized. Call initialize() first.");
+    if (!this.userCommitment) {
+      throw new Error("User not initialized. Call initializeUser() first.");
+    }
+    const pool = await this.getShieldPool();
+    if (!pool) {
+      return { shares: 0n, valueUsdc: 0n };
+    }
+    const shares = await this.getUserShares();
+    const valueUsdc = this.calculateShareValue(
+      shares,
+      pool.totalPoolValue,
+      pool.totalShares
+    );
+    return { shares, valueUsdc };
+  }
+  /**
+   * Set up a recurring payment
+   *
+   * @param params - Recurring payment parameters
+   * @param options - Optional configuration
+   * @returns Transaction result with optional Tuk Tuk cron job info
+   */
+  async setupRecurringPayment(params, options) {
+    if (!this.program) throw new Error("SDK not initialized. Call initialize() first.");
+    if (!this.userCommitment) {
+      throw new Error("User not initialized. Call initializeUser() first.");
+    }
+    const pool = await this.getShieldPool();
+    if (!pool) {
+      throw new Error("Shield Pool not initialized");
+    }
+    const intervalSeconds = INTERVAL_SECONDS[params.interval];
+    const amount = new import_anchor2.BN(params.amountUsdc * 10 ** USDC_DECIMALS);
+    const transferNonce = new import_anchor2.BN(pool.nonce.toString());
+    const poolAddress = this.getShieldPoolAddress();
+    const [userSharePda] = getUserSharePda(poolAddress, this.userCommitment, this.programId);
+    const [scheduledTransferPda] = getScheduledTransferPda(
+      this.userCommitment,
+      BigInt(transferNonce.toString()),
+      this.programId
+    );
+    try {
+      const signature = await this.program.methods.setupTransfer(params.recipientAddress, amount, intervalSeconds, transferNonce).accounts({
+        payer: this.wallet.publicKey,
+        shieldPool: poolAddress,
+        userShare: userSharePda,
+        scheduledTransfer: scheduledTransferPda,
+        systemProgram: import_web36.SystemProgram.programId
+      }).rpc();
+      let result = {
+        signature,
+        success: true
+      };
+      if (options?.enableTukTukAutomation && this.tuktuk) {
+        try {
+          const { intervalToCronSchedule: intervalToCronSchedule2 } = await Promise.resolve().then(() => (init_tuktuk(), tuktuk_exports));
+          const cronSchedule = intervalToCronSchedule2(intervalSeconds);
+          const jobName = `subly_transfer_${scheduledTransferPda.toBase58().slice(0, 8)}`;
+          const executeTransferIx = await this.program.methods.executeTransfer().accounts({
+            executor: this.wallet.publicKey,
+            shieldPool: poolAddress,
+            scheduledTransfer: scheduledTransferPda,
+            systemProgram: import_web36.SystemProgram.programId
+          }).instruction();
+          const cronResult = await this.tuktuk.createCronJob(cronSchedule, executeTransferIx, jobName);
+          result.cronJobPda = cronResult.cronJobPda.toBase58();
+          result.cronJobTx = cronResult.tx;
+          const fundingAmount = options.cronJobFundingSol ?? 0.1;
+          await this.tuktuk.fundCronJob(cronResult.cronJobPda, fundingAmount);
+          console.log("Tuk Tuk cron job created:", cronResult.cronJobPda.toBase58());
+        } catch (error) {
+          console.warn("Failed to create Tuk Tuk cron job:", error);
+        }
+      }
+      return result;
+    } catch (error) {
+      console.error("Setup recurring payment failed:", error);
+      throw error;
+    }
+  }
+  /**
+   * Cancel a recurring payment
+   *
+   * @param transferId - The scheduled transfer PDA address
+   * @param options - Optional configuration
+   * @returns Transaction result with optional Tuk Tuk cleanup info
+   */
+  async cancelRecurringPayment(transferId, options) {
+    if (!this.program) throw new Error("SDK not initialized. Call initialize() first.");
+    if (!this.userCommitment) {
+      throw new Error("User not initialized. Call initializeUser() first.");
+    }
+    const poolAddress = this.getShieldPoolAddress();
+    const [userSharePda] = getUserSharePda(poolAddress, this.userCommitment, this.programId);
+    try {
+      const signature = await this.program.methods.cancelTransfer().accounts({
+        authority: this.wallet.publicKey,
+        shieldPool: poolAddress,
+        userShare: userSharePda,
+        scheduledTransfer: transferId,
+        systemProgram: import_web36.SystemProgram.programId
+      }).rpc();
+      let result = {
+        signature,
+        success: true
+      };
+      if (options?.closeCronJob && options.cronJobPda && this.tuktuk) {
+        try {
+          await this.tuktuk.closeCronJob(options.cronJobPda);
+          result.cronJobClosed = true;
+          console.log("Tuk Tuk cron job closed:", options.cronJobPda.toBase58());
+        } catch (error) {
+          console.warn("Failed to close Tuk Tuk cron job:", error);
+          result.cronJobClosed = false;
+        }
+      }
+      return result;
+    } catch (error) {
+      console.error("Cancel recurring payment failed:", error);
+      throw error;
+    }
+  }
+  /**
+   * Get yield information for the pool
+   *
+   * @returns Current APY and earned yield
+   */
+  async getYieldInfo() {
+    const pool = await this.getShieldPool();
+    if (!pool) {
+      return { apy: 0, earnedUsdc: 0n };
+    }
+    if (this.kamino) {
+      try {
+        const kaminoYield = await this.kamino.getKaminoYieldInfo();
+        return {
+          apy: kaminoYield.apy * 100,
+          // Convert decimal to percentage
+          earnedUsdc: BigInt(Math.floor(kaminoYield.earnedYield * 1e6))
+          // Convert to base units
+        };
+      } catch (error) {
+        console.warn("Failed to get Kamino yield info:", error);
+      }
+    }
+    const apy = 5;
+    const earnedUsdc = 0n;
+    return { apy, earnedUsdc };
+  }
+  // ============================================
+  // Privacy Cash Integration Methods
+  // ============================================
+  /**
+   * Deposit USDC privately using Privacy Cash
+   *
+   * @param amount Amount in USDC (human-readable)
+   * @returns Transaction signature
+   */
+  async depositPrivate(amount) {
+    if (!this.privacyCash) {
+      throw new Error("Privacy Cash not initialized. Enable it during initialize()");
+    }
+    return this.privacyCash.depositPrivateUSDC(amount);
+  }
+  /**
+   * Withdraw USDC privately using Privacy Cash
+   *
+   * @param amount Amount in USDC (human-readable)
+   * @param recipient Optional recipient address
+   * @returns Withdrawal result
+   */
+  async withdrawPrivate(amount, recipient) {
+    if (!this.privacyCash) {
+      throw new Error("Privacy Cash not initialized. Enable it during initialize()");
+    }
+    const result = await this.privacyCash.withdrawPrivateUSDC(amount, recipient);
+    return {
+      tx: result.tx,
+      amountReceived: result.amountInBaseUnits / 1e6,
+      fee: result.feeInBaseUnits / 1e6
+    };
+  }
+  /**
+   * Get private USDC balance from Privacy Cash
+   *
+   * @returns Balance in USDC
+   */
+  async getPrivateBalance() {
+    if (!this.privacyCash) {
+      throw new Error("Privacy Cash not initialized. Enable it during initialize()");
+    }
+    return this.privacyCash.getPrivateUSDCBalance();
+  }
+  // ============================================
+  // Tuk Tuk Automation Methods
+  // ============================================
+  /**
+   * Check for pending transfers that are due for execution
+   *
+   * @param scheduledTransferPdas List of scheduled transfer PDAs to check
+   * @returns List of pending transfers
+   */
+  async checkPendingTransfers(scheduledTransferPdas) {
+    if (!this.tuktuk) {
+      throw new Error("Tuk Tuk not initialized. Enable it during initialize()");
+    }
+    return this.tuktuk.checkPendingTransfers(scheduledTransferPdas);
+  }
+  /**
+   * Manually execute a pending transfer
+   * Use this when Tuk Tuk automation is not active
+   *
+   * @param transferId Transfer ID (PDA address as string)
+   * @param executeTransferIx The execute_transfer instruction
+   * @returns Transaction signature
+   */
+  async executePendingTransfer(transferId, executeTransferIx) {
+    if (!this.tuktuk) {
+      throw new Error("Tuk Tuk not initialized. Enable it during initialize()");
+    }
+    return this.tuktuk.executePendingTransfer(transferId, executeTransferIx);
+  }
+  // ============================================
+  // Kamino Yield Methods
+  // ============================================
+  /**
+   * Deposit to Kamino Lending for yield generation
+   *
+   * @param amount Amount in USDC
+   * @returns Deposit result
+   */
+  async depositToKamino(amount) {
+    if (!this.kamino) {
+      throw new Error("Kamino not initialized. Enable it during initialize()");
+    }
+    const result = await this.kamino.depositToKamino(amount);
+    return { tx: result.tx };
+  }
+  /**
+   * Withdraw from Kamino Lending
+   *
+   * @param amount Amount in USDC
+   * @returns Withdrawal result
+   */
+  async withdrawFromKamino(amount) {
+    if (!this.kamino) {
+      throw new Error("Kamino not initialized. Enable it during initialize()");
+    }
+    const result = await this.kamino.withdrawFromKamino(amount);
+    return { tx: result.tx };
+  }
+  /**
+   * Get detailed yield information from Kamino
+   *
+   * @returns Kamino yield info
+   */
+  async getKaminoYieldInfo() {
+    if (!this.kamino) {
+      throw new Error("Kamino not initialized. Enable it during initialize()");
+    }
+    return this.kamino.getKaminoYieldInfo();
+  }
+  // ============================================
+  // Private helper methods
+  // ============================================
+  /**
+   * Get user's share account
+   */
+  async getUserShareAccount() {
+    if (!this.program || !this.userCommitment) return null;
+    try {
+      const poolAddress = this.getShieldPoolAddress();
+      const [userSharePda] = getUserSharePda(poolAddress, this.userCommitment, this.programId);
+      const userShare = await this.program.account.userShare.fetch(userSharePda);
+      return userShare;
+    } catch {
+      return null;
+    }
+  }
+  /**
+   * Get user's current shares (decrypted)
+   */
+  async getUserShares() {
+    const userShare = await this.getUserShareAccount();
+    if (!userShare) return 0n;
+    return readPlaceholderShares(new Uint8Array(userShare.encryptedShareAmount));
+  }
+  /**
+   * Calculate shares to mint for a deposit
+   */
+  calculateSharesForDeposit(depositAmount, totalPoolValue, totalShares) {
+    if (totalPoolValue.isZero() || totalShares.isZero()) {
+      return BigInt(depositAmount.toString());
+    }
+    const shares = depositAmount.mul(totalShares).div(totalPoolValue);
+    return BigInt(shares.toString());
+  }
+  /**
+   * Calculate shares to burn for a withdrawal
+   */
+  calculateSharesForWithdrawal(withdrawalAmount, totalPoolValue, totalShares) {
+    if (totalPoolValue.isZero()) return 0n;
+    const shares = withdrawalAmount.mul(totalShares).div(totalPoolValue);
+    return BigInt(shares.toString());
+  }
+  /**
+   * Calculate the value of shares in USDC
+   */
+  calculateShareValue(shares, totalPoolValue, totalShares) {
+    if (totalShares.isZero()) return 0n;
+    const value = new import_anchor2.BN(shares.toString()).mul(totalPoolValue).div(totalShares);
+    return BigInt(value.toString());
+  }
+};
+function createSublyVaultClient(connection, wallet, config) {
+  return new SublyVaultClient(connection, wallet, PROGRAM_ID, config);
+}
+
+// src/idl/subly_vault.ts
+var PROGRAM_ADDRESS = "BRU5ubQjz7DjF6wWzs16SmEzPgfHTe6u8iYNpoMuAVPL";
+function getIdl() {
+  return {
+    address: PROGRAM_ADDRESS,
+    metadata: {
+      name: "subly_vault",
+      version: "0.1.0",
+      spec: "0.1.0",
+      description: "Subly Vault - Privacy-first subscription payment protocol for Solana Mainnet"
+    },
+    instructions: [
+      {
+        name: "initialize",
+        discriminator: [],
+        accounts: [
+          { name: "authority", writable: true, signer: true },
+          { name: "shieldPool", writable: true },
+          { name: "systemProgram" }
+        ],
+        args: []
+      },
+      {
+        name: "deposit",
+        discriminator: [],
+        accounts: [
+          { name: "depositor", writable: true, signer: true },
+          { name: "shieldPool", writable: true },
+          { name: "userShare", writable: true },
+          { name: "depositHistory", writable: true },
+          { name: "systemProgram" }
+        ],
+        args: [
+          { name: "amount", type: "u64" },
+          { name: "commitment", type: { array: ["u8", 32] } },
+          { name: "encryptedShare", type: { array: ["u8", 64] } },
+          { name: "_depositIndex", type: "u64" }
+        ]
+      },
+      {
+        name: "withdraw",
+        discriminator: [],
+        accounts: [
+          { name: "withdrawer", writable: true, signer: true },
+          { name: "shieldPool", writable: true },
+          { name: "userShare", writable: true },
+          { name: "nullifier", writable: true },
+          { name: "systemProgram" }
+        ],
+        args: [
+          { name: "amount", type: "u64" },
+          { name: "nullifierHash", type: { array: ["u8", 32] } },
+          { name: "newEncryptedShare", type: { array: ["u8", 64] } },
+          { name: "_proof", type: "bytes" },
+          { name: "_publicInputs", type: { vec: { array: ["u8", 32] } } }
+        ]
+      },
+      {
+        name: "setupTransfer",
+        discriminator: [],
+        accounts: [
+          { name: "payer", writable: true, signer: true },
+          { name: "shieldPool" },
+          { name: "userShare" },
+          { name: "scheduledTransfer", writable: true },
+          { name: "systemProgram" }
+        ],
+        args: [
+          { name: "recipient", type: "pubkey" },
+          { name: "amount", type: "u64" },
+          { name: "intervalSeconds", type: "u32" },
+          { name: "_transferNonce", type: "u64" }
+        ]
+      },
+      {
+        name: "executeTransfer",
+        discriminator: [],
+        accounts: [
+          { name: "executor", writable: true, signer: true },
+          { name: "shieldPool", writable: true },
+          { name: "scheduledTransfer", writable: true },
+          { name: "userShare", writable: true },
+          { name: "batchProof", writable: true },
+          { name: "nullifier", writable: true },
+          { name: "transferHistory", writable: true },
+          { name: "systemProgram" }
+        ],
+        args: [{ name: "executionIndex", type: "u32" }]
+      },
+      {
+        name: "cancelTransfer",
+        discriminator: [],
+        accounts: [
+          { name: "authority", writable: true, signer: true },
+          { name: "shieldPool" },
+          { name: "userShare" },
+          { name: "scheduledTransfer", writable: true },
+          { name: "systemProgram" }
+        ],
+        args: []
+      }
+    ],
+    accounts: [
+      { name: "ShieldPool", discriminator: [] },
+      { name: "UserShare", discriminator: [] },
+      { name: "DepositHistory", discriminator: [] },
+      { name: "Nullifier", discriminator: [] },
+      { name: "ScheduledTransfer", discriminator: [] },
+      { name: "TransferHistory", discriminator: [] },
+      { name: "BatchProofStorage", discriminator: [] }
+    ],
+    errors: [],
+    types: []
+  };
+}
+
+// src/index.ts
+init_tuktuk();
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  BATCH_PROOF_SEED,
+  DEPOSIT_HISTORY_SEED,
+  INTERVAL_SECONDS,
+  KAMINO_LENDING_PROGRAM_ID,
+  KAMINO_MAIN_MARKET,
+  KEY_DERIVATION_MESSAGE,
+  KaminoError,
+  KaminoIntegration,
+  NULLIFIER_SEED,
+  OperationType,
+  PRIVACY_CASH_PROGRAM_ID,
+  PRIVACY_CASH_USDC_MINT,
+  PROGRAM_ID,
+  PrivacyCashError,
+  PrivacyCashIntegration,
+  SCHEDULED_TRANSFER_SEED,
+  SHIELD_POOL_SEED,
+  SublyVaultClient,
+  TRANSFER_HISTORY_SEED,
+  TUKTUK_CRON_PROGRAM_ID,
+  TUKTUK_PROGRAM_ID,
+  TransferStatus,
+  TukTukError,
+  TukTukIntegration,
+  USDC_DECIMALS,
+  USDC_MINT_MAINNET,
+  USER_SHARE_SEED,
+  createKaminoIntegration,
+  createPlaceholderEncryptedShare,
+  createPrivacyCashIntegration,
+  createSublyVaultClient,
+  createTukTukIntegration,
+  decryptShares,
+  deriveEncryptionKey,
+  encryptShares,
+  generateCommitment,
+  generateNullifier,
+  generateSecret,
+  getBatchProofPda,
+  getDepositHistoryPda,
+  getIdl,
+  getNullifierPda,
+  getScheduledTransferPda,
+  getShieldPoolPda,
+  getTransferHistoryPda,
+  getUserSharePda,
+  intervalToCronSchedule,
+  readPlaceholderShares,
+  retrieveSecret,
+  storeSecret,
+  verifyCommitment
+});

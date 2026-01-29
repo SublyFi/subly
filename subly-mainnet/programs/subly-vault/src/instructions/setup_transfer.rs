@@ -1,12 +1,17 @@
-use anchor_lang::prelude::*;
 use crate::constants::*;
 use crate::errors::VaultError;
-use crate::state::{ShieldPool, UserShare, ScheduledTransfer};
+use crate::state::{ScheduledTransfer, ShieldPool, UserShare};
+use anchor_lang::prelude::*;
 
+/// Setup a privacy-preserving recurring transfer
+///
+/// The recipient address is encrypted and stored in `encrypted_transfer_data`.
+/// The actual recipient is known only to the user and is stored locally.
+/// At execution time, the user (or relayer) provides the recipient to Privacy Cash.
 #[derive(Accounts)]
-#[instruction(recipient: Pubkey, amount: u64, interval_seconds: u32, transfer_nonce: u64)]
+#[instruction(encrypted_transfer_data: [u8; 128], amount: u64, interval_seconds: u32, transfer_nonce: u64)]
 pub struct SetupTransfer<'info> {
-    /// The user setting up the transfer
+    /// The user setting up the transfer (or relayer on behalf of user)
     #[account(mut)]
     pub payer: Signer<'info>,
 

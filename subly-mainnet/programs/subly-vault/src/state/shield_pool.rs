@@ -50,8 +50,8 @@ impl ShieldPool {
         + 16                       // nonce: u128
         + 1                        // bump: u8
         + 1                        // is_active: bool
-        + 64;                      // _reserved: [u8; 64]
-    // Total: 210 bytes
+        + 64; // _reserved: [u8; 64]
+              // Total: 210 bytes
 
     /// Calculate shares to mint for a given deposit amount
     /// Formula: new_shares = deposit_amount * total_shares / total_pool_value

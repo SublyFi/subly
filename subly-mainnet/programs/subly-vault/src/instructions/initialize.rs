@@ -1,6 +1,6 @@
-use anchor_lang::prelude::*;
 use crate::constants::*;
 use crate::state::ShieldPool;
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {

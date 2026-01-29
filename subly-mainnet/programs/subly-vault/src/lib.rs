@@ -45,7 +45,97 @@ pub mod subly_vault {
         Ok(())
     }
 
+    /// Register a private deposit from Privacy Cash
+    ///
+    /// This is the preferred method for deposits as it preserves privacy.
+    /// The registrar (relayer or pool authority) registers the deposit
+    /// without exposing the user's wallet address.
+    pub fn register_deposit(
+        ctx: Context<RegisterDeposit>,
+        note_commitment: [u8; 32],
+        user_commitment: [u8; 32],
+        encrypted_share: [u8; 64],
+        amount: u64,
+    ) -> Result<()> {
+        require!(
+            amount >= MIN_DEPOSIT_AMOUNT,
+            VaultError::InsufficientDeposit
+        );
+        require!(
+            amount <= MAX_DEPOSIT_AMOUNT,
+            VaultError::DepositExceedsMaximum
+        );
+
+        let pool = &mut ctx.accounts.shield_pool;
+        let clock = Clock::get()?;
+
+        // Calculate shares for this deposit
+        let shares_to_mint = pool
+            .calculate_shares_for_deposit(amount)
+            .ok_or(VaultError::InvalidShareCalculation)?;
+
+        require!(shares_to_mint > 0, VaultError::InvalidShareCalculation);
+
+        // Initialize note commitment registry (prevents double registration)
+        let registry = &mut ctx.accounts.note_commitment_registry;
+        registry.note_commitment = note_commitment;
+        registry.user_commitment = user_commitment;
+        registry.amount = amount;
+        registry.registered_at = clock.unix_timestamp;
+        registry.pool = pool.key();
+        registry.bump = ctx.bumps.note_commitment_registry;
+        registry._reserved = [0u8; 31];
+
+        // Initialize or update user share
+        let user_share = &mut ctx.accounts.user_share;
+        if user_share.pool == Pubkey::default() {
+            // New user - initialize
+            user_share.share_id = user_share.key();
+            user_share.pool = pool.key();
+            user_share.user_commitment = user_commitment;
+            user_share.bump = ctx.bumps.user_share;
+            user_share._reserved = [0u8; 32];
+        }
+
+        // Update encrypted share amount
+        user_share.encrypted_share_amount = encrypted_share;
+        user_share.last_update = clock.unix_timestamp;
+
+        // Update pool totals
+        pool.total_pool_value = pool
+            .total_pool_value
+            .checked_add(amount)
+            .ok_or(VaultError::ArithmeticOverflow)?;
+        pool.total_shares = pool
+            .total_shares
+            .checked_add(shares_to_mint)
+            .ok_or(VaultError::ArithmeticOverflow)?;
+        pool.nonce = pool
+            .nonce
+            .checked_add(1)
+            .ok_or(VaultError::ArithmeticOverflow)?;
+
+        emit!(PrivateDepositRegistered {
+            pool: pool.key(),
+            note_commitment,
+            shares_minted: shares_to_mint,
+            pool_value_after: pool.total_pool_value,
+            total_shares_after: pool.total_shares,
+            timestamp: clock.unix_timestamp,
+        });
+
+        msg!(
+            "Private deposit registered: {} USDC, {} shares minted",
+            amount,
+            shares_to_mint
+        );
+
+        Ok(())
+    }
+
     /// Deposit USDC into the Shield Pool
+    /// DEPRECATED: Use register_deposit for privacy-preserving deposits
+    #[deprecated(note = "Use register_deposit for privacy-preserving deposits")]
     pub fn deposit(
         ctx: Context<Deposit>,
         amount: u64,
@@ -53,8 +143,14 @@ pub mod subly_vault {
         encrypted_share: [u8; 64],
         _deposit_index: u64,
     ) -> Result<()> {
-        require!(amount >= MIN_DEPOSIT_AMOUNT, VaultError::InsufficientDeposit);
-        require!(amount <= MAX_DEPOSIT_AMOUNT, VaultError::DepositExceedsMaximum);
+        require!(
+            amount >= MIN_DEPOSIT_AMOUNT,
+            VaultError::InsufficientDeposit
+        );
+        require!(
+            amount <= MAX_DEPOSIT_AMOUNT,
+            VaultError::DepositExceedsMaximum
+        );
 
         let pool = &mut ctx.accounts.shield_pool;
         let clock = Clock::get()?;
@@ -98,7 +194,10 @@ pub mod subly_vault {
             .total_shares
             .checked_add(shares_to_mint)
             .ok_or(VaultError::ArithmeticOverflow)?;
-        pool.nonce = pool.nonce.checked_add(1).ok_or(VaultError::ArithmeticOverflow)?;
+        pool.nonce = pool
+            .nonce
+            .checked_add(1)
+            .ok_or(VaultError::ArithmeticOverflow)?;
 
         emit!(Deposited {
             pool: pool.key(),
@@ -109,7 +208,11 @@ pub mod subly_vault {
             timestamp: clock.unix_timestamp,
         });
 
-        msg!("Deposited {} USDC, minted {} shares", amount, shares_to_mint);
+        msg!(
+            "Deposited {} USDC, minted {} shares",
+            amount,
+            shares_to_mint
+        );
         Ok(())
     }
 
@@ -128,14 +231,20 @@ pub mod subly_vault {
         let clock = Clock::get()?;
 
         require!(pool.is_active, VaultError::PoolNotInitialized);
-        require!(pool.total_pool_value >= amount, VaultError::InsufficientBalance);
+        require!(
+            pool.total_pool_value >= amount,
+            VaultError::InsufficientBalance
+        );
 
         let shares_to_burn = pool
             .calculate_shares_for_withdrawal(amount)
             .ok_or(VaultError::InvalidShareCalculation)?;
 
         require!(shares_to_burn > 0, VaultError::InvalidShareCalculation);
-        require!(shares_to_burn <= pool.total_shares, VaultError::InsufficientBalance);
+        require!(
+            shares_to_burn <= pool.total_shares,
+            VaultError::InsufficientBalance
+        );
 
         let nullifier = &mut ctx.accounts.nullifier;
         require!(!nullifier.is_used, VaultError::NullifierAlreadyUsed);
@@ -159,7 +268,10 @@ pub mod subly_vault {
             .total_shares
             .checked_sub(shares_to_burn)
             .ok_or(VaultError::ArithmeticOverflow)?;
-        pool.nonce = pool.nonce.checked_add(1).ok_or(VaultError::ArithmeticOverflow)?;
+        pool.nonce = pool
+            .nonce
+            .checked_add(1)
+            .ok_or(VaultError::ArithmeticOverflow)?;
 
         emit!(Withdrawn {
             pool: pool.key(),
@@ -176,17 +288,21 @@ pub mod subly_vault {
         Ok(())
     }
 
-    /// Set up a recurring transfer
+    /// Set up a privacy-preserving recurring transfer
+    ///
+    /// The recipient address is encrypted and stored in `encrypted_transfer_data`.
+    /// The actual recipient is known only to the user and stored locally.
+    /// At execution time, the user provides the recipient to Privacy Cash.
     pub fn setup_transfer(
         ctx: Context<SetupTransfer>,
-        recipient: Pubkey,
+        encrypted_transfer_data: [u8; 128],
         amount: u64,
         interval_seconds: u32,
         _transfer_nonce: u64,
     ) -> Result<()> {
         require!(amount > 0, VaultError::InvalidWithdrawalAmount);
         require!(
-            interval_seconds >= MIN_TRANSFER_INTERVAL && interval_seconds <= MAX_TRANSFER_INTERVAL,
+            (MIN_TRANSFER_INTERVAL..=MAX_TRANSFER_INTERVAL).contains(&interval_seconds),
             VaultError::InvalidInterval
         );
 
@@ -201,7 +317,7 @@ pub mod subly_vault {
         let transfer = &mut ctx.accounts.scheduled_transfer;
         transfer.transfer_id = transfer.key();
         transfer.user_commitment = commitment;
-        transfer.recipient = recipient;
+        transfer.encrypted_transfer_data = encrypted_transfer_data;
         transfer.amount = amount;
         transfer.interval_seconds = interval_seconds;
         transfer.next_execution = first_execution;
@@ -210,14 +326,14 @@ pub mod subly_vault {
         transfer.execution_count = 0;
         transfer.total_transferred = 0;
         transfer.created_at = clock.unix_timestamp;
-        transfer.clockwork_thread = Pubkey::default();
+        transfer.tuktuk_cron_job = Pubkey::default();
         transfer.bump = ctx.bumps.scheduled_transfer;
         transfer._reserved = [0u8; 32];
 
-        emit!(TransferScheduled {
+        // Privacy-preserving event: recipient is NOT emitted
+        emit!(PrivateTransferScheduled {
             transfer_id: transfer.key(),
             commitment,
-            recipient,
             amount,
             interval_seconds,
             first_execution,
@@ -225,48 +341,58 @@ pub mod subly_vault {
         });
 
         msg!(
-            "Scheduled transfer created: {} USDC to {} every {} seconds",
+            "Private scheduled transfer created: {} USDC every {} seconds",
             amount,
-            recipient,
             interval_seconds
         );
         Ok(())
     }
 
-    /// Execute a scheduled transfer
+    /// Record a transfer execution (privacy-preserving)
+    ///
+    /// This records that a transfer has been executed, without revealing
+    /// the recipient. The actual transfer is done via Privacy Cash off-chain.
     pub fn execute_transfer(ctx: Context<ExecuteTransfer>, execution_index: u32) -> Result<()> {
         let transfer = &mut ctx.accounts.scheduled_transfer;
         let pool = &mut ctx.accounts.shield_pool;
         let clock = Clock::get()?;
 
         require!(transfer.is_active, VaultError::TransferNotActive);
-        require!(transfer.is_due(clock.unix_timestamp), VaultError::TransferNotDue);
+        require!(
+            transfer.is_due(clock.unix_timestamp),
+            VaultError::TransferNotDue
+        );
 
-        let commitment = transfer.user_commitment;
+        let _commitment = transfer.user_commitment;
         let amount = transfer.amount;
-        let recipient = transfer.recipient;
+        // Note: recipient is NOT read from on-chain - it's stored encrypted
+        // and provided by the client at execution time via Privacy Cash
 
         let batch_proof = &ctx.accounts.batch_proof;
         require!(!batch_proof.is_used, VaultError::NullifierAlreadyUsed);
 
-        let pool_value_diff = if pool.total_pool_value > batch_proof.pool_value_at_generation {
-            pool.total_pool_value - batch_proof.pool_value_at_generation
-        } else {
-            batch_proof.pool_value_at_generation - pool.total_pool_value
-        };
+        let pool_value_diff = pool
+            .total_pool_value
+            .abs_diff(batch_proof.pool_value_at_generation);
 
         let tolerance_amount = (batch_proof.pool_value_at_generation as u128)
             .checked_mul(batch_proof.pool_value_tolerance_bps as u128)
             .and_then(|v| v.checked_div(10000))
             .ok_or(VaultError::ArithmeticOverflow)? as u64;
 
-        require!(pool_value_diff <= tolerance_amount, VaultError::InvalidProof);
+        require!(
+            pool_value_diff <= tolerance_amount,
+            VaultError::InvalidProof
+        );
 
         let shares_to_burn = pool
             .calculate_shares_for_withdrawal(amount)
             .ok_or(VaultError::InvalidShareCalculation)?;
 
-        require!(pool.total_pool_value >= amount, VaultError::InsufficientBalance);
+        require!(
+            pool.total_pool_value >= amount,
+            VaultError::InsufficientBalance
+        );
 
         let nullifier = &mut ctx.accounts.nullifier;
         nullifier.nullifier = batch_proof.nullifier;
@@ -312,20 +438,18 @@ pub mod subly_vault {
         history.execution_index = execution_index as u64;
         history.bump = ctx.bumps.transfer_history;
 
-        emit!(TransferExecuted {
+        // Privacy-preserving event: recipient is NOT emitted
+        emit!(TransferExecutionRecorded {
             transfer_id: transfer.key(),
-            commitment,
-            recipient,
-            amount,
             execution_index: execution_index as u64,
-            next_execution: transfer.next_execution,
+            amount,
             timestamp: clock.unix_timestamp,
         });
 
         msg!(
-            "Transfer executed: {} USDC to {}, next execution at {}",
+            "Transfer recorded: {} USDC, execution #{}, next at {}",
             amount,
-            recipient,
+            execution_index,
             transfer.next_execution
         );
         Ok(())

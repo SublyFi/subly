@@ -1,14 +1,25 @@
 use anchor_lang::prelude::*;
 
 /// Kamino Lending Program ID on Mainnet
-/// Note: This is the actual Kamino lending program ID
-pub const KAMINO_LENDING_PROGRAM_ID: Pubkey = pubkey!("KLend2g3cP87ber41VSz2cHu5M3mxzQS7pzLFz1UJwp");
+/// Verified program address for Kamino Lending (klend)
+/// Source: https://github.com/Kamino-Finance/klend-sdk
+pub const KAMINO_LENDING_PROGRAM_ID: Pubkey =
+    pubkey!("KLend2g3cP87ber41VSz2cHu5M3mxzQS7pzLFz1UJwp");
+
+/// Kamino Main Market address (for USDC lending)
+pub const KAMINO_MAIN_MARKET: Pubkey = pubkey!("7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF");
 
 /// Kamino deposit instruction discriminator
-pub const KAMINO_DEPOSIT_DISCRIMINATOR: [u8; 8] = [0x00; 8]; // Placeholder
+/// Note: In the current architecture, Kamino operations are handled via the
+/// TypeScript SDK (@kamino-finance/klend-sdk) which manages obligation accounts,
+/// refresh operations, and complex transaction building internally.
+/// CPI from on-chain programs is available but requires careful account setup.
+/// Discriminator for V2 deposit_reserve_liquidity instruction.
+pub const KAMINO_DEPOSIT_DISCRIMINATOR: [u8; 8] = [0x00; 8]; // Use SDK for actual implementation
 
 /// Kamino withdraw instruction discriminator
-pub const KAMINO_WITHDRAW_DISCRIMINATOR: [u8; 8] = [0x00; 8]; // Placeholder
+/// See note above - prefer SDK for production use
+pub const KAMINO_WITHDRAW_DISCRIMINATOR: [u8; 8] = [0x00; 8]; // Use SDK for actual implementation
 
 /// Accounts required for Kamino deposit
 #[derive(Accounts)]

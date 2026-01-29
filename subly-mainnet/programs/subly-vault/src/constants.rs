@@ -25,6 +25,9 @@ pub const WITHDRAW_REQUEST_SEED: &[u8] = b"withdraw";
 /// Batch Proof Storage PDA seed
 pub const BATCH_PROOF_SEED: &[u8] = b"batch_proof";
 
+/// Note Commitment Registry PDA seed (Privacy Cash deposit proof)
+pub const NOTE_COMMITMENT_REGISTRY_SEED: &[u8] = b"note_commitment_registry";
+
 /// USDC mint on Mainnet
 pub const USDC_MINT_MAINNET: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 

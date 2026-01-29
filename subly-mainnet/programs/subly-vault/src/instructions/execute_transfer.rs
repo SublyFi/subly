@@ -1,10 +1,9 @@
-use anchor_lang::prelude::*;
 use crate::constants::*;
 use crate::errors::VaultError;
 use crate::state::{
-    ShieldPool, UserShare, ScheduledTransfer, TransferHistory,
-    Nullifier, BatchProofStorage,
+    BatchProofStorage, Nullifier, ScheduledTransfer, ShieldPool, TransferHistory, UserShare,
 };
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 #[instruction(execution_index: u32)]

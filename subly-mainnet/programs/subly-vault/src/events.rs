@@ -73,3 +73,37 @@ pub struct PoolValueUpdated {
     pub yield_amount: u64,
     pub timestamp: i64,
 }
+
+/// Emitted when a private deposit is registered via Privacy Cash
+#[event]
+pub struct PrivateDepositRegistered {
+    pub pool: Pubkey,
+    /// Note: user_commitment is NOT emitted to preserve privacy
+    pub note_commitment: [u8; 32],
+    pub shares_minted: u64,
+    pub pool_value_after: u64,
+    pub total_shares_after: u64,
+    pub timestamp: i64,
+}
+
+/// Emitted when a transfer execution is recorded (privacy-preserving)
+/// Note: recipient is NOT emitted to preserve privacy
+#[event]
+pub struct TransferExecutionRecorded {
+    pub transfer_id: Pubkey,
+    pub execution_index: u64,
+    pub amount: u64,
+    pub timestamp: i64,
+}
+
+/// Emitted when a private transfer is scheduled (privacy-preserving)
+/// Note: recipient is stored encrypted, not emitted in clear
+#[event]
+pub struct PrivateTransferScheduled {
+    pub transfer_id: Pubkey,
+    pub commitment: [u8; 32],
+    pub amount: u64,
+    pub interval_seconds: u32,
+    pub first_execution: i64,
+    pub timestamp: i64,
+}

@@ -1,9 +1,11 @@
 use anchor_lang::prelude::*;
 
-/// Scheduled Transfer - Recurring payment configuration
+/// Scheduled Transfer - Recurring payment configuration (Privacy-Preserving)
 ///
-/// Enables automated subscription payments from the Shield Pool
-/// to business recipients. Executed by Clockwork automation.
+/// Enables automated subscription payments from the Shield Pool.
+/// The recipient address is stored encrypted to preserve privacy.
+/// Actual recipient is stored in the user's local storage and provided
+/// at execution time via Privacy Cash.
 #[account]
 pub struct ScheduledTransfer {
     /// Unique identifier (PDA address)
@@ -12,9 +14,10 @@ pub struct ScheduledTransfer {
     /// User commitment (links to UserShare)
     pub user_commitment: [u8; 32],
 
-    /// Recipient address (business receiving payments)
-    /// Note: This is public information (necessary for receiving funds)
-    pub recipient: Pubkey,
+    /// Encrypted transfer data (contains recipient, memo, etc.)
+    /// Encrypted with user's derived key - only user can decrypt
+    /// Format: AES-256-GCM encrypted { recipient: Pubkey, memo: String }
+    pub encrypted_transfer_data: [u8; 128],
 
     /// Transfer amount in USDC per interval
     pub amount: u64,
@@ -40,8 +43,9 @@ pub struct ScheduledTransfer {
     /// Timestamp when transfer was created
     pub created_at: i64,
 
-    /// Clockwork thread address (for automation)
-    pub clockwork_thread: Pubkey,
+    /// Tuk Tuk cron job address (for automation)
+    /// Note: Clockwork was deprecated in Oct 2023, replaced by Tuk Tuk (Helium)
+    pub tuktuk_cron_job: Pubkey,
 
     /// PDA bump seed
     pub bump: u8,
@@ -54,7 +58,7 @@ impl ScheduledTransfer {
     pub const SPACE: usize = 8    // discriminator
         + 32                       // transfer_id: Pubkey
         + 32                       // user_commitment: [u8; 32]
-        + 32                       // recipient: Pubkey
+        + 128                      // encrypted_transfer_data: [u8; 128]
         + 8                        // amount: u64
         + 4                        // interval_seconds: u32
         + 8                        // next_execution: i64
@@ -63,10 +67,10 @@ impl ScheduledTransfer {
         + 8                        // execution_count: u64
         + 8                        // total_transferred: u64
         + 8                        // created_at: i64
-        + 32                       // clockwork_thread: Pubkey
+        + 32                       // tuktuk_cron_job: Pubkey
         + 1                        // bump: u8
-        + 32;                      // _reserved: [u8; 32]
-    // Total: 215 bytes
+        + 32; // _reserved: [u8; 32]
+              // Total: 311 bytes
 
     /// Check if the transfer is due for execution
     pub fn is_due(&self, current_timestamp: i64) -> bool {
@@ -127,6 +131,6 @@ impl BatchProofStorage {
         + 1                        // is_used: bool
         + 8                        // pool_value_at_generation: u64
         + 2                        // pool_value_tolerance_bps: u16
-        + 1;                       // bump: u8
-    // Total: 672 bytes
+        + 1; // bump: u8
+             // Total: 672 bytes
 }

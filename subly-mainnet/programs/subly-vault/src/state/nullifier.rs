@@ -35,8 +35,8 @@ impl Nullifier {
         + 1                        // is_used: bool
         + 8                        // used_at: i64
         + 1                        // operation_type: OperationType (enum = 1 byte)
-        + 1;                       // bump: u8
-    // Total: 51 bytes
+        + 1; // bump: u8
+             // Total: 51 bytes
 }
 
 /// Withdraw Request - Tracks pending withdrawals
@@ -89,6 +89,6 @@ impl WithdrawRequest {
         + 8                        // created_at: i64
         + 8                        // completed_at: i64
         + 8                        // expires_at: i64
-        + 1;                       // bump: u8
-    // Total: 107 bytes
+        + 1; // bump: u8
+             // Total: 107 bytes
 }

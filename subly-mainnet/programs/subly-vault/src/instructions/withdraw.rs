@@ -1,7 +1,7 @@
-use anchor_lang::prelude::*;
 use crate::constants::*;
 use crate::errors::VaultError;
-use crate::state::{ShieldPool, UserShare, Nullifier};
+use crate::state::{Nullifier, ShieldPool, UserShare};
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 #[instruction(

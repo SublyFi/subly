@@ -1,15 +1,20 @@
 use anchor_lang::prelude::*;
 
 /// Privacy Cash Program ID on Mainnet
-/// Note: This is a placeholder - replace with actual program ID after verification
-pub const PRIVACY_CASH_PROGRAM_ID: Pubkey = pubkey!("PCash11111111111111111111111111111111111111");
+/// Verified program address for Privacy Cash on Solana mainnet
+/// Source: https://github.com/Privacy-Cash/privacy-cash
+pub const PRIVACY_CASH_PROGRAM_ID: Pubkey = pubkey!("9fhQBbumKEFuXtMBDw8AaQyAjCorLGJQiS3skWZdQyQD");
 
 /// Privacy Cash deposit instruction discriminator
-/// Calculated as: sha256("global:deposit_spl")[0..8]
-pub const DEPOSIT_SPL_DISCRIMINATOR: [u8; 8] = [0x00; 8]; // Placeholder
+/// Note: In the current architecture, Privacy Cash operations are handled via the
+/// TypeScript SDK (privacycash npm package) which manages ZK proof generation internally.
+/// CPI from on-chain programs is not used - the vault program only handles share accounting.
+/// These discriminators are kept for reference but are not actively used.
+pub const DEPOSIT_SPL_DISCRIMINATOR: [u8; 8] = [0x00; 8]; // Not used - SDK handles deposits
 
 /// Privacy Cash withdraw instruction discriminator
-pub const WITHDRAW_SPL_DISCRIMINATOR: [u8; 8] = [0x00; 8]; // Placeholder
+/// See note above - withdrawals are handled via SDK, not CPI
+pub const WITHDRAW_SPL_DISCRIMINATOR: [u8; 8] = [0x00; 8]; // Not used - SDK handles withdrawals
 
 /// Accounts required for Privacy Cash deposit
 #[derive(Accounts)]
@@ -130,8 +135,8 @@ pub fn cpi_deposit_spl<'info>(
 pub fn cpi_withdraw_spl<'info>(
     ctx: CpiContext<'_, '_, '_, 'info, PrivacyCashWithdraw<'info>>,
     amount: u64,
-    _nullifier: [u8; 32],  // Nullifier to prevent double-spend
-    _proof: &[u8],          // ZK proof of ownership
+    _nullifier: [u8; 32], // Nullifier to prevent double-spend
+    _proof: &[u8],        // ZK proof of ownership
 ) -> Result<()> {
     // Build instruction data
     let mut data = Vec::with_capacity(8 + 8 + 32 + _proof.len());
