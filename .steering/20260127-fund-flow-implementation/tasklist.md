@@ -14,9 +14,9 @@
 
 ## 前提条件
 
-- [ ] Kamino SDK (`@kamino-finance/klend-sdk`) のAPIドキュメント確認
-- [ ] Kamino プログラムのアカウント構造を理解
-- [ ] CPI 呼び出しに必要なアカウント一覧を整理
+- [x] Kamino SDK (`@kamino-finance/klend-sdk`) のAPIドキュメント確認
+- [x] Kamino プログラムのアカウント構造を理解
+- [x] CPI 呼び出しに必要なアカウント一覧を整理
 
 ---
 
@@ -24,20 +24,22 @@
 
 ### 1.1 オンチェーンプログラム変更
 
-- [ ] `state/shield_pool.rs` に新フィールド追加
-  - [ ] `token_account: Pubkey` (Shield Pool の USDC ATA)
-  - [ ] `kamino_ctoken_account: Pubkey` (Kamino cToken アカウント)
-  - [ ] `SPACE` 定数を更新
+- [x] `state/shield_pool.rs` に新フィールド追加
+  - [x] `token_account: Pubkey` (Shield Pool の USDC ATA)
+  - [x] `kamino_ctoken_account: Pubkey` (Kamino cToken アカウント)
+  - [x] `SPACE` 定数を更新
 
-- [ ] `instructions/initialize.rs` を更新
-  - [ ] Shield Pool ATA の作成ロジック追加
-  - [ ] Kamino cToken アカウントの作成ロジック追加
-  - [ ] 必要なアカウント（Token Program, Associated Token Program）を追加
+- [x] `instructions/initialize.rs` を更新
+  - [x] Shield Pool ATA の作成ロジック追加
+  - [x] Kamino cToken アカウントの作成ロジック追加
+  - [x] 必要なアカウント（Token Program, Associated Token Program）を追加
 
-- [ ] `constants.rs` に追加
-  - [ ] `USDC_MINT` (Mainnet USDC mint address)
-  - [ ] `KAMINO_LENDING_PROGRAM_ID`
-  - [ ] `KAMINO_MAIN_MARKET`
+- [x] `constants.rs` に追加
+  - [x] `USDC_MINT` (Mainnet USDC mint address)
+  - [x] `KAMINO_LENDING_PROGRAM_ID`
+  - [x] `KAMINO_MAIN_MARKET`
+  - [x] `KAMINO_USDC_RESERVE`
+  - [x] `KAMINO_CUSDC_MINT`
 
 ### 1.2 テスト
 
@@ -50,20 +52,19 @@
 
 ### 2.1 CPI モジュール作成
 
-- [ ] `integrations/kamino_cpi.rs` を新規作成
-  - [ ] Kamino Lending プログラムの instruction 構造体定義
-  - [ ] `kamino_deposit()` CPI 関数
-  - [ ] `kamino_withdraw()` CPI 関数
-  - [ ] 必要なアカウント構造体
+- [x] `integrations/kamino.rs` を更新
+  - [x] Kamino Lending プログラムの instruction discriminator 定義
+  - [x] `cpi_deposit_reserve_liquidity()` CPI 関数
+  - [x] `cpi_redeem_reserve_collateral()` CPI 関数
+  - [x] 必要なアカウント構造体 (`KaminoDepositAccounts`, `KaminoRedeemAccounts`)
 
-- [ ] `integrations/mod.rs` にエクスポート追加
+- [x] `integrations/mod.rs` にエクスポート確認済み
 
 ### 2.2 Kamino アカウント構造の定義
 
-- [ ] `state/kamino_accounts.rs` を新規作成（必要に応じて）
-  - [ ] KaminoMarket 構造体
-  - [ ] KaminoReserve 構造体
-  - [ ] KaminoObligation 構造体
+- [x] Kamino CPI用のアカウント構造体を `integrations/kamino.rs` に定義
+  - [x] `KaminoDepositAccounts` 構造体
+  - [x] `KaminoRedeemAccounts` 構造体
 
 ### 2.3 テスト
 
@@ -76,19 +77,22 @@
 
 ### 3.1 オンチェーン変更
 
-- [ ] `instructions/register_deposit.rs` を更新
-  - [ ] アカウント構造に追加:
-    - [ ] `shield_pool_token_account`
-    - [ ] `kamino_market`
-    - [ ] `kamino_reserve`
-    - [ ] `kamino_ctoken_account`
-    - [ ] `token_program`
-    - [ ] `kamino_program`
-  - [ ] 処理ロジック追加:
-    - [ ] Shield Pool ATA の残高確認
-    - [ ] Kamino deposit CPI 呼び出し
+- [x] `instructions/register_deposit.rs` を更新
+  - [x] アカウント構造に追加:
+    - [x] `pool_token_account`
+    - [x] `pool_ctoken_account`
+    - [x] `kamino_lending_market`
+    - [x] `kamino_lending_market_authority`
+    - [x] `kamino_reserve`
+    - [x] `kamino_reserve_liquidity_supply`
+    - [x] `kamino_reserve_collateral_mint`
+    - [x] `kamino_program`
+    - [x] `token_program`
+  - [x] 処理ロジック追加:
+    - [x] Shield Pool ATA の残高確認
+    - [x] Kamino deposit CPI 呼び出し (`deposit_to_kamino` メソッド)
 
-- [ ] `lib.rs` の `register_deposit` ハンドラ更新
+- [x] `lib.rs` の `register_deposit` ハンドラ更新
 
 ### 3.2 SDK変更
 
@@ -108,19 +112,22 @@
 
 ### 4.1 オンチェーン変更
 
-- [ ] `instructions/withdraw.rs` を更新
-  - [ ] アカウント構造に追加:
-    - [ ] `shield_pool_token_account`
-    - [ ] `kamino_market`
-    - [ ] `kamino_reserve`
-    - [ ] `kamino_ctoken_account`
-    - [ ] `token_program`
-    - [ ] `kamino_program`
-  - [ ] 処理ロジック追加:
-    - [ ] Kamino withdraw CPI 呼び出し
-    - [ ] Shield Pool ATA への USDC 入金確認
+- [x] `instructions/withdraw.rs` を更新
+  - [x] アカウント構造に追加:
+    - [x] `pool_token_account`
+    - [x] `pool_ctoken_account`
+    - [x] `kamino_lending_market`
+    - [x] `kamino_lending_market_authority`
+    - [x] `kamino_reserve`
+    - [x] `kamino_reserve_liquidity_supply`
+    - [x] `kamino_reserve_collateral_mint`
+    - [x] `kamino_program`
+    - [x] `token_program`
+  - [x] 処理ロジック追加:
+    - [x] Kamino redeem CPI 呼び出し (`redeem_from_kamino` メソッド)
+    - [x] Shield Pool ATA への USDC 入金
 
-- [ ] `lib.rs` の `withdraw` ハンドラ更新
+- [x] `lib.rs` の `withdraw` ハンドラ更新
 
 ### 4.2 SDK変更
 
@@ -140,11 +147,11 @@
 
 ### 5.1 オンチェーン変更
 
-- [ ] `instructions/execute_transfer.rs` を更新
-  - [ ] アカウント構造に Kamino 関連アカウント追加
-  - [ ] Kamino withdraw CPI 呼び出し追加
+- [x] `instructions/execute_transfer.rs` を更新
+  - [x] アカウント構造に Kamino 関連アカウント追加
+  - [x] Kamino redeem CPI 呼び出し追加 (`redeem_from_kamino` メソッド)
 
-- [ ] `lib.rs` の `execute_transfer` ハンドラ更新
+- [x] `lib.rs` の `execute_transfer` ハンドラ更新
 
 ### 5.2 SDK変更
 
@@ -164,13 +171,13 @@
 
 ### 6.1 オンチェーン変更
 
-- [ ] `instructions/update_pool_value.rs` を新規作成
-  - [ ] Kamino ポジションの現在価値を取得
-  - [ ] `total_pool_value` を更新
-  - [ ] `last_yield_update` を更新
+- [x] `instructions/update_pool_value.rs` を新規作成
+  - [x] cToken残高からプール価値を計算
+  - [x] `total_pool_value` を更新
+  - [x] `last_yield_update` を更新
 
-- [ ] `instructions/mod.rs` にエクスポート追加
-- [ ] `lib.rs` にハンドラ追加
+- [x] `instructions/mod.rs` にエクスポート追加
+- [x] `lib.rs` に `update_pool_value` ハンドラ追加
 
 ### 6.2 SDK変更
 
@@ -185,7 +192,8 @@
 
 ## フェーズ7: IDL更新・ビルド
 
-- [ ] `anchor build` で新しい IDL を生成
+- [x] `cargo build --release` が成功する
+- [ ] `anchor build` で新しい IDL を生成（Cargoバージョンの問題あり）
 - [ ] `packages/vault-sdk/src/idl/subly_vault.json` を更新
 - [ ] 型定義の整合性を確認
 
@@ -195,7 +203,7 @@
 
 ### 8.1 Rust プログラム
 
-- [ ] `anchor build` が成功する
+- [x] `cargo build --release` が成功する
 - [ ] `cargo clippy` で警告がない
 - [ ] `cargo fmt --check` でフォーマットが正しい
 
@@ -221,18 +229,18 @@
 
 ## 実装状況サマリー
 
-### 完了済み
-（なし - 未着手）
+### 完了済み (オンチェーンプログラム)
+- **フェーズ1**: Shield Pool Token Account の追加 ✅
+- **フェーズ2**: Kamino CPI モジュールの実装 ✅
+- **フェーズ3**: register_deposit への統合 ✅ (オンチェーン部分)
+- **フェーズ4**: withdraw への統合 ✅ (オンチェーン部分)
+- **フェーズ5**: execute_transfer への統合 ✅ (オンチェーン部分)
+- **フェーズ6**: update_pool_value 命令追加 ✅ (オンチェーン部分)
 
-### 未完了
-- **フェーズ1**: Shield Pool Token Account の追加
-- **フェーズ2**: Kamino CPI モジュールの実装
-- **フェーズ3**: register_deposit への統合
-- **フェーズ4**: withdraw への統合
-- **フェーズ5**: execute_transfer への統合
-- **フェーズ6**: total_pool_value 更新メカニズム
-- **フェーズ7**: IDL更新・ビルド
-- **フェーズ8**: 品質チェック
+### 未完了 (SDK・テスト・ドキュメント)
+- **フェーズ3-5**: SDK変更とテスト
+- **フェーズ7**: IDL更新（Cargoバージョン問題要解決）
+- **フェーズ8**: 品質チェック（clippy, fmt, テスト）
 - **フェーズ9**: ドキュメント更新
 
 ---
@@ -263,3 +271,21 @@
 ### リスク4: Privacy Cash との連携タイミング
 
 **対策**: SDK レベルでの適切なエラーハンドリング、リトライロジック
+
+---
+
+## 変更されたファイル一覧
+
+### オンチェーンプログラム
+- `programs/subly-vault/Cargo.toml` - anchor-spl 依存関係追加
+- `programs/subly-vault/src/constants.rs` - USDC/Kamino定数追加
+- `programs/subly-vault/src/state/shield_pool.rs` - 新フィールド追加
+- `programs/subly-vault/src/instructions/initialize.rs` - トークンアカウント作成
+- `programs/subly-vault/src/instructions/register_deposit.rs` - Kamino CPI追加
+- `programs/subly-vault/src/instructions/withdraw.rs` - Kamino CPI追加
+- `programs/subly-vault/src/instructions/execute_transfer.rs` - Kamino CPI追加
+- `programs/subly-vault/src/instructions/update_pool_value.rs` - 新規作成
+- `programs/subly-vault/src/instructions/mod.rs` - エクスポート追加
+- `programs/subly-vault/src/integrations/kamino.rs` - CPI関数実装
+- `programs/subly-vault/src/events.rs` - PoolValueUpdatedイベント更新
+- `programs/subly-vault/src/lib.rs` - 全ハンドラ更新

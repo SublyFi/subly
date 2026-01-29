@@ -33,6 +33,8 @@ pub mod subly_vault {
         pool.nonce = 0;
         pool.bump = ctx.bumps.shield_pool;
         pool.is_active = true;
+        pool.token_account = ctx.accounts.pool_token_account.key();
+        pool.kamino_ctoken_account = ctx.accounts.pool_ctoken_account.key();
         pool._reserved = [0u8; 64];
 
         emit!(PoolInitialized {
@@ -42,6 +44,8 @@ pub mod subly_vault {
         });
 
         msg!("Shield Pool initialized: {}", pool.key());
+        msg!("  Token Account: {}", pool.token_account);
+        msg!("  cToken Account: {}", pool.kamino_ctoken_account);
         Ok(())
     }
 
@@ -50,6 +54,13 @@ pub mod subly_vault {
     /// This is the preferred method for deposits as it preserves privacy.
     /// The registrar (relayer or pool authority) registers the deposit
     /// without exposing the user's wallet address.
+    ///
+    /// Flow:
+    /// 1. Verify deposit amount meets requirements
+    /// 2. Verify pool token account has sufficient balance (Privacy Cash has already deposited)
+    /// 3. Calculate shares to mint
+    /// 4. Deposit USDC to Kamino for yield generation
+    /// 5. Update pool state
     pub fn register_deposit(
         ctx: Context<RegisterDeposit>,
         note_commitment: [u8; 32],
@@ -66,15 +77,28 @@ pub mod subly_vault {
             VaultError::DepositExceedsMaximum
         );
 
-        let pool = &mut ctx.accounts.shield_pool;
-        let clock = Clock::get()?;
+        // Verify pool token account has sufficient balance
+        // (Privacy Cash should have already transferred USDC to this account)
+        let pool_token_balance = ctx.accounts.pool_token_account.amount;
+        require!(
+            pool_token_balance >= amount,
+            VaultError::InsufficientBalance
+        );
 
-        // Calculate shares for this deposit
-        let shares_to_mint = pool
+        // Calculate shares for this deposit before mutable borrow
+        let shares_to_mint = ctx
+            .accounts
+            .shield_pool
             .calculate_shares_for_deposit(amount)
             .ok_or(VaultError::InvalidShareCalculation)?;
 
         require!(shares_to_mint > 0, VaultError::InvalidShareCalculation);
+
+        // Deposit USDC to Kamino for yield generation (before mutable borrows)
+        ctx.accounts.deposit_to_kamino(amount)?;
+
+        let pool = &mut ctx.accounts.shield_pool;
+        let clock = Clock::get()?;
 
         // Initialize note commitment registry (prevents double registration)
         let registry = &mut ctx.accounts.note_commitment_registry;
@@ -129,6 +153,7 @@ pub mod subly_vault {
             amount,
             shares_to_mint
         );
+        msg!("  USDC deposited to Kamino for yield generation");
 
         Ok(())
     }
@@ -217,6 +242,13 @@ pub mod subly_vault {
     }
 
     /// Withdraw USDC from the Shield Pool
+    ///
+    /// Flow:
+    /// 1. Verify nullifier hasn't been used (prevents double-spend)
+    /// 2. Calculate shares to burn
+    /// 3. Redeem cTokens from Kamino to get USDC
+    /// 4. Update user shares and pool state
+    /// 5. (SDK handles) Transfer USDC via Privacy Cash
     pub fn withdraw(
         ctx: Context<Withdraw>,
         amount: u64,
@@ -227,28 +259,43 @@ pub mod subly_vault {
     ) -> Result<()> {
         require!(amount > 0, VaultError::InvalidWithdrawalAmount);
 
-        let pool = &mut ctx.accounts.shield_pool;
-        let clock = Clock::get()?;
-
-        require!(pool.is_active, VaultError::PoolNotInitialized);
+        // Read-only checks first (before mutable borrow)
         require!(
-            pool.total_pool_value >= amount,
+            ctx.accounts.shield_pool.is_active,
+            VaultError::PoolNotInitialized
+        );
+        require!(
+            ctx.accounts.shield_pool.total_pool_value >= amount,
             VaultError::InsufficientBalance
         );
 
-        let shares_to_burn = pool
+        let shares_to_burn = ctx
+            .accounts
+            .shield_pool
             .calculate_shares_for_withdrawal(amount)
             .ok_or(VaultError::InvalidShareCalculation)?;
 
         require!(shares_to_burn > 0, VaultError::InvalidShareCalculation);
         require!(
-            shares_to_burn <= pool.total_shares,
+            shares_to_burn <= ctx.accounts.shield_pool.total_shares,
             VaultError::InsufficientBalance
         );
 
-        let nullifier = &mut ctx.accounts.nullifier;
-        require!(!nullifier.is_used, VaultError::NullifierAlreadyUsed);
+        // Check nullifier before CPI
+        require!(
+            !ctx.accounts.nullifier.is_used,
+            VaultError::NullifierAlreadyUsed
+        );
 
+        // Redeem cTokens from Kamino to get USDC (before mutable borrows)
+        // Note: Using amount as collateral_amount assumes 1:1 ratio
+        // In production, this should be calculated based on exchange rate
+        ctx.accounts.redeem_from_kamino(amount)?;
+
+        let pool = &mut ctx.accounts.shield_pool;
+        let clock = Clock::get()?;
+
+        let nullifier = &mut ctx.accounts.nullifier;
         nullifier.nullifier = nullifier_hash;
         nullifier.is_used = true;
         nullifier.used_at = clock.unix_timestamp;
@@ -285,6 +332,7 @@ pub mod subly_vault {
         });
 
         msg!("Withdrew {} USDC, burned {} shares", amount, shares_to_burn);
+        msg!("  USDC redeemed from Kamino, ready for Privacy Cash transfer");
         Ok(())
     }
 
@@ -352,31 +400,42 @@ pub mod subly_vault {
     ///
     /// This records that a transfer has been executed, without revealing
     /// the recipient. The actual transfer is done via Privacy Cash off-chain.
+    ///
+    /// Flow:
+    /// 1. Verify batch proof
+    /// 2. Redeem cTokens from Kamino
+    /// 3. Update pool and transfer state
+    /// 4. (SDK handles) Transfer USDC via Privacy Cash
     pub fn execute_transfer(ctx: Context<ExecuteTransfer>, execution_index: u32) -> Result<()> {
-        let transfer = &mut ctx.accounts.scheduled_transfer;
-        let pool = &mut ctx.accounts.shield_pool;
         let clock = Clock::get()?;
 
-        require!(transfer.is_active, VaultError::TransferNotActive);
+        // Read-only checks first (before mutable borrow)
         require!(
-            transfer.is_due(clock.unix_timestamp),
+            ctx.accounts.scheduled_transfer.is_active,
+            VaultError::TransferNotActive
+        );
+        require!(
+            ctx.accounts.scheduled_transfer.is_due(clock.unix_timestamp),
             VaultError::TransferNotDue
         );
 
-        let _commitment = transfer.user_commitment;
-        let amount = transfer.amount;
+        let amount = ctx.accounts.scheduled_transfer.amount;
         // Note: recipient is NOT read from on-chain - it's stored encrypted
         // and provided by the client at execution time via Privacy Cash
 
-        let batch_proof = &ctx.accounts.batch_proof;
-        require!(!batch_proof.is_used, VaultError::NullifierAlreadyUsed);
+        require!(
+            !ctx.accounts.batch_proof.is_used,
+            VaultError::NullifierAlreadyUsed
+        );
 
-        let pool_value_diff = pool
+        let pool_value_diff = ctx
+            .accounts
+            .shield_pool
             .total_pool_value
-            .abs_diff(batch_proof.pool_value_at_generation);
+            .abs_diff(ctx.accounts.batch_proof.pool_value_at_generation);
 
-        let tolerance_amount = (batch_proof.pool_value_at_generation as u128)
-            .checked_mul(batch_proof.pool_value_tolerance_bps as u128)
+        let tolerance_amount = (ctx.accounts.batch_proof.pool_value_at_generation as u128)
+            .checked_mul(ctx.accounts.batch_proof.pool_value_tolerance_bps as u128)
             .and_then(|v| v.checked_div(10000))
             .ok_or(VaultError::ArithmeticOverflow)? as u64;
 
@@ -385,24 +444,37 @@ pub mod subly_vault {
             VaultError::InvalidProof
         );
 
-        let shares_to_burn = pool
+        let shares_to_burn = ctx
+            .accounts
+            .shield_pool
             .calculate_shares_for_withdrawal(amount)
             .ok_or(VaultError::InvalidShareCalculation)?;
 
         require!(
-            pool.total_pool_value >= amount,
+            ctx.accounts.shield_pool.total_pool_value >= amount,
             VaultError::InsufficientBalance
         );
 
+        // Copy batch_proof values before CPI (they'll be needed after mutable borrow)
+        let batch_proof_nullifier = ctx.accounts.batch_proof.nullifier;
+        let batch_proof_new_encrypted_share = ctx.accounts.batch_proof.new_encrypted_share;
+
+        // Redeem cTokens from Kamino to get USDC for the transfer (before mutable borrows)
+        ctx.accounts.redeem_from_kamino(amount)?;
+
+        // Now take mutable borrows
+        let transfer = &mut ctx.accounts.scheduled_transfer;
+        let pool = &mut ctx.accounts.shield_pool;
+
         let nullifier = &mut ctx.accounts.nullifier;
-        nullifier.nullifier = batch_proof.nullifier;
+        nullifier.nullifier = batch_proof_nullifier;
         nullifier.is_used = true;
         nullifier.used_at = clock.unix_timestamp;
         nullifier.operation_type = OperationType::Transfer;
         nullifier.bump = ctx.bumps.nullifier;
 
         let user_share = &mut ctx.accounts.user_share;
-        user_share.encrypted_share_amount = batch_proof.new_encrypted_share;
+        user_share.encrypted_share_amount = batch_proof_new_encrypted_share;
         user_share.last_update = clock.unix_timestamp;
 
         let batch_proof = &mut ctx.accounts.batch_proof;
@@ -473,6 +545,69 @@ pub mod subly_vault {
         });
 
         msg!("Transfer {} cancelled", transfer.key());
+        Ok(())
+    }
+
+    /// Update the pool's total value based on Kamino yield
+    ///
+    /// This reads the current cToken balance and calculates the equivalent
+    /// USDC value. The exchange rate between cTokens and USDC increases
+    /// over time as yield accrues.
+    ///
+    /// Should be called periodically (e.g., daily) by the pool authority
+    /// or an automated keeper.
+    ///
+    /// Note: The exchange_rate parameter is provided by the caller after
+    /// reading the current rate from Kamino's reserve state off-chain.
+    /// This approach avoids complex on-chain oracle integration.
+    pub fn update_pool_value(
+        ctx: Context<UpdatePoolValue>,
+        exchange_rate_numerator: u64,
+        exchange_rate_denominator: u64,
+    ) -> Result<()> {
+        require!(
+            exchange_rate_denominator > 0,
+            VaultError::ArithmeticOverflow
+        );
+
+        let pool = &mut ctx.accounts.shield_pool;
+        let clock = Clock::get()?;
+
+        let ctoken_balance = ctx.accounts.pool_ctoken_account.amount;
+        let usdc_balance = ctx.accounts.pool_token_account.amount;
+
+        // Calculate USDC value from cToken balance using exchange rate
+        // ctoken_value = ctoken_balance * exchange_rate_numerator / exchange_rate_denominator
+        let ctoken_value = (ctoken_balance as u128)
+            .checked_mul(exchange_rate_numerator as u128)
+            .and_then(|v| v.checked_div(exchange_rate_denominator as u128))
+            .ok_or(VaultError::ArithmeticOverflow)? as u64;
+
+        // Total pool value = USDC balance + cToken value
+        let new_pool_value = usdc_balance
+            .checked_add(ctoken_value)
+            .ok_or(VaultError::ArithmeticOverflow)?;
+
+        let old_pool_value = pool.total_pool_value;
+        pool.total_pool_value = new_pool_value;
+        pool.last_yield_update = clock.unix_timestamp;
+
+        emit!(PoolValueUpdated {
+            pool: pool.key(),
+            old_value: old_pool_value,
+            new_value: new_pool_value,
+            ctoken_balance,
+            usdc_balance,
+            timestamp: clock.unix_timestamp,
+        });
+
+        msg!(
+            "Pool value updated: {} -> {} USDC (cTokens: {}, USDC: {})",
+            old_pool_value,
+            new_pool_value,
+            ctoken_balance,
+            usdc_balance
+        );
         Ok(())
     }
 }

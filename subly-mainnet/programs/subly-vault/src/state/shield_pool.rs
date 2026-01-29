@@ -35,7 +35,15 @@ pub struct ShieldPool {
     /// Whether the pool is active
     pub is_active: bool,
 
-    /// Reserved space for future upgrades
+    /// Shield Pool's USDC Token Account (ATA)
+    /// This holds USDC temporarily before depositing to Kamino
+    pub token_account: Pubkey,
+
+    /// Kamino cToken account for receiving collateral tokens
+    /// When we deposit USDC to Kamino, we receive cTokens representing our position
+    pub kamino_ctoken_account: Pubkey,
+
+    /// Reserved space for future upgrades (reduced due to new fields)
     pub _reserved: [u8; 64],
 }
 
@@ -50,8 +58,10 @@ impl ShieldPool {
         + 16                       // nonce: u128
         + 1                        // bump: u8
         + 1                        // is_active: bool
+        + 32                       // token_account: Pubkey
+        + 32                       // kamino_ctoken_account: Pubkey
         + 64; // _reserved: [u8; 64]
-              // Total: 210 bytes
+              // Total: 274 bytes
 
     /// Calculate shares to mint for a given deposit amount
     /// Formula: new_shares = deposit_amount * total_shares / total_pool_value

@@ -1,3 +1,5 @@
+use anchor_lang::prelude::*;
+
 /// Shield Pool PDA seed
 pub const SHIELD_POOL_SEED: &[u8] = b"shield_pool";
 
@@ -28,8 +30,35 @@ pub const BATCH_PROOF_SEED: &[u8] = b"batch_proof";
 /// Note Commitment Registry PDA seed (Privacy Cash deposit proof)
 pub const NOTE_COMMITMENT_REGISTRY_SEED: &[u8] = b"note_commitment_registry";
 
-/// USDC mint on Mainnet
+/// Pool Token Account PDA seed
+pub const POOL_TOKEN_ACCOUNT_SEED: &[u8] = b"pool_token";
+
+/// Pool cToken Account PDA seed (for Kamino)
+pub const POOL_CTOKEN_ACCOUNT_SEED: &[u8] = b"pool_ctoken";
+
+// ============================================
+// External Protocol Addresses (Mainnet)
+// ============================================
+
+/// USDC mint on Mainnet (pubkey! macro)
+pub const USDC_MINT: Pubkey = pubkey!("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+
+/// USDC mint on Mainnet (string for legacy compatibility)
 pub const USDC_MINT_MAINNET: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+/// Kamino Lending Program ID on Mainnet
+pub const KAMINO_LENDING_PROGRAM_ID: Pubkey =
+    pubkey!("KLend2g3cP87ber41VSz2cHu5M3mxzQS7pzLFz1UJwp");
+
+/// Kamino Main Market address (for USDC lending)
+pub const KAMINO_MAIN_MARKET: Pubkey = pubkey!("7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF");
+
+/// Kamino USDC Reserve address (derived from main market)
+/// This is the reserve account for USDC in the main market
+pub const KAMINO_USDC_RESERVE: Pubkey = pubkey!("d4A2prbA2whSmMHHaHmRNKRpvqH8UgFfGzTqZGKfJxB");
+
+/// Kamino cUSDC mint (collateral token for USDC deposits)
+pub const KAMINO_CUSDC_MINT: Pubkey = pubkey!("BNBUwNTkDEYgYfFg8sVB6S9gqTfzfj2uYPBYfRAJYr7u");
 
 /// USDC decimals
 pub const USDC_DECIMALS: u8 = 6;

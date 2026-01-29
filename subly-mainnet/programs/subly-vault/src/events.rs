@@ -70,7 +70,10 @@ pub struct PoolValueUpdated {
     pub pool: Pubkey,
     pub old_value: u64,
     pub new_value: u64,
-    pub yield_amount: u64,
+    /// Current cToken balance in Kamino
+    pub ctoken_balance: u64,
+    /// Current USDC balance (not in Kamino)
+    pub usdc_balance: u64,
     pub timestamp: i64,
 }
 

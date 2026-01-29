@@ -339,7 +339,10 @@ describe("subly-vault", () => {
     let commitment: number[];
     let userSharePda: PublicKey;
     let scheduledTransferPda: PublicKey;
-    const recipient = Keypair.generate().publicKey;
+    // Privacy-preserving: recipient is encrypted, not stored in plain text
+    const generateEncryptedTransferData = (): number[] => {
+      return Array.from(crypto.randomBytes(128));
+    };
 
     before(async () => {
       // First, create a deposit
@@ -372,12 +375,14 @@ describe("subly-vault", () => {
       const amount = new anchor.BN(10_000_000); // 10 USDC per transfer
       const intervalSeconds = 86400; // 1 day
       const transferNonce = new anchor.BN(0);
+      // Privacy-preserving: recipient is encrypted in this 128-byte data
+      const encryptedTransferData = generateEncryptedTransferData();
 
       [scheduledTransferPda] = getScheduledTransferPda(commitment, transferNonce);
 
       try {
         const tx = await program.methods
-          .setupTransfer(recipient, amount, intervalSeconds, transferNonce)
+          .setupTransfer(encryptedTransferData, amount, intervalSeconds, transferNonce)
           .accounts({
             payer: provider.wallet.publicKey,
             shieldPool: shieldPoolPda,
@@ -394,14 +399,14 @@ describe("subly-vault", () => {
           scheduledTransferPda
         );
 
-        expect(transfer.recipient.toBase58()).to.equal(recipient.toBase58());
+        // Privacy: recipient is no longer stored in plain text
+        expect(transfer.encryptedTransferData).to.deep.equal(encryptedTransferData);
         expect(transfer.amount.toNumber()).to.equal(amount.toNumber());
         expect(transfer.intervalSeconds).to.equal(intervalSeconds);
         expect(transfer.isActive).to.equal(true);
         expect(transfer.executionCount.toNumber()).to.equal(0);
 
         console.log("Scheduled transfer created successfully!");
-        console.log("  Recipient:", transfer.recipient.toBase58());
         console.log("  Amount:", transfer.amount.toString());
         console.log("  Interval:", transfer.intervalSeconds, "seconds");
         console.log("  Next Execution:", new Date(transfer.nextExecution.toNumber() * 1000).toISOString());
@@ -415,12 +420,13 @@ describe("subly-vault", () => {
       const amount = new anchor.BN(10_000_000);
       const invalidInterval = 100; // Less than minimum (86400)
       const transferNonce = new anchor.BN(1);
+      const encryptedTransferData = generateEncryptedTransferData();
 
       const [newTransferPda] = getScheduledTransferPda(commitment, transferNonce);
 
       try {
         await program.methods
-          .setupTransfer(recipient, amount, invalidInterval, transferNonce)
+          .setupTransfer(encryptedTransferData, amount, invalidInterval, transferNonce)
           .accounts({
             payer: provider.wallet.publicKey,
             shieldPool: shieldPoolPda,
