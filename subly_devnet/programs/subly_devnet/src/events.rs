@@ -30,4 +30,26 @@ pub struct SubscriptionCountUpdatedEvent {
     pub plan: Pubkey,
     pub encrypted_count: [u8; 32],
     pub nonce: [u8; 16],
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct MxeInitializedEvent {
+    pub mxe_account: Pubkey,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct ComputationQueuedEvent {
+    pub plan: Pubkey,
+    pub operation: String,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct SubscriptionStatusEncryptedEvent {
+    pub subscription: Pubkey,
+    pub encrypted_status: [u8; 64],
+    pub status_nonce: [u8; 16],
+    pub timestamp: i64,
 }

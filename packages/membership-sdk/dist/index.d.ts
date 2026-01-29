@@ -241,6 +241,7 @@ declare const CONSTANTS: {
         readonly BUSINESS: "business";
         readonly PLAN: "plan";
         readonly SUBSCRIPTION: "subscription";
+        readonly MXE: "mxe";
     };
 };
 
@@ -342,6 +343,22 @@ declare class SublyMembershipClient {
      */
     getSubscriptionCount(planPubkey: PublicKey): Promise<Uint8Array | null>;
     /**
+     * Initialize the MXE account for Arcium integration
+     * This should be called once after program deployment
+     * @returns Transaction result with signature
+     */
+    initializeMxe(): Promise<TransactionResult>;
+    /**
+     * Check if MXE account is initialized
+     * @returns True if MXE account exists
+     */
+    isMxeInitialized(): Promise<boolean>;
+    /**
+     * Get the MXE account PDA
+     * @returns MXE account PDA
+     */
+    getMxePda(): PublicKey;
+    /**
      * Get the program ID
      */
     getProgramId(): PublicKey;
@@ -385,6 +402,13 @@ declare function deriveSubscriptionPda(plan: PublicKey, membershipCommitment: Ui
  * @returns The business PDA
  */
 declare function getBusinessPdaForAuthority(authority: PublicKey, programId: PublicKey): PublicKey;
+/**
+ * Derive the MXE account PDA
+ * Used for Arcium MXE integration
+ * @param programId - The program ID
+ * @returns The MXE PDA and bump
+ */
+declare function deriveMxePda(programId: PublicKey): [PublicKey, number];
 
 /**
  * Generate a random nonce for encryption
@@ -1492,4 +1516,4 @@ declare const PROGRAM_ID = "2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA";
 
 declare const IDL: any;
 
-export { type Business, type BusinessAccount, CONSTANTS, type CreatePlanInput, type EncryptedData, IDL, type MembershipProof, type NetworkConfig, PROGRAM_ID, type Plan, type PlanAccount, type PlanFilter, type RegisterBusinessInput, type SublyDevnet, SublyMembershipClient, type SublyMembershipClientConfig, type SubscribeInput, type Subscription, type SubscriptionAccount, type SubscriptionFilter, type TransactionResult, bigIntToBytes, dateToTimestamp, daysToSeconds, decryptPlanData, deriveBusinessPda, derivePlanPda, deriveSubscriptionPda, encryptPlanData, formatBillingCycle, formatUsdc, generateMembershipCommitment, generateNonce, generateUserCommitment, generateUserSecret, getBusinessPdaForAuthority, secondsToDays, timestampToDate, usdcFromOnChain, usdcToOnChain };
+export { type Business, type BusinessAccount, CONSTANTS, type CreatePlanInput, type EncryptedData, IDL, type MembershipProof, type NetworkConfig, PROGRAM_ID, type Plan, type PlanAccount, type PlanFilter, type RegisterBusinessInput, type SublyDevnet, SublyMembershipClient, type SublyMembershipClientConfig, type SubscribeInput, type Subscription, type SubscriptionAccount, type SubscriptionFilter, type TransactionResult, bigIntToBytes, dateToTimestamp, daysToSeconds, decryptPlanData, deriveBusinessPda, deriveMxePda, derivePlanPda, deriveSubscriptionPda, encryptPlanData, formatBillingCycle, formatUsdc, generateMembershipCommitment, generateNonce, generateUserCommitment, generateUserSecret, getBusinessPdaForAuthority, secondsToDays, timestampToDate, usdcFromOnChain, usdcToOnChain };

@@ -1027,7 +1027,8 @@ var CONSTANTS = {
   SEEDS: {
     BUSINESS: "business",
     PLAN: "plan",
-    SUBSCRIPTION: "subscription"
+    SUBSCRIPTION: "subscription",
+    MXE: "mxe"
   }
 };
 
@@ -1060,6 +1061,12 @@ function deriveSubscriptionPda(plan, membershipCommitment, programId) {
 function getBusinessPdaForAuthority(authority, programId) {
   const [pda] = deriveBusinessPda(authority, programId);
   return pda;
+}
+function deriveMxePda(programId) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from(CONSTANTS.SEEDS.MXE)],
+    programId
+  );
 }
 
 // src/utils/encryption.ts
@@ -1526,6 +1533,52 @@ var SublyMembershipClient = class {
     }
   }
   // ============================================
+  // MXE Operations (Arcium Integration)
+  // ============================================
+  /**
+   * Initialize the MXE account for Arcium integration
+   * This should be called once after program deployment
+   * @returns Transaction result with signature
+   */
+  async initializeMxe() {
+    try {
+      const [mxePda] = deriveMxePda(this.programId);
+      const signature = await this.program.methods.initializeMxe().accounts({
+        payer: this.wallet.publicKey,
+        mxeAccount: mxePda,
+        systemProgram: SystemProgram.programId
+      }).rpc();
+      return { signature, success: true };
+    } catch (error) {
+      return {
+        signature: "",
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+  /**
+   * Check if MXE account is initialized
+   * @returns True if MXE account exists
+   */
+  async isMxeInitialized() {
+    try {
+      const [mxePda] = deriveMxePda(this.programId);
+      await this.program.account.mxeAccount.fetch(mxePda);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  /**
+   * Get the MXE account PDA
+   * @returns MXE account PDA
+   */
+  getMxePda() {
+    const [mxePda] = deriveMxePda(this.programId);
+    return mxePda;
+  }
+  // ============================================
   // Utility Methods
   // ============================================
   /**
@@ -1557,6 +1610,7 @@ export {
   daysToSeconds,
   decryptPlanData,
   deriveBusinessPda,
+  deriveMxePda,
   derivePlanPda,
   deriveSubscriptionPda,
   encryptPlanData,
