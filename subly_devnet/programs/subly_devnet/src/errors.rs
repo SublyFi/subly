@@ -43,4 +43,35 @@ pub enum SublyError {
 
     #[msg("Invalid billing cycle")]
     InvalidBillingCycle,
+
+    // Light Protocol ZK Compression errors
+    #[msg("Invalid Merkle tree")]
+    InvalidMerkleTree,
+
+    #[msg("Invalid plan")]
+    InvalidPlan,
+
+    #[msg("Invalid membership commitment")]
+    InvalidMembershipCommitment,
+
+    #[msg("Proof has expired")]
+    ProofExpired,
+
+    #[msg("Invalid proof signature")]
+    InvalidProofSignature,
+
+    #[msg("Arithmetic overflow")]
+    Overflow,
+
+    #[msg("Compressed subscription not found")]
+    CompressedSubscriptionNotFound,
+
+    #[msg("Invalid proof data")]
+    InvalidProofData,
+
+    #[msg("Invalid tree info data")]
+    InvalidTreeInfo,
+
+    #[msg("Invalid account meta data")]
+    InvalidAccountMeta,
 }

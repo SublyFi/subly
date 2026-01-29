@@ -1,0 +1,2 @@
+export * from "./proof";
+//# sourceMappingURL=index.d.ts.map

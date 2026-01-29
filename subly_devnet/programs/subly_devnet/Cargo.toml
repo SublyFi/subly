@@ -25,5 +25,12 @@ arcium-client = { default-features = false, version = "0.5.4" }
 arcium-macros = "0.5.4"
 arcium-anchor = "0.5.4"
 
+# Light Protocol for ZK Compression
+light-sdk = { version = "0.17", features = ["anchor", "v2"] }
+light-sdk-types = { version = "0.17", features = ["v2"] }
+light-hasher = "5.0"
+borsh = "0.10"
+borsh-derive = "0.10"
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

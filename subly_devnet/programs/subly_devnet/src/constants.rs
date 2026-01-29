@@ -21,3 +21,9 @@ pub const MXE_SEED: &[u8] = b"mxe";
 
 /// Sign PDA Seed for Arcium
 pub const SIGN_PDA_SEED: &[u8] = b"sign_pda";
+
+/// Light Protocol CPI Authority Seed
+pub const LIGHT_CPI_AUTHORITY_SEED: &[u8] = b"authority";
+
+/// Compressed Subscription PDA Seed
+pub const COMPRESSED_SUBSCRIPTION_SEED: &[u8] = b"compressed_sub";

@@ -53,3 +53,55 @@ pub struct SubscriptionStatusEncryptedEvent {
     pub status_nonce: [u8; 16],
     pub timestamp: i64,
 }
+
+// ============================================
+// Light Protocol ZK Compression Events
+// ============================================
+
+#[event]
+pub struct ZkSubscriptionCreatedEvent {
+    /// The plan this subscription belongs to
+    pub plan: Pubkey,
+    /// Membership commitment for ZK proofs
+    pub membership_commitment: [u8; 32],
+    /// Address of the compressed subscription in Light Protocol
+    pub compressed_address: [u8; 32],
+    /// Leaf index in the state tree
+    pub leaf_index: u32,
+    /// Creation timestamp
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct MembershipVerifiedEvent {
+    /// The plan membership was verified for
+    pub plan: Pubkey,
+    /// Membership commitment that was verified
+    pub membership_commitment: [u8; 32],
+    /// Verification timestamp
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct SubscriptionMigratedToZkEvent {
+    /// Original subscription account (PDA)
+    pub original_subscription: Pubkey,
+    /// The plan this subscription belongs to
+    pub plan: Pubkey,
+    /// Membership commitment for ZK proofs
+    pub membership_commitment: [u8; 32],
+    /// Address of the new compressed subscription
+    pub compressed_address: [u8; 32],
+    /// Migration timestamp
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct ZkSubscriptionCancelledEvent {
+    /// The plan this subscription belonged to
+    pub plan: Pubkey,
+    /// Membership commitment
+    pub membership_commitment: [u8; 32],
+    /// Cancellation timestamp
+    pub timestamp: i64,
+}

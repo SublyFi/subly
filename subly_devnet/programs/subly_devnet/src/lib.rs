@@ -3,12 +3,18 @@ use anchor_lang::prelude::*;
 pub mod constants;
 pub mod errors;
 pub mod events;
+pub mod instructions;
 pub mod state;
 
 use constants::*;
 use errors::SublyError;
 use events::*;
+use instructions::*;
 use state::*;
+
+// Note: Light Protocol types are used internally but not re-exported
+// to avoid Anchor IDL generation issues. Instruction parameters use byte arrays
+// which are deserialized internally to Light Protocol types.
 
 declare_id!("2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA");
 
@@ -336,6 +342,111 @@ pub mod subly_devnet {
         });
 
         Ok(())
+    }
+
+    // ============================================
+    // Light Protocol ZK Compression Instructions
+    // ============================================
+    // These instructions use Light Protocol for ZK compressed subscriptions
+    // allowing membership proofs without revealing subscriber identity.
+
+    /// Initialize ZK subscription tracker for a plan
+    /// This must be called before creating ZK compressed subscriptions
+    pub fn initialize_zk_tracker(ctx: Context<InitializeZkTracker>) -> Result<()> {
+        instructions::initialize_zk_tracker(ctx)
+    }
+
+    /// Subscribe to a plan using ZK compression (Light Protocol)
+    /// Creates a compressed subscription that can be proven via ZK proofs
+    ///
+    /// # Arguments
+    /// * `proof_data` - Serialized ValidityProof (borsh encoded)
+    /// * `address_tree_info_data` - Serialized PackedAddressTreeInfo (borsh encoded)
+    /// * `output_state_tree_index` - Index of the output state tree
+    /// * `membership_commitment` - Commitment hash for membership proofs
+    /// * `encrypted_user_commitment` - Encrypted user commitment (Arcium)
+    pub fn subscribe_zk<'info>(
+        ctx: Context<'_, '_, '_, 'info, SubscribeZk<'info>>,
+        proof_data: Vec<u8>,
+        address_tree_info_data: Vec<u8>,
+        output_state_tree_index: u8,
+        membership_commitment: [u8; 32],
+        encrypted_user_commitment: [u8; 32],
+    ) -> Result<()> {
+        instructions::subscribe_zk(
+            ctx,
+            proof_data,
+            address_tree_info_data,
+            output_state_tree_index,
+            membership_commitment,
+            encrypted_user_commitment,
+        )
+    }
+
+    /// Verify membership on-chain using ZK proof
+    /// Validates that a membership commitment exists in the state tree
+    ///
+    /// # Arguments
+    /// * `proof_data` - Serialized ValidityProof (borsh encoded)
+    /// * `account_meta_data` - Serialized CompressedAccountMeta (borsh encoded)
+    /// * `membership_commitment` - Commitment hash to verify
+    /// * `owner` - Expected owner of the subscription
+    pub fn verify_membership<'info>(
+        ctx: Context<'_, '_, '_, 'info, VerifyMembership<'info>>,
+        proof_data: Vec<u8>,
+        account_meta_data: Vec<u8>,
+        membership_commitment: [u8; 32],
+        owner: Pubkey,
+    ) -> Result<()> {
+        instructions::verify_membership(
+            ctx,
+            proof_data,
+            account_meta_data,
+            membership_commitment,
+            owner,
+        )
+    }
+
+    /// Verify membership off-chain (signature-based)
+    /// Simple verification using proof signature and expiry
+    pub fn verify_membership_offchain(
+        ctx: Context<VerifyMembershipOffchain>,
+        membership_commitment: [u8; 32],
+        proof_signature: [u8; 64],
+        proof_nonce: [u8; 32],
+        valid_until: i64,
+    ) -> Result<()> {
+        instructions::verify_membership_offchain(
+            ctx,
+            membership_commitment,
+            proof_signature,
+            proof_nonce,
+            valid_until,
+        )
+    }
+
+    /// Migrate existing PDA subscription to ZK compression
+    /// Creates a compressed subscription and optionally closes the original PDA
+    ///
+    /// # Arguments
+    /// * `proof_data` - Serialized ValidityProof (borsh encoded)
+    /// * `address_tree_info_data` - Serialized PackedAddressTreeInfo (borsh encoded)
+    /// * `output_state_tree_index` - Index of the output state tree
+    /// * `close_original` - Whether to close the original subscription PDA
+    pub fn migrate_subscription_to_zk<'info>(
+        ctx: Context<'_, '_, '_, 'info, MigrateToZk<'info>>,
+        proof_data: Vec<u8>,
+        address_tree_info_data: Vec<u8>,
+        output_state_tree_index: u8,
+        close_original: bool,
+    ) -> Result<()> {
+        instructions::migrate_subscription_to_zk(
+            ctx,
+            proof_data,
+            address_tree_info_data,
+            output_state_tree_index,
+            close_original,
+        )
     }
 }
 
