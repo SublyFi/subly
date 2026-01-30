@@ -42,11 +42,14 @@ interface DepositHistory {
 }
 /**
  * Scheduled transfer configuration
+ * Note: recipient is NOT stored on-chain - it's encrypted in encryptedTransferData
+ * and stored locally for privacy
  */
 interface ScheduledTransfer {
     transferId: PublicKey;
     userCommitment: Uint8Array;
-    recipient: PublicKey;
+    /** Encrypted transfer data (recipient is encrypted within this) */
+    encryptedTransferData: Uint8Array;
     amount: BN;
     intervalSeconds: number;
     nextExecution: BN;
@@ -55,7 +58,19 @@ interface ScheduledTransfer {
     executionCount: BN;
     totalTransferred: BN;
     createdAt: BN;
-    clockworkThread: PublicKey;
+    /** Tuk Tuk cron job (replaces deprecated Clockwork) */
+    tuktukCronJob: PublicKey;
+    bump: number;
+}
+/**
+ * Note Commitment Registry - tracks Privacy Cash deposits
+ */
+interface NoteCommitmentRegistry {
+    noteCommitment: Uint8Array;
+    userCommitment: Uint8Array;
+    amount: BN;
+    registeredAt: BN;
+    pool: PublicKey;
     bump: number;
 }
 /**
@@ -98,13 +113,24 @@ declare enum OperationType {
     Transfer = "Transfer"
 }
 /**
- * Deposit parameters
+ * Deposit parameters (DEPRECATED - use RegisterDepositParams)
+ * @deprecated Use registerDeposit with Privacy Cash for privacy-preserving deposits
  */
 interface DepositParams {
     /** Amount in USDC (6 decimals) */
     amount: number | BN;
     /** Optional user secret for commitment generation */
     secret?: Uint8Array;
+}
+/**
+ * Register deposit parameters for Privacy Cash integration
+ * This is the preferred privacy-preserving deposit method
+ */
+interface RegisterDepositParams {
+    /** Note commitment from Privacy Cash deposit proof */
+    noteCommitment: Uint8Array;
+    /** Amount in USDC (6 decimals) */
+    amount: number | BN;
 }
 /**
  * Withdraw parameters
@@ -117,14 +143,17 @@ interface WithdrawParams {
 }
 /**
  * Setup recurring payment parameters
+ * Note: recipient is encrypted and stored locally for privacy
  */
 interface SetupRecurringPaymentParams {
-    /** Recipient address (business) */
+    /** Recipient address (business) - stored locally, NOT on-chain */
     recipientAddress: PublicKey;
     /** Amount per transfer in USDC */
     amountUsdc: number;
     /** Transfer interval */
     interval: "hourly" | "daily" | "weekly" | "monthly";
+    /** Optional memo for local reference */
+    memo?: string;
 }
 /**
  * Balance result
@@ -159,6 +188,8 @@ interface VaultSdkConfig {
     commitment?: "processed" | "confirmed" | "finalized";
     /** Skip preflight simulation */
     skipPreflight?: boolean;
+    /** Storage key for local encrypted storage (default: 'subly-vault') */
+    storageKey?: string;
 }
 /**
  * Interval to seconds mapping
@@ -170,6 +201,160 @@ declare const INTERVAL_SECONDS: Record<SetupRecurringPaymentParams["interval"], 
 declare const PROGRAM_ID: PublicKey;
 declare const USDC_MINT_MAINNET: PublicKey;
 declare const USDC_DECIMALS = 6;
+declare const KAMINO_USDC_RESERVE: PublicKey;
+declare const KAMINO_CUSDC_MINT: PublicKey;
+declare const POOL_TOKEN_ACCOUNT_SEED: Buffer<ArrayBuffer>;
+declare const POOL_CTOKEN_ACCOUNT_SEED: Buffer<ArrayBuffer>;
+
+/**
+ * Local Storage Module for Privacy-Preserving Data
+ *
+ * This module handles the encrypted storage of sensitive data that
+ * should not be stored on-chain, such as:
+ * - Transfer recipient addresses
+ * - User secrets
+ * - Decryption keys
+ *
+ * All data is encrypted with AES-256-GCM before storage.
+ */
+/**
+ * Local transfer data - stored off-chain for privacy
+ */
+interface LocalTransferData {
+    /** The scheduled transfer PDA address */
+    transferId: string;
+    /** Recipient address (the business receiving payments) */
+    recipient: string;
+    /** Transfer amount in USDC */
+    amount: number;
+    /** Payment interval in seconds */
+    intervalSeconds: number;
+    /** When the transfer was created */
+    createdAt: number;
+    /** Last execution timestamp (if any) */
+    lastExecuted?: number;
+    /** Optional memo */
+    memo?: string;
+}
+/**
+ * Local vault data - user's complete local state
+ */
+interface LocalVaultData {
+    /** User's secret (32 bytes, base64 encoded) */
+    userSecret: string;
+    /** User's commitment (32 bytes, base64 encoded) */
+    userCommitment: string;
+    /** Current share amount (string representation of bigint) */
+    shares: string;
+    /** All scheduled transfers */
+    transfers: LocalTransferData[];
+    /** Version for migration purposes */
+    version: number;
+    /** Last updated timestamp */
+    lastUpdated: number;
+}
+/**
+ * Local Storage Manager
+ *
+ * Handles encrypted storage of privacy-sensitive data.
+ * Uses wallet-derived key for encryption.
+ */
+declare class LocalStorageManager {
+    private encryptionKey;
+    private storageKey;
+    constructor(storageKeyPrefix?: string);
+    /**
+     * Initialize the storage manager with a password or signature
+     *
+     * @param passwordOrSignature - Password string or wallet signature bytes
+     */
+    initialize(passwordOrSignature: string | Uint8Array): Promise<void>;
+    /**
+     * Check if the manager is initialized
+     */
+    isInitialized(): boolean;
+    /**
+     * Encrypt data using nacl secretbox
+     */
+    private encrypt;
+    /**
+     * Decrypt data using nacl secretbox
+     */
+    private decrypt;
+    /**
+     * Get storage (browser localStorage or in-memory)
+     */
+    private setStorage;
+    /**
+     * Get from storage (browser localStorage or in-memory)
+     */
+    private getStorage;
+    /**
+     * Remove from storage
+     */
+    private removeStorage;
+    /**
+     * Save vault data to local storage
+     */
+    saveVaultData(data: LocalVaultData): Promise<void>;
+    /**
+     * Load vault data from local storage
+     */
+    loadVaultData(): Promise<LocalVaultData | null>;
+    /**
+     * Ensure vault data exists, create if not
+     */
+    private ensureVaultData;
+    /**
+     * Save a transfer to local storage
+     * @alias saveTransferDetails
+     */
+    saveTransfer(transfer: LocalTransferData): Promise<void>;
+    /**
+     * Get a transfer from local storage
+     * @alias loadTransferDetails
+     */
+    getTransfer(transferId: string): Promise<LocalTransferData | null>;
+    /**
+     * Get all transfers from local storage
+     */
+    getAllTransfers(): Promise<LocalTransferData[]>;
+    /**
+     * Delete a transfer from local storage
+     */
+    deleteTransfer(transferId: string): Promise<void>;
+    /**
+     * Clear all local storage data
+     */
+    clearAll(): Promise<void>;
+    /**
+     * Create initial vault data structure
+     */
+    static createInitialData(userSecret: Uint8Array, userCommitment: Uint8Array): LocalVaultData;
+}
+/**
+ * Encrypt transfer data for on-chain storage
+ *
+ * This creates the encrypted_transfer_data that is stored on-chain.
+ * Only the user can decrypt this data using their wallet-derived key.
+ *
+ * @param recipient - Recipient address
+ * @param encryptionKey - 32-byte encryption key derived from wallet signature
+ * @param memo - Optional memo
+ * @returns 128-byte encrypted transfer data
+ */
+declare function encryptTransferData(recipient: string, encryptionKey: Uint8Array, memo?: string): Promise<Uint8Array>;
+/**
+ * Decrypt transfer data from on-chain storage
+ *
+ * @param encryptedData - 128-byte encrypted transfer data
+ * @param encryptionKey - 32-byte encryption key
+ * @returns Decrypted recipient and memo
+ */
+declare function decryptTransferData(encryptedData: Uint8Array, encryptionKey: Uint8Array): {
+    recipient: string;
+    memo: string;
+};
 
 /**
  * Tuk Tuk Integration Module
@@ -482,6 +667,7 @@ declare class SublyVaultClient {
     private privacyCash;
     private tuktuk;
     private kamino;
+    private localStorage;
     private userSecret;
     private userCommitment;
     constructor(connection: Connection, wallet: Wallet, programId?: PublicKey, config?: VaultSdkConfig);
@@ -489,15 +675,20 @@ declare class SublyVaultClient {
      * Initialize the SDK with the program IDL
      * Must be called before using other methods
      *
+     * IMPORTANT: Privacy Cash is REQUIRED for privacy-preserving operations.
+     * All deposits and transfers must go through Privacy Cash to protect user privacy.
+     *
      * @param idl - Program IDL
-     * @param options - Optional initialization options for external integrations
+     * @param options - Initialization options for external integrations
      */
-    initialize(idl: Idl, options?: {
-        privacyCashPrivateKey?: string | Uint8Array | Keypair;
+    initialize(idl: Idl, options: {
+        /** REQUIRED: Private key for Privacy Cash operations */
+        privacyCashPrivateKey: string | Uint8Array | Keypair;
         rpcUrl?: string;
-        enablePrivacyCash?: boolean;
         enableTukTuk?: boolean;
         enableKamino?: boolean;
+        /** Encryption password for local storage (default: derived from wallet) */
+        storagePassword?: string;
     }): Promise<void>;
     /**
      * Get the Shield Pool PDA address
@@ -520,31 +711,49 @@ declare class SublyVaultClient {
      */
     getUserCommitment(): Uint8Array;
     /**
-     * Deposit USDC into the Shield Pool
+     * Register a private deposit from Privacy Cash
      *
-     * @param params - Deposit parameters
-     * @param options - Optional configuration
+     * This is the PREFERRED method for deposits as it preserves privacy.
+     * The deposit flow is:
+     * 1. User deposits USDC to Privacy Cash (separate transaction)
+     * 2. Privacy Cash returns a note_commitment as proof
+     * 3. User calls registerDeposit with the note_commitment
+     * 4. The registrar (relayer or user) registers without exposing the user's wallet
+     *
+     * After registration, USDC is deposited to Kamino for yield generation.
+     *
+     * @param params - Register deposit parameters
      * @returns Transaction result
      */
-    deposit(params: DepositParams, options?: {
-        /** Use Privacy Cash for private deposit */
-        usePrivacyCash?: boolean;
-    }): Promise<TransactionResult>;
+    registerDeposit(params: RegisterDepositParams): Promise<TransactionResult>;
     /**
-     * Withdraw USDC from the Shield Pool
+     * Deposit USDC into the Shield Pool via Privacy Cash
+     *
+     * This method performs a complete privacy-preserving deposit:
+     * 1. Deposits USDC to Privacy Cash
+     * 2. Gets the note_commitment from Privacy Cash
+     * 3. Registers the deposit on-chain
+     *
+     * @deprecated For more control, use depositToPrivacyCash() + registerDeposit() separately
+     * @param params - Deposit parameters
+     * @returns Transaction result with Privacy Cash info
+     */
+    deposit(params: DepositParams): Promise<TransactionResult & {
+        noteCommitment?: Uint8Array;
+    }>;
+    /**
+     * Withdraw USDC from the Shield Pool via Privacy Cash
+     *
+     * All withdrawals go through Privacy Cash to preserve privacy.
+     * USDC is first redeemed from Kamino, then transferred via Privacy Cash.
      *
      * @param params - Withdrawal parameters
-     * @param options - Optional configuration
-     * @returns Transaction result with optional Privacy Cash info
+     * @param recipient - Optional recipient address (defaults to self via Privacy Cash)
+     * @returns Transaction result with Privacy Cash info
      */
-    withdraw(params: WithdrawParams, options?: {
-        /** Use Privacy Cash for private withdrawal */
-        usePrivacyCash?: boolean;
-        /** Recipient address (for Privacy Cash withdrawal) */
-        recipient?: string;
-    }): Promise<TransactionResult & {
-        privacyCashTx?: string;
-        privacyCashFee?: number;
+    withdraw(params: WithdrawParams, recipient?: string): Promise<TransactionResult & {
+        privacyCashTx: string;
+        privacyCashFee: number;
     }>;
     /**
      * Get the user's current balance
@@ -553,11 +762,15 @@ declare class SublyVaultClient {
      */
     getBalance(): Promise<BalanceResult>;
     /**
-     * Set up a recurring payment
+     * Set up a privacy-preserving recurring payment
+     *
+     * The recipient address is encrypted and stored locally - NOT on-chain.
+     * On-chain only stores encrypted_transfer_data that cannot reveal the recipient.
+     * At execution time, the recipient is loaded from local storage and sent via Privacy Cash.
      *
      * @param params - Recurring payment parameters
      * @param options - Optional configuration
-     * @returns Transaction result with optional Tuk Tuk cron job info
+     * @returns Transaction result with transfer ID and optional Tuk Tuk cron job info
      */
     setupRecurringPayment(params: SetupRecurringPaymentParams, options?: {
         /** Create a Tuk Tuk cron job for automated execution */
@@ -565,8 +778,35 @@ declare class SublyVaultClient {
         /** Amount of SOL to fund the cron job (default: 0.1 SOL) */
         cronJobFundingSol?: number;
     }): Promise<TransactionResult & {
+        transferId: string;
         cronJobPda?: string;
         cronJobTx?: string;
+    }>;
+    /**
+     * Get the recipient address for a scheduled transfer from local storage
+     *
+     * @param transferId - The scheduled transfer PDA address
+     * @returns Recipient address or null if not found
+     */
+    getTransferRecipient(transferId: string): Promise<string | null>;
+    /**
+     * Get all scheduled transfers from local storage
+     *
+     * @returns List of transfer data stored locally
+     */
+    getAllLocalTransfers(): Promise<LocalTransferData[]>;
+    /**
+     * Execute a scheduled transfer via Privacy Cash
+     *
+     * This method loads the recipient from local storage and sends via Privacy Cash.
+     * On-chain, no recipient information is stored.
+     *
+     * @param transferId - The scheduled transfer PDA address
+     * @param executionIndex - The execution index for tracking
+     * @returns Transaction result with Privacy Cash info
+     */
+    executeScheduledTransfer(transferId: PublicKey, executionIndex: number): Promise<TransactionResult & {
+        privacyCashTx: string;
     }>;
     /**
      * Cancel a recurring payment
@@ -659,6 +899,31 @@ declare class SublyVaultClient {
      * @returns Kamino yield info
      */
     getKaminoYieldInfo(): Promise<KaminoYieldInfo>;
+    /**
+     * Update the pool's total value based on Kamino yield
+     *
+     * This reads the current cToken balance and calculates the equivalent
+     * USDC value. Should be called periodically (e.g., daily) by the pool authority.
+     *
+     * @param exchangeRateNumerator - Current Kamino exchange rate numerator
+     * @param exchangeRateDenominator - Current Kamino exchange rate denominator
+     * @returns Transaction result
+     */
+    updatePoolValue(exchangeRateNumerator: BN, exchangeRateDenominator: BN): Promise<TransactionResult>;
+    /**
+     * Get the actual pool value including Kamino yield
+     *
+     * Calculates the current value by reading cToken balance and applying
+     * the current exchange rate.
+     *
+     * @returns Pool value in USDC (base units)
+     */
+    getActualPoolValue(): Promise<bigint>;
+    /**
+     * Get Kamino reserve liquidity supply address
+     * This is the token account where USDC liquidity is stored in the reserve
+     */
+    private getKaminoReserveLiquiditySupply;
     /**
      * Get user's share account
      */
@@ -805,6 +1070,7 @@ declare const SCHEDULED_TRANSFER_SEED: Buffer<ArrayBuffer>;
 declare const TRANSFER_HISTORY_SEED: Buffer<ArrayBuffer>;
 declare const NULLIFIER_SEED: Buffer<ArrayBuffer>;
 declare const BATCH_PROOF_SEED: Buffer<ArrayBuffer>;
+declare const NOTE_COMMITMENT_REGISTRY_SEED: Buffer<ArrayBuffer>;
 /**
  * Derive the Shield Pool PDA address
  */
@@ -844,16 +1110,22 @@ declare function getNullifierPda(nullifierHash: Uint8Array, programId?: PublicKe
  * @param executionIndex - Index of this execution
  */
 declare function getBatchProofPda(scheduledTransfer: PublicKey, executionIndex: number, programId?: PublicKey): [PublicKey, number];
+/**
+ * Derive the Note Commitment Registry PDA address
+ * Used for Privacy Cash deposit proofs to prevent double-registration
+ * @param noteCommitment - Note commitment from Privacy Cash (32 bytes)
+ */
+declare function getNoteCommitmentRegistryPda(noteCommitment: Uint8Array, programId?: PublicKey): [PublicKey, number];
 
 /**
  * Program IDL type definition
- * This file is auto-generated from the program's IDL
+ * This file is manually maintained until anchor build works with edition2024
  */
 
 type SublyVault = Idl;
 /**
  * Load the IDL from JSON
- * In production, import the generated IDL JSON file from target/idl/subly_vault.json
+ * This is a manually maintained IDL that reflects the current on-chain program structure
  */
 declare function getIdl(): SublyVault;
 
@@ -863,8 +1135,22 @@ declare function getIdl(): SublyVault;
  * Provides wrapper functions for the Privacy Cash SDK to enable
  * private USDC deposits and withdrawals on Solana mainnet.
  *
- * Note: Privacy Cash only works on mainnet (no devnet support).
- * Requires Node.js 24 or higher.
+ * @packageDocumentation
+ * @module privacy-cash
+ *
+ * SDK Information:
+ * - Package: privacycash v1.1.11
+ * - Repository: https://github.com/Privacy-Cash/privacy-cash-sdk
+ * - Network: Mainnet only (no devnet support)
+ * - Runtime: Node.js 24+ required
+ *
+ * API Reference (privacycash v1.1.11):
+ * - depositUSDC({ base_units }) → { tx: string }
+ * - withdrawUSDC({ base_units, recipientAddress?, referrer? }) → { isPartial, tx, recipient, base_units, fee_base_units }
+ * - getPrivateBalanceUSDC() → { base_units, amount, lamports }
+ * - getPrivateBalanceSpl(mintAddress) → { base_units, amount, lamports }
+ * - depositSPL({ base_units?, amount?, mintAddress }) → { tx: string }
+ * - withdrawSPL({ base_units?, amount?, mintAddress, recipientAddress?, referrer? }) → { isPartial, tx, recipient, base_units, fee_base_units }
  */
 
 /**
@@ -876,13 +1162,34 @@ declare const USDC_MINT: PublicKey;
  */
 declare const PRIVACY_CASH_PROGRAM_ID: PublicKey;
 /**
+ * Raw SDK response from depositUSDC/depositSPL
+ * @internal
+ */
+interface SDKDepositResponse {
+    tx: string;
+}
+/**
  * Result of a private withdrawal
+ *
+ * Maps SDK snake_case fields to camelCase for TypeScript consistency.
+ *
+ * @example
+ * ```typescript
+ * const result = await integration.withdrawPrivateUSDC(10);
+ * console.log(`Withdrew ${result.baseUnits / 1_000_000} USDC`);
+ * console.log(`Fee: ${result.feeBaseUnits / 1_000_000} USDC`);
+ * ```
  */
 interface WithdrawResult {
+    /** Transaction signature */
     tx: string;
+    /** Recipient address (base58) */
     recipient: string;
-    amountInBaseUnits: number;
-    feeInBaseUnits: number;
+    /** Amount withdrawn in base units (1 USDC = 1,000,000 base units) */
+    baseUnits: number;
+    /** Protocol fee in base units */
+    feeBaseUnits: number;
+    /** True if withdrawal was partial due to insufficient private balance */
     isPartial: boolean;
 }
 /**
@@ -916,14 +1223,23 @@ declare class PrivacyCashIntegration {
     /**
      * Deposit USDC privately
      *
+     * Uses the USDC-specific depositUSDC method for better reliability.
+     *
+     * SDK Method: depositUSDC({ base_units }) → { tx: string }
+     * Fallback: depositSPL({ mintAddress, base_units }) → { tx: string }
+     *
      * @param amount Amount in USDC (human-readable, e.g., 10 = 10 USDC)
      * @returns Transaction signature
      */
-    depositPrivateUSDC(amount: number): Promise<{
-        tx: string;
-    }>;
+    depositPrivateUSDC(amount: number): Promise<SDKDepositResponse>;
     /**
      * Withdraw USDC privately
+     *
+     * Uses the USDC-specific withdrawUSDC method for better reliability.
+     *
+     * SDK Method: withdrawUSDC({ base_units, recipientAddress?, referrer? })
+     *            → { isPartial, tx, recipient, base_units, fee_base_units }
+     * Fallback: withdrawSPL({ mintAddress, base_units, recipientAddress? })
      *
      * @param amount Amount in USDC (human-readable, e.g., 10 = 10 USDC)
      * @param recipient Optional recipient address (defaults to self)
@@ -932,6 +1248,11 @@ declare class PrivacyCashIntegration {
     withdrawPrivateUSDC(amount: number, recipient?: string): Promise<WithdrawResult>;
     /**
      * Get private USDC balance
+     *
+     * Uses the USDC-specific getPrivateBalanceUSDC method for better reliability.
+     *
+     * SDK Method: getPrivateBalanceUSDC() → { base_units, amount, lamports }
+     * Fallback: getPrivateBalanceSpl(mintAddress) → { base_units, amount, lamports }
      *
      * @returns Balance in USDC (human-readable)
      */
@@ -969,4 +1290,4 @@ declare class PrivacyCashError extends Error {
  */
 declare function createPrivacyCashIntegration(config: PrivacyCashConfig): Promise<PrivacyCashIntegration>;
 
-export { BATCH_PROOF_SEED, type BalanceResult, type CronJobResult, DEPOSIT_HISTORY_SEED, type DepositHistory, type DepositParams, INTERVAL_SECONDS, KAMINO_LENDING_PROGRAM_ID, KAMINO_MAIN_MARKET, KEY_DERIVATION_MESSAGE, type KaminoConfig, type KaminoDepositResult, KaminoError, KaminoIntegration, type KaminoWithdrawResult, type KaminoYieldInfo, NULLIFIER_SEED, type Nullifier, OperationType, PRIVACY_CASH_PROGRAM_ID, USDC_MINT as PRIVACY_CASH_USDC_MINT, PROGRAM_ID, type PendingTransfer, type PrivacyCashConfig, PrivacyCashError, PrivacyCashIntegration, SCHEDULED_TRANSFER_SEED, SHIELD_POOL_SEED, type ScheduledTransfer, type SetupRecurringPaymentParams, type ShieldPool, type SublyVault, SublyVaultClient, TRANSFER_HISTORY_SEED, TUKTUK_CRON_PROGRAM_ID, TUKTUK_PROGRAM_ID, type TransactionResult, type TransferHistory, TransferStatus, type TukTukConfig, TukTukError, TukTukIntegration, USDC_DECIMALS, USDC_MINT_MAINNET, USER_SHARE_SEED, type UserShare, type VaultSdkConfig, type WithdrawParams, type WithdrawResult, type YieldInfo, createKaminoIntegration, createPlaceholderEncryptedShare, createPrivacyCashIntegration, createSublyVaultClient, createTukTukIntegration, decryptShares, deriveEncryptionKey, encryptShares, generateCommitment, generateNullifier, generateSecret, getBatchProofPda, getDepositHistoryPda, getIdl, getNullifierPda, getScheduledTransferPda, getShieldPoolPda, getTransferHistoryPda, getUserSharePda, intervalToCronSchedule, readPlaceholderShares, retrieveSecret, storeSecret, verifyCommitment };
+export { BATCH_PROOF_SEED, type BalanceResult, type CronJobResult, DEPOSIT_HISTORY_SEED, type DepositHistory, type DepositParams, INTERVAL_SECONDS, KAMINO_CUSDC_MINT, KAMINO_LENDING_PROGRAM_ID, KAMINO_MAIN_MARKET, KAMINO_USDC_RESERVE, KEY_DERIVATION_MESSAGE, type KaminoConfig, type KaminoDepositResult, KaminoError, KaminoIntegration, type KaminoWithdrawResult, type KaminoYieldInfo, LocalStorageManager, type LocalTransferData, type LocalVaultData, NOTE_COMMITMENT_REGISTRY_SEED, NULLIFIER_SEED, type NoteCommitmentRegistry, type Nullifier, OperationType, POOL_CTOKEN_ACCOUNT_SEED, POOL_TOKEN_ACCOUNT_SEED, PRIVACY_CASH_PROGRAM_ID, USDC_MINT as PRIVACY_CASH_USDC_MINT, PROGRAM_ID, type PendingTransfer, type PrivacyCashConfig, PrivacyCashError, PrivacyCashIntegration, type RegisterDepositParams, SCHEDULED_TRANSFER_SEED, SHIELD_POOL_SEED, type ScheduledTransfer, type SetupRecurringPaymentParams, type ShieldPool, type SublyVault, SublyVaultClient, TRANSFER_HISTORY_SEED, TUKTUK_CRON_PROGRAM_ID, TUKTUK_PROGRAM_ID, type TransactionResult, type TransferHistory, TransferStatus, type TukTukConfig, TukTukError, TukTukIntegration, USDC_DECIMALS, USDC_MINT_MAINNET, USER_SHARE_SEED, type UserShare, type VaultSdkConfig, type WithdrawParams, type WithdrawResult, type YieldInfo, createKaminoIntegration, createPlaceholderEncryptedShare, createPrivacyCashIntegration, createSublyVaultClient, createTukTukIntegration, decryptShares, decryptTransferData, deriveEncryptionKey, encryptShares, encryptTransferData, generateCommitment, generateNullifier, generateSecret, getBatchProofPda, getDepositHistoryPda, getIdl, getNoteCommitmentRegistryPda, getNullifierPda, getScheduledTransferPda, getShieldPoolPda, getTransferHistoryPda, getUserSharePda, intervalToCronSchedule, readPlaceholderShares, retrieveSecret, storeSecret, verifyCommitment };

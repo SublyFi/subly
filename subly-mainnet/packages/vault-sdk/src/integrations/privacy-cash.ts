@@ -4,14 +4,28 @@
  * Provides wrapper functions for the Privacy Cash SDK to enable
  * private USDC deposits and withdrawals on Solana mainnet.
  *
- * Note: Privacy Cash only works on mainnet (no devnet support).
- * Requires Node.js 24 or higher.
+ * @packageDocumentation
+ * @module privacy-cash
+ *
+ * SDK Information:
+ * - Package: privacycash v1.1.11
+ * - Repository: https://github.com/Privacy-Cash/privacy-cash-sdk
+ * - Network: Mainnet only (no devnet support)
+ * - Runtime: Node.js 24+ required
+ *
+ * API Reference (privacycash v1.1.11):
+ * - depositUSDC({ base_units }) → { tx: string }
+ * - withdrawUSDC({ base_units, recipientAddress?, referrer? }) → { isPartial, tx, recipient, base_units, fee_base_units }
+ * - getPrivateBalanceUSDC() → { base_units, amount, lamports }
+ * - getPrivateBalanceSpl(mintAddress) → { base_units, amount, lamports }
+ * - depositSPL({ base_units?, amount?, mintAddress }) → { tx: string }
+ * - withdrawSPL({ base_units?, amount?, mintAddress, recipientAddress?, referrer? }) → { isPartial, tx, recipient, base_units, fee_base_units }
  */
 
 import { Keypair, PublicKey } from '@solana/web3.js';
 
-// Privacy Cash SDK types (imported dynamically to handle Node.js version requirements)
-// The actual SDK is: import { PrivacyCash } from 'privacycash';
+// Privacy Cash SDK (privacycash v1.1.11)
+// Dynamic import to handle Node.js version requirements
 
 /**
  * USDC mint address on Solana mainnet
@@ -23,14 +37,66 @@ export const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyT
  */
 export const PRIVACY_CASH_PROGRAM_ID = new PublicKey('9fhQBbumKEFuXtMBDw8AaQyAjCorLGJQiS3skWZdQyQD');
 
+// ============================================================================
+// SDK Response Types (matching privacycash v1.1.11 actual return values)
+// ============================================================================
+
 /**
- * Result of a private withdrawal
+ * Raw SDK response from depositUSDC/depositSPL
+ * @internal
  */
-export interface WithdrawResult {
+export interface SDKDepositResponse {
+  tx: string;
+}
+
+/**
+ * Raw SDK response from withdrawUSDC/withdrawSPL
+ * @internal
+ */
+export interface SDKWithdrawResponse {
+  isPartial: boolean;
   tx: string;
   recipient: string;
-  amountInBaseUnits: number;
-  feeInBaseUnits: number;
+  base_units: number;
+  fee_base_units: number;
+}
+
+/**
+ * Raw SDK response from getPrivateBalanceUSDC/getPrivateBalanceSpl
+ * @internal
+ */
+export interface SDKBalanceResponse {
+  base_units: number;
+  amount: number;   // Human-readable amount
+  lamports: number; // SOL lamports (for SOL operations)
+}
+
+// ============================================================================
+// Public Types
+// ============================================================================
+
+/**
+ * Result of a private withdrawal
+ *
+ * Maps SDK snake_case fields to camelCase for TypeScript consistency.
+ *
+ * @example
+ * ```typescript
+ * const result = await integration.withdrawPrivateUSDC(10);
+ * console.log(`Withdrew ${result.baseUnits / 1_000_000} USDC`);
+ * console.log(`Fee: ${result.feeBaseUnits / 1_000_000} USDC`);
+ * ```
+ */
+export interface WithdrawResult {
+  /** Transaction signature */
+  tx: string;
+  /** Recipient address (base58) */
+  recipient: string;
+  /** Amount withdrawn in base units (1 USDC = 1,000,000 base units) */
+  baseUnits: number;
+  /** Protocol fee in base units */
+  feeBaseUnits: number;
+  /** True if withdrawal was partial due to insufficient private balance */
   isPartial: boolean;
 }
 
@@ -111,16 +177,33 @@ export class PrivacyCashIntegration {
   /**
    * Deposit USDC privately
    *
+   * Uses the USDC-specific depositUSDC method for better reliability.
+   *
+   * SDK Method: depositUSDC({ base_units }) → { tx: string }
+   * Fallback: depositSPL({ mintAddress, base_units }) → { tx: string }
+   *
    * @param amount Amount in USDC (human-readable, e.g., 10 = 10 USDC)
    * @returns Transaction signature
    */
-  async depositPrivateUSDC(amount: number): Promise<{ tx: string }> {
+  async depositPrivateUSDC(amount: number): Promise<SDKDepositResponse> {
     this.ensureInitialized();
 
     try {
+      // Convert human-readable amount to base units (1 USDC = 1,000,000 base units)
+      const baseUnits = Math.floor(amount * 1_000_000);
+
+      // Use USDC-specific method (preferred)
+      if (typeof this.client.depositUSDC === 'function') {
+        const result = await this.client.depositUSDC({
+          base_units: baseUnits,
+        });
+        return { tx: result.tx };
+      }
+
+      // Fallback to generic SPL method
       const result = await this.client.depositSPL({
         mintAddress: USDC_MINT.toBase58(),
-        amount: amount, // Human-readable amount
+        base_units: baseUnits,
       });
 
       return { tx: result.tx };
@@ -135,6 +218,12 @@ export class PrivacyCashIntegration {
   /**
    * Withdraw USDC privately
    *
+   * Uses the USDC-specific withdrawUSDC method for better reliability.
+   *
+   * SDK Method: withdrawUSDC({ base_units, recipientAddress?, referrer? })
+   *            → { isPartial, tx, recipient, base_units, fee_base_units }
+   * Fallback: withdrawSPL({ mintAddress, base_units, recipientAddress? })
+   *
    * @param amount Amount in USDC (human-readable, e.g., 10 = 10 USDC)
    * @param recipient Optional recipient address (defaults to self)
    * @returns Withdrawal result with transaction and fee information
@@ -143,22 +232,37 @@ export class PrivacyCashIntegration {
     this.ensureInitialized();
 
     try {
-      const params: any = {
-        mintAddress: USDC_MINT.toBase58(),
-        amount: amount, // Human-readable amount
-      };
+      // Convert human-readable amount to base units (1 USDC = 1,000,000 base units)
+      const baseUnits = Math.floor(amount * 1_000_000);
 
-      if (recipient) {
-        params.recipientAddress = recipient;
+      // Use USDC-specific method (preferred)
+      if (typeof this.client.withdrawUSDC === 'function') {
+        const result = await this.client.withdrawUSDC({
+          base_units: baseUnits,
+          recipientAddress: recipient,
+        });
+
+        return {
+          tx: result.tx,
+          recipient: result.recipient,
+          baseUnits: result.base_units,
+          feeBaseUnits: result.fee_base_units,
+          isPartial: result.isPartial ?? false,
+        };
       }
 
-      const result = await this.client.withdrawSPL(params);
+      // Fallback to generic SPL method
+      const result = await this.client.withdrawSPL({
+        mintAddress: USDC_MINT.toBase58(),
+        base_units: baseUnits,
+        recipientAddress: recipient,
+      });
 
       return {
         tx: result.tx,
         recipient: result.recipient,
-        amountInBaseUnits: result.amount_in_lamports || result.amount_in_base_units,
-        feeInBaseUnits: result.fee_in_lamports || result.fee_in_base_units,
+        baseUnits: result.base_units,
+        feeBaseUnits: result.fee_base_units,
         isPartial: result.isPartial ?? false,
       };
     } catch (error) {
@@ -172,24 +276,29 @@ export class PrivacyCashIntegration {
   /**
    * Get private USDC balance
    *
+   * Uses the USDC-specific getPrivateBalanceUSDC method for better reliability.
+   *
+   * SDK Method: getPrivateBalanceUSDC() → { base_units, amount, lamports }
+   * Fallback: getPrivateBalanceSpl(mintAddress) → { base_units, amount, lamports }
+   *
    * @returns Balance in USDC (human-readable)
    */
   async getPrivateUSDCBalance(): Promise<number> {
     this.ensureInitialized();
 
     try {
-      // Try the USDC-specific method first
+      // Try the USDC-specific method first (preferred)
       if (typeof this.client.getPrivateBalanceUSDC === 'function') {
-        const balance = await this.client.getPrivateBalanceUSDC();
-        return balance;
+        const result = await this.client.getPrivateBalanceUSDC();
+        // SDK returns { base_units, amount, lamports }
+        // amount is human-readable USDC
+        return result.amount ?? (result.base_units / 1_000_000);
       }
 
       // Fallback to generic SPL method
-      const balance = await this.client.getPrivateBalanceSpl({
-        mintAddress: USDC_MINT.toBase58(),
-      });
-
-      return balance;
+      // Note: getPrivateBalanceSpl takes mintAddress directly, not as an object
+      const result = await this.client.getPrivateBalanceSpl(USDC_MINT.toBase58());
+      return result.amount ?? (result.base_units / 1_000_000);
     } catch (error) {
       throw new PrivacyCashError(
         `Failed to get private balance: ${error instanceof Error ? error.message : 'Unknown error'}`,

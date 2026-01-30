@@ -484,7 +484,7 @@ export class SublyVaultClient {
         signature,
         success: true,
         privacyCashTx: privacyResult.tx,
-        privacyCashFee: privacyResult.feeInBaseUnits / 1e6,
+        privacyCashFee: privacyResult.feeBaseUnits / 1e6,
       };
     } catch (error) {
       console.error("Withdraw failed:", error);
@@ -848,8 +848,8 @@ export class SublyVaultClient {
     const result = await this.privacyCash.withdrawPrivateUSDC(amount, recipient);
     return {
       tx: result.tx,
-      amountReceived: result.amountInBaseUnits / 1e6,
-      fee: result.feeInBaseUnits / 1e6,
+      amountReceived: result.baseUnits / 1e6,
+      fee: result.feeBaseUnits / 1e6,
     };
   }
 
