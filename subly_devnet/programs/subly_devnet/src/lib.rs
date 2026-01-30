@@ -817,6 +817,7 @@ pub struct Subscribe<'info> {
 
 /// Subscribe with Arcium MXE encryption
 /// This account structure includes all required Arcium accounts for queue_computation
+/// Note: Box is used for large Arcium account types to avoid stack overflow (4KB limit)
 #[queue_computation_accounts("set_subscription_active", payer)]
 #[derive(Accounts)]
 #[instruction(
@@ -832,7 +833,7 @@ pub struct SubscribeWithArcium<'info> {
 
     /// MXE Account - Arcium MXE configuration
     #[account(address = derive_mxe_pda!())]
-    pub mxe_account: Account<'info, MXEAccount>,
+    pub mxe_account: Box<Account<'info, MXEAccount>>,
 
     /// Mempool Account
     /// CHECK: Validated by Arcium program
@@ -851,19 +852,19 @@ pub struct SubscribeWithArcium<'info> {
 
     /// Computation Definition Account for set_subscription_active
     #[account(address = derive_comp_def_pda!(comp_def_offsets::SET_SUBSCRIPTION_ACTIVE))]
-    pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
+    pub comp_def_account: Box<Account<'info, ComputationDefinitionAccount>>,
 
     /// Cluster Account
     #[account(mut, address = derive_cluster_pda!(mxe_account, SublyError::InvalidMxeAccount))]
-    pub cluster_account: Account<'info, Cluster>,
+    pub cluster_account: Box<Account<'info, Cluster>>,
 
     /// Fee Pool Account
     #[account(mut, address = ARCIUM_FEE_POOL_ACCOUNT_ADDRESS)]
-    pub pool_account: Account<'info, FeePool>,
+    pub pool_account: Box<Account<'info, FeePool>>,
 
     /// Clock Account
     #[account(address = ARCIUM_CLOCK_ACCOUNT_ADDRESS)]
-    pub clock_account: Account<'info, ClockAccount>,
+    pub clock_account: Box<Account<'info, ClockAccount>>,
 
     /// Sign PDA for CPI signing
     #[account(
@@ -928,6 +929,7 @@ pub struct CancelSubscription<'info> {
 
 /// Cancel subscription with Arcium MXE encryption
 /// This account structure includes all required Arcium accounts for queue_computation
+/// Note: Box is used for large Arcium account types to avoid stack overflow (4KB limit)
 #[queue_computation_accounts("set_subscription_cancelled", payer)]
 #[derive(Accounts)]
 #[instruction(computation_offset: u64)]
@@ -938,7 +940,7 @@ pub struct CancelSubscriptionWithArcium<'info> {
 
     /// MXE Account - Arcium MXE configuration
     #[account(address = derive_mxe_pda!())]
-    pub mxe_account: Account<'info, MXEAccount>,
+    pub mxe_account: Box<Account<'info, MXEAccount>>,
 
     /// Mempool Account
     /// CHECK: Validated by Arcium program
@@ -957,19 +959,19 @@ pub struct CancelSubscriptionWithArcium<'info> {
 
     /// Computation Definition Account for set_subscription_cancelled
     #[account(address = derive_comp_def_pda!(comp_def_offsets::SET_SUBSCRIPTION_CANCELLED))]
-    pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
+    pub comp_def_account: Box<Account<'info, ComputationDefinitionAccount>>,
 
     /// Cluster Account
     #[account(mut, address = derive_cluster_pda!(mxe_account, SublyError::InvalidMxeAccount))]
-    pub cluster_account: Account<'info, Cluster>,
+    pub cluster_account: Box<Account<'info, Cluster>>,
 
     /// Fee Pool Account
     #[account(mut, address = ARCIUM_FEE_POOL_ACCOUNT_ADDRESS)]
-    pub pool_account: Account<'info, FeePool>,
+    pub pool_account: Box<Account<'info, FeePool>>,
 
     /// Clock Account
     #[account(address = ARCIUM_CLOCK_ACCOUNT_ADDRESS)]
-    pub clock_account: Account<'info, ClockAccount>,
+    pub clock_account: Box<Account<'info, ClockAccount>>,
 
     /// Sign PDA for CPI signing
     #[account(

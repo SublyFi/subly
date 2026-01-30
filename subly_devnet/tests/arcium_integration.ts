@@ -8,6 +8,7 @@ import {
   getArciumEnv,
   getClusterAccAddress,
   getMXEPublicKey,
+  getMXEAccAddress,
   getCompDefAccAddress,
   getComputationAccAddress,
   getMempoolAccAddress,
@@ -18,6 +19,8 @@ import {
   getArciumProgramId,
   RescueCipher,
   x25519,
+  buildFinalizeCompDefTx,
+  uploadCircuit,
 } from "@arcium-hq/client";
 
 // ============================================
@@ -77,6 +80,15 @@ function readKpJson(path: string): Keypair {
   const fs = require("fs");
   const json = JSON.parse(fs.readFileSync(path, "utf-8"));
   return Keypair.fromSecretKey(new Uint8Array(json));
+}
+
+// Read raw circuit JSON file
+function readRawCircuit(circuitName: string): Uint8Array {
+  const fs = require("fs");
+  const path = require("path");
+  const circuitPath = path.join(__dirname, "..", "artifacts", `${circuitName}_raw_circuit_0.json`);
+  const content = fs.readFileSync(circuitPath, "utf-8");
+  return new TextEncoder().encode(content);
 }
 
 describe("SublyDevnet Arcium Integration", () => {
@@ -152,7 +164,8 @@ describe("SublyDevnet Arcium Integration", () => {
 
   // Get Arcium accounts using SDK functions
   function getArciumAccounts(computationOffset: BN, compDefOffset: number) {
-    const mxeAccount = deriveMxePda();
+    // Use Arcium SDK to get the MXE account (owned by Arcium program)
+    const mxeAccount = getMXEAccAddress(program.programId);
     return {
       payer: owner.publicKey,
       mxeAccount,
@@ -422,11 +435,12 @@ describe("SublyDevnet Arcium Integration", () => {
         return;
       }
 
+      // Step 1: Initialize comp_def
       const tx = await program.methods
         .initSetSubscriptionActiveCompDef()
         .accountsPartial({
           payer: owner.publicKey,
-          mxeAccount: deriveMxePda(),
+          mxeAccount: getMXEAccAddress(program.programId),
           compDefAccount,
           clusterAccount,
           systemProgram: SystemProgram.programId,
@@ -434,8 +448,33 @@ describe("SublyDevnet Arcium Integration", () => {
         })
         .signers([owner])
         .rpc({ commitment: "confirmed" });
-
       console.log("Init set_subscription_active comp_def tx:", tx);
+
+      // Step 2: Upload raw circuit
+      console.log("Uploading raw circuit for set_subscription_active...");
+      const rawCircuit = readRawCircuit("set_subscription_active");
+      const uploadTxs = await uploadCircuit(
+        provider,
+        "set_subscription_active",
+        program.programId,
+        rawCircuit,
+        true
+      );
+      console.log("Upload circuit txs:", uploadTxs.length);
+
+      // Step 3: Finalize comp_def
+      console.log("Finalizing set_subscription_active comp_def...");
+      const finalizeTx = await buildFinalizeCompDefTx(
+        provider,
+        COMP_DEF_OFFSETS.SET_SUBSCRIPTION_ACTIVE,
+        program.programId
+      );
+      const latestBlockhash = await provider.connection.getLatestBlockhash();
+      finalizeTx.recentBlockhash = latestBlockhash.blockhash;
+      finalizeTx.feePayer = owner.publicKey;
+      finalizeTx.sign(owner);
+      const finalizeSig = await provider.sendAndConfirm(finalizeTx);
+      console.log("Finalize comp_def tx:", finalizeSig);
     });
 
     it("should initialize set_subscription_cancelled comp_def", async () => {
@@ -450,11 +489,12 @@ describe("SublyDevnet Arcium Integration", () => {
         return;
       }
 
+      // Step 1: Initialize comp_def
       const tx = await program.methods
         .initSetSubscriptionCancelledCompDef()
         .accountsPartial({
           payer: owner.publicKey,
-          mxeAccount: deriveMxePda(),
+          mxeAccount: getMXEAccAddress(program.programId),
           compDefAccount,
           clusterAccount,
           systemProgram: SystemProgram.programId,
@@ -462,8 +502,33 @@ describe("SublyDevnet Arcium Integration", () => {
         })
         .signers([owner])
         .rpc({ commitment: "confirmed" });
-
       console.log("Init set_subscription_cancelled comp_def tx:", tx);
+
+      // Step 2: Upload raw circuit
+      console.log("Uploading raw circuit for set_subscription_cancelled...");
+      const rawCircuit = readRawCircuit("set_subscription_cancelled");
+      const uploadTxs = await uploadCircuit(
+        provider,
+        "set_subscription_cancelled",
+        program.programId,
+        rawCircuit,
+        true
+      );
+      console.log("Upload circuit txs:", uploadTxs.length);
+
+      // Step 3: Finalize comp_def
+      console.log("Finalizing set_subscription_cancelled comp_def...");
+      const finalizeTx = await buildFinalizeCompDefTx(
+        provider,
+        COMP_DEF_OFFSETS.SET_SUBSCRIPTION_CANCELLED,
+        program.programId
+      );
+      const latestBlockhash = await provider.connection.getLatestBlockhash();
+      finalizeTx.recentBlockhash = latestBlockhash.blockhash;
+      finalizeTx.feePayer = owner.publicKey;
+      finalizeTx.sign(owner);
+      const finalizeSig = await provider.sendAndConfirm(finalizeTx);
+      console.log("Finalize comp_def tx:", finalizeSig);
     });
 
     it("should initialize increment_count comp_def", async () => {
@@ -478,11 +543,12 @@ describe("SublyDevnet Arcium Integration", () => {
         return;
       }
 
+      // Step 1: Initialize comp_def
       const tx = await program.methods
         .initIncrementCountCompDef()
         .accountsPartial({
           payer: owner.publicKey,
-          mxeAccount: deriveMxePda(),
+          mxeAccount: getMXEAccAddress(program.programId),
           compDefAccount,
           clusterAccount,
           systemProgram: SystemProgram.programId,
@@ -490,8 +556,33 @@ describe("SublyDevnet Arcium Integration", () => {
         })
         .signers([owner])
         .rpc({ commitment: "confirmed" });
-
       console.log("Init increment_count comp_def tx:", tx);
+
+      // Step 2: Upload raw circuit
+      console.log("Uploading raw circuit for increment_count...");
+      const rawCircuit = readRawCircuit("increment_count");
+      const uploadTxs = await uploadCircuit(
+        provider,
+        "increment_count",
+        program.programId,
+        rawCircuit,
+        true
+      );
+      console.log("Upload circuit txs:", uploadTxs.length);
+
+      // Step 3: Finalize comp_def
+      console.log("Finalizing increment_count comp_def...");
+      const finalizeTx = await buildFinalizeCompDefTx(
+        provider,
+        COMP_DEF_OFFSETS.INCREMENT_COUNT,
+        program.programId
+      );
+      const latestBlockhash = await provider.connection.getLatestBlockhash();
+      finalizeTx.recentBlockhash = latestBlockhash.blockhash;
+      finalizeTx.feePayer = owner.publicKey;
+      finalizeTx.sign(owner);
+      const finalizeSig = await provider.sendAndConfirm(finalizeTx);
+      console.log("Finalize comp_def tx:", finalizeSig);
     });
 
     it("should initialize decrement_count comp_def", async () => {
@@ -506,11 +597,12 @@ describe("SublyDevnet Arcium Integration", () => {
         return;
       }
 
+      // Step 1: Initialize comp_def
       const tx = await program.methods
         .initDecrementCountCompDef()
         .accountsPartial({
           payer: owner.publicKey,
-          mxeAccount: deriveMxePda(),
+          mxeAccount: getMXEAccAddress(program.programId),
           compDefAccount,
           clusterAccount,
           systemProgram: SystemProgram.programId,
@@ -518,8 +610,33 @@ describe("SublyDevnet Arcium Integration", () => {
         })
         .signers([owner])
         .rpc({ commitment: "confirmed" });
-
       console.log("Init decrement_count comp_def tx:", tx);
+
+      // Step 2: Upload raw circuit
+      console.log("Uploading raw circuit for decrement_count...");
+      const rawCircuit = readRawCircuit("decrement_count");
+      const uploadTxs = await uploadCircuit(
+        provider,
+        "decrement_count",
+        program.programId,
+        rawCircuit,
+        true
+      );
+      console.log("Upload circuit txs:", uploadTxs.length);
+
+      // Step 3: Finalize comp_def
+      console.log("Finalizing decrement_count comp_def...");
+      const finalizeTx = await buildFinalizeCompDefTx(
+        provider,
+        COMP_DEF_OFFSETS.DECREMENT_COUNT,
+        program.programId
+      );
+      const latestBlockhash = await provider.connection.getLatestBlockhash();
+      finalizeTx.recentBlockhash = latestBlockhash.blockhash;
+      finalizeTx.feePayer = owner.publicKey;
+      finalizeTx.sign(owner);
+      const finalizeSig = await provider.sendAndConfirm(finalizeTx);
+      console.log("Finalize comp_def tx:", finalizeSig);
     });
 
     it("should initialize initialize_count comp_def", async () => {
@@ -534,11 +651,12 @@ describe("SublyDevnet Arcium Integration", () => {
         return;
       }
 
+      // Step 1: Initialize comp_def
       const tx = await program.methods
         .initInitializeCountCompDef()
         .accountsPartial({
           payer: owner.publicKey,
-          mxeAccount: deriveMxePda(),
+          mxeAccount: getMXEAccAddress(program.programId),
           compDefAccount,
           clusterAccount,
           systemProgram: SystemProgram.programId,
@@ -546,8 +664,33 @@ describe("SublyDevnet Arcium Integration", () => {
         })
         .signers([owner])
         .rpc({ commitment: "confirmed" });
-
       console.log("Init initialize_count comp_def tx:", tx);
+
+      // Step 2: Upload raw circuit
+      console.log("Uploading raw circuit for initialize_count...");
+      const rawCircuit = readRawCircuit("initialize_count");
+      const uploadTxs = await uploadCircuit(
+        provider,
+        "initialize_count",
+        program.programId,
+        rawCircuit,
+        true
+      );
+      console.log("Upload circuit txs:", uploadTxs.length);
+
+      // Step 3: Finalize comp_def
+      console.log("Finalizing initialize_count comp_def...");
+      const finalizeTx = await buildFinalizeCompDefTx(
+        provider,
+        COMP_DEF_OFFSETS.INITIALIZE_COUNT,
+        program.programId
+      );
+      const latestBlockhash = await provider.connection.getLatestBlockhash();
+      finalizeTx.recentBlockhash = latestBlockhash.blockhash;
+      finalizeTx.feePayer = owner.publicKey;
+      finalizeTx.sign(owner);
+      const finalizeSig = await provider.sendAndConfirm(finalizeTx);
+      console.log("Finalize comp_def tx:", finalizeSig);
     });
 
     it("should initialize initialize_subscription_status comp_def", async () => {
@@ -562,11 +705,12 @@ describe("SublyDevnet Arcium Integration", () => {
         return;
       }
 
+      // Step 1: Initialize comp_def
       const tx = await program.methods
         .initInitializeSubscriptionStatusCompDef()
         .accountsPartial({
           payer: owner.publicKey,
-          mxeAccount: deriveMxePda(),
+          mxeAccount: getMXEAccAddress(program.programId),
           compDefAccount,
           clusterAccount,
           systemProgram: SystemProgram.programId,
@@ -574,8 +718,33 @@ describe("SublyDevnet Arcium Integration", () => {
         })
         .signers([owner])
         .rpc({ commitment: "confirmed" });
-
       console.log("Init initialize_subscription_status comp_def tx:", tx);
+
+      // Step 2: Upload raw circuit
+      console.log("Uploading raw circuit for initialize_subscription_status...");
+      const rawCircuit = readRawCircuit("initialize_subscription_status");
+      const uploadTxs = await uploadCircuit(
+        provider,
+        "initialize_subscription_status",
+        program.programId,
+        rawCircuit,
+        true
+      );
+      console.log("Upload circuit txs:", uploadTxs.length);
+
+      // Step 3: Finalize comp_def
+      console.log("Finalizing initialize_subscription_status comp_def...");
+      const finalizeTx = await buildFinalizeCompDefTx(
+        provider,
+        COMP_DEF_OFFSETS.INITIALIZE_SUBSCRIPTION_STATUS,
+        program.programId
+      );
+      const latestBlockhash = await provider.connection.getLatestBlockhash();
+      finalizeTx.recentBlockhash = latestBlockhash.blockhash;
+      finalizeTx.feePayer = owner.publicKey;
+      finalizeTx.sign(owner);
+      const finalizeSig = await provider.sendAndConfirm(finalizeTx);
+      console.log("Finalize comp_def tx:", finalizeSig);
     });
   });
 
