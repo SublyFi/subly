@@ -26,8 +26,8 @@ describe("SublyDevnet", () => {
     );
   }
 
-  // Get the default wallet
-  const owner = readKpJson(`${os.homedir()}/.config/solana/id.json`);
+  // Generate a unique test keypair to avoid conflicts with other tests
+  const owner = Keypair.generate();
 
   // Helper function to derive Business PDA
   function deriveBusinessPda(authority: PublicKey): [PublicKey, number] {
@@ -71,6 +71,16 @@ describe("SublyDevnet", () => {
   let planPda: PublicKey;
   let subscriptionPda: PublicKey;
   let membershipCommitment: Uint8Array;
+
+  // Setup: Fund the test wallet
+  before(async () => {
+    const airdropSig = await provider.connection.requestAirdrop(
+      owner.publicKey,
+      10_000_000_000 // 10 SOL
+    );
+    await provider.connection.confirmTransaction(airdropSig, "confirmed");
+    console.log("Test wallet funded:", owner.publicKey.toString());
+  });
 
   describe("Business Registration", () => {
     it("should register a new business", async () => {

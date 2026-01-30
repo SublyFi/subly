@@ -1,11 +1,28 @@
 use anchor_lang::prelude::*;
+// sha2 crate removed - callback_ix helper handles discriminator generation
 
+pub mod arcium;
 pub mod constants;
 pub mod errors;
 pub mod events;
 pub mod instructions;
 pub mod state;
 
+use arcium::prelude::*;
+use arcium::{comp_def_offsets, queue_computation, DEFAULT_CU_PRICE_MICRO, DEFAULT_NUM_CALLBACK_TXS};
+use arcium::SignedComputationOutputs;
+
+// ErrorCode enum required by callback_accounts macro
+// Uses Anchor's #[error_code] to implement necessary conversions
+#[error_code]
+pub enum ErrorCode {
+    #[msg("The cluster is not set")]
+    ClusterNotSet,
+    #[msg("The computation was aborted")]
+    AbortedComputation,
+}
+use arcium_client::idl::arcium::types::CallbackAccount;
+use arcium_macros::{arcium_program, arcium_callback, callback_accounts, init_computation_definition_accounts};
 use constants::*;
 use errors::SublyError;
 use events::*;
@@ -33,7 +50,7 @@ declare_id!("2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA");
 // full Arcium infrastructure is set up.
 // ============================================
 
-#[program]
+#[arcium_program]
 pub mod subly_devnet {
     use super::*;
 
@@ -49,6 +66,60 @@ pub mod subly_devnet {
             timestamp: clock.unix_timestamp,
         });
 
+        Ok(())
+    }
+
+    // ============================================
+    // Computation Definition Initialization
+    // ============================================
+    // These instructions must be called once per encrypted instruction
+    // to register the computation definition with Arcium.
+
+    /// Initialize computation definition for set_subscription_active
+    pub fn init_set_subscription_active_comp_def(
+        ctx: Context<InitSetSubscriptionActiveCompDef>,
+    ) -> Result<()> {
+        arcium::init_comp_def(ctx.accounts, None, None)?;
+        Ok(())
+    }
+
+    /// Initialize computation definition for set_subscription_cancelled
+    pub fn init_set_subscription_cancelled_comp_def(
+        ctx: Context<InitSetSubscriptionCancelledCompDef>,
+    ) -> Result<()> {
+        arcium::init_comp_def(ctx.accounts, None, None)?;
+        Ok(())
+    }
+
+    /// Initialize computation definition for increment_count
+    pub fn init_increment_count_comp_def(
+        ctx: Context<InitIncrementCountCompDef>,
+    ) -> Result<()> {
+        arcium::init_comp_def(ctx.accounts, None, None)?;
+        Ok(())
+    }
+
+    /// Initialize computation definition for decrement_count
+    pub fn init_decrement_count_comp_def(
+        ctx: Context<InitDecrementCountCompDef>,
+    ) -> Result<()> {
+        arcium::init_comp_def(ctx.accounts, None, None)?;
+        Ok(())
+    }
+
+    /// Initialize computation definition for initialize_count
+    pub fn init_initialize_count_comp_def(
+        ctx: Context<InitInitializeCountCompDef>,
+    ) -> Result<()> {
+        arcium::init_comp_def(ctx.accounts, None, None)?;
+        Ok(())
+    }
+
+    /// Initialize computation definition for initialize_subscription_status
+    pub fn init_initialize_subscription_status_comp_def(
+        ctx: Context<InitInitializeSubscriptionStatusCompDef>,
+    ) -> Result<()> {
+        arcium::init_comp_def(ctx.accounts, None, None)?;
         Ok(())
     }
 
@@ -144,6 +215,7 @@ pub mod subly_devnet {
         plan_account.nonce = nonce;
         plan_account.plan_nonce = plan_nonce;
         plan_account.bump = ctx.bumps.plan_account;
+        plan_account.pending_count_encryption = false; // No Arcium CPI in this version
 
         // Increment business plan count
         business_account.plan_count = business_account.plan_count.checked_add(1).unwrap();
@@ -202,6 +274,85 @@ pub mod subly_devnet {
         Ok(())
     }
 
+    /// Subscribe to a plan with Arcium MXE encryption
+    /// This version queues encrypted computations for subscription status and count
+    pub fn subscribe_with_arcium(
+        ctx: Context<SubscribeWithArcium>,
+        computation_offset: u64,
+        encrypted_user_commitment: [u8; 32],
+        membership_commitment: [u8; 32],
+        nonce: u128,
+    ) -> Result<()> {
+        // Validate plan is active
+        require!(
+            ctx.accounts.plan_account.is_active,
+            SublyError::PlanNotActive
+        );
+
+        let clock = Clock::get()?;
+
+        // Capture keys for event before mutable borrow
+        let subscription_key = ctx.accounts.subscription_account.key();
+        let plan_key = ctx.accounts.plan_account.key();
+
+        // Initialize subscription account
+        {
+            let subscription_account = &mut ctx.accounts.subscription_account;
+            subscription_account.subscription_id = subscription_key;
+            subscription_account.plan = plan_key;
+            subscription_account.encrypted_user_commitment = encrypted_user_commitment;
+            subscription_account.membership_commitment = membership_commitment;
+            subscription_account.subscribed_at = clock.unix_timestamp;
+            subscription_account.cancelled_at = 0;
+            subscription_account.is_active = true;
+            subscription_account.nonce = nonce;
+            subscription_account.bump = ctx.bumps.subscription_account;
+            // Initialize encrypted status fields (will be updated via MXE callback)
+            subscription_account.encrypted_status = [0u8; 64];
+            subscription_account.status_nonce = [0u8; 16];
+            // Mark as pending encryption until callback is received
+            subscription_account.pending_encryption = true;
+        }
+
+        // Build arguments for set_subscription_active computation
+        // Input is Enc<Mxe, i64> - the subscription timestamp
+        let args = ArgBuilder::new()
+            .plaintext_i64(clock.unix_timestamp)
+            .build();
+
+        // Build callback instruction using the generated helper method
+        // The callback_ix helper handles the 6 standard Arcium accounts automatically
+        let callback_ix = SetSubscriptionActiveCallback::callback_ix(
+            computation_offset,
+            &ctx.accounts.mxe_account,
+            &[CallbackAccount {
+                pubkey: subscription_key,
+                is_writable: true,
+            }],
+        )?;
+
+        // Queue the set_subscription_active computation
+        queue_computation(
+            ctx.accounts,
+            computation_offset,
+            args,
+            None, // No callback server
+            vec![callback_ix],
+            DEFAULT_NUM_CALLBACK_TXS,
+            DEFAULT_CU_PRICE_MICRO,
+        )?;
+
+        // Emit event
+        emit!(SubscriptionCreatedEvent {
+            subscription: subscription_key,
+            plan: plan_key,
+            membership_commitment,
+            timestamp: clock.unix_timestamp,
+        });
+
+        Ok(())
+    }
+
     /// Get the encrypted subscription count for a plan
     /// Returns the encrypted count that can be decrypted by authorized parties
     pub fn get_subscription_count(ctx: Context<GetSubscriptionCount>) -> Result<[u8; 32]> {
@@ -231,6 +382,70 @@ pub mod subly_devnet {
         Ok(())
     }
 
+    /// Cancel a subscription with Arcium MXE encryption
+    /// This version queues encrypted computations for status and count updates
+    pub fn cancel_subscription_with_arcium(
+        ctx: Context<CancelSubscriptionWithArcium>,
+        computation_offset: u64,
+    ) -> Result<()> {
+        let clock = Clock::get()?;
+
+        // Capture keys for callback and event
+        let subscription_key = ctx.accounts.subscription_account.key();
+        let plan_key = ctx.accounts.plan_account.key();
+
+        // Validate and update subscription
+        {
+            let subscription_account = &mut ctx.accounts.subscription_account;
+
+            // Validate subscription is active
+            require!(
+                subscription_account.is_active,
+                SublyError::SubscriptionNotActive
+            );
+
+            // Mark as cancelled
+            subscription_account.is_active = false;
+            subscription_account.cancelled_at = clock.unix_timestamp;
+            subscription_account.pending_encryption = true;
+        }
+
+        // Build arguments for set_subscription_cancelled computation
+        let args = ArgBuilder::new()
+            .plaintext_i64(clock.unix_timestamp)
+            .build();
+
+        // Build callback instruction using the generated helper method
+        let callback_ix = SetSubscriptionCancelledCallback::callback_ix(
+            computation_offset,
+            &ctx.accounts.mxe_account,
+            &[CallbackAccount {
+                pubkey: subscription_key,
+                is_writable: true,
+            }],
+        )?;
+
+        // Queue the set_subscription_cancelled computation
+        queue_computation(
+            ctx.accounts,
+            computation_offset,
+            args,
+            None,
+            vec![callback_ix],
+            DEFAULT_NUM_CALLBACK_TXS,
+            DEFAULT_CU_PRICE_MICRO,
+        )?;
+
+        // Emit event
+        emit!(SubscriptionCancelledEvent {
+            subscription: subscription_key,
+            plan: plan_key,
+            timestamp: clock.unix_timestamp,
+        });
+
+        Ok(())
+    }
+
     /// Deactivate a plan (business owner only)
     pub fn deactivate_plan(ctx: Context<DeactivatePlan>) -> Result<()> {
         let plan_account = &mut ctx.accounts.plan_account;
@@ -248,24 +463,36 @@ pub mod subly_devnet {
     // Arcium MXE Callback Functions
     // ============================================
     // These callbacks are invoked by the Arcium network when MXE computations complete.
-    // They update the encrypted subscription count on the Plan account.
+    // Callback function names must follow the pattern: <encrypted_ix>_callback
+    // They receive SignedComputationOutputs<T> which must be verified before use.
 
     /// Callback for increment_count MXE computation
     /// Called by Arcium when the encrypted increment operation completes
+    #[arcium_callback(encrypted_ix = "increment_count")]
     pub fn increment_count_callback(
         ctx: Context<IncrementCountCallback>,
-        encrypted_count: [u8; 32],
-        nonce: [u8; 16],
+        output: SignedComputationOutputs<IncrementCountOutput>,
     ) -> Result<()> {
+        // Verify and extract the output
+        let verified_output = output
+            .verify_output(&ctx.accounts.cluster_account, &ctx.accounts.computation_account)
+            .map_err(|_| SublyError::InvalidComputationOutput)?;
+
         // Update the plan's encrypted subscription count
         let plan_account = &mut ctx.accounts.plan_account;
-        plan_account.encrypted_subscription_count = encrypted_count;
+        // The output contains encrypted u64 as ciphertexts (accessed via field_0)
+        // ciphertexts is [[u8; 32]], so we take the first element
+        if !verified_output.field_0.ciphertexts.is_empty() {
+            plan_account.encrypted_subscription_count
+                .copy_from_slice(&verified_output.field_0.ciphertexts[0]);
+        }
+        plan_account.pending_count_encryption = false;
 
         let clock = Clock::get()?;
         emit!(SubscriptionCountUpdatedEvent {
             plan: plan_account.key(),
-            encrypted_count,
-            nonce,
+            encrypted_count: plan_account.encrypted_subscription_count,
+            nonce: [0u8; 16], // Nonce is handled internally by Arcium
             timestamp: clock.unix_timestamp,
         });
 
@@ -274,20 +501,29 @@ pub mod subly_devnet {
 
     /// Callback for decrement_count MXE computation
     /// Called by Arcium when the encrypted decrement operation completes
+    #[arcium_callback(encrypted_ix = "decrement_count")]
     pub fn decrement_count_callback(
         ctx: Context<DecrementCountCallback>,
-        encrypted_count: [u8; 32],
-        nonce: [u8; 16],
+        output: SignedComputationOutputs<DecrementCountOutput>,
     ) -> Result<()> {
+        // Verify and extract the output
+        let verified_output = output
+            .verify_output(&ctx.accounts.cluster_account, &ctx.accounts.computation_account)
+            .map_err(|_| SublyError::InvalidComputationOutput)?;
+
         // Update the plan's encrypted subscription count
         let plan_account = &mut ctx.accounts.plan_account;
-        plan_account.encrypted_subscription_count = encrypted_count;
+        if !verified_output.field_0.ciphertexts.is_empty() {
+            plan_account.encrypted_subscription_count
+                .copy_from_slice(&verified_output.field_0.ciphertexts[0]);
+        }
+        plan_account.pending_count_encryption = false;
 
         let clock = Clock::get()?;
         emit!(SubscriptionCountUpdatedEvent {
             plan: plan_account.key(),
-            encrypted_count,
-            nonce,
+            encrypted_count: plan_account.encrypted_subscription_count,
+            nonce: [0u8; 16],
             timestamp: clock.unix_timestamp,
         });
 
@@ -302,20 +538,31 @@ pub mod subly_devnet {
 
     /// Callback for set_subscription_active MXE computation
     /// Called by Arcium when the encrypted status is ready after subscription
-    pub fn subscribe_status_callback(
-        ctx: Context<SubscribeStatusCallback>,
-        encrypted_status: [u8; 64],
-        status_nonce: [u8; 16],
+    #[arcium_callback(encrypted_ix = "set_subscription_active")]
+    pub fn set_subscription_active_callback(
+        ctx: Context<SetSubscriptionActiveCallback>,
+        output: SignedComputationOutputs<SetSubscriptionActiveOutput>,
     ) -> Result<()> {
+        // Verify and extract the output
+        let verified_output = output
+            .verify_output(&ctx.accounts.cluster_account, &ctx.accounts.computation_account)
+            .map_err(|_| SublyError::InvalidComputationOutput)?;
+
         let subscription_account = &mut ctx.accounts.subscription_account;
-        subscription_account.encrypted_status = encrypted_status;
-        subscription_account.status_nonce = status_nonce;
+        // The output contains encrypted SubscriptionStatus (accessed via field_0)
+        // ciphertexts is [[u8; 32]], we need 2 elements for 64 bytes
+        let ciphertexts = &verified_output.field_0.ciphertexts;
+        if ciphertexts.len() >= 2 {
+            subscription_account.encrypted_status[..32].copy_from_slice(&ciphertexts[0]);
+            subscription_account.encrypted_status[32..64].copy_from_slice(&ciphertexts[1]);
+        }
+        subscription_account.pending_encryption = false;
 
         let clock = Clock::get()?;
         emit!(SubscriptionStatusEncryptedEvent {
             subscription: subscription_account.key(),
-            encrypted_status,
-            status_nonce,
+            encrypted_status: subscription_account.encrypted_status,
+            status_nonce: [0u8; 16],
             timestamp: clock.unix_timestamp,
         });
 
@@ -324,20 +571,29 @@ pub mod subly_devnet {
 
     /// Callback for set_subscription_cancelled MXE computation
     /// Called by Arcium when the encrypted cancellation status is ready
-    pub fn cancel_status_callback(
-        ctx: Context<CancelStatusCallback>,
-        encrypted_status: [u8; 64],
-        status_nonce: [u8; 16],
+    #[arcium_callback(encrypted_ix = "set_subscription_cancelled")]
+    pub fn set_subscription_cancelled_callback(
+        ctx: Context<SetSubscriptionCancelledCallback>,
+        output: SignedComputationOutputs<SetSubscriptionCancelledOutput>,
     ) -> Result<()> {
+        // Verify and extract the output
+        let verified_output = output
+            .verify_output(&ctx.accounts.cluster_account, &ctx.accounts.computation_account)
+            .map_err(|_| SublyError::InvalidComputationOutput)?;
+
         let subscription_account = &mut ctx.accounts.subscription_account;
-        subscription_account.encrypted_status = encrypted_status;
-        subscription_account.status_nonce = status_nonce;
+        let ciphertexts = &verified_output.field_0.ciphertexts;
+        if ciphertexts.len() >= 2 {
+            subscription_account.encrypted_status[..32].copy_from_slice(&ciphertexts[0]);
+            subscription_account.encrypted_status[32..64].copy_from_slice(&ciphertexts[1]);
+        }
+        subscription_account.pending_encryption = false;
 
         let clock = Clock::get()?;
         emit!(SubscriptionStatusEncryptedEvent {
             subscription: subscription_account.key(),
-            encrypted_status,
-            status_nonce,
+            encrypted_status: subscription_account.encrypted_status,
+            status_nonce: [0u8; 16],
             timestamp: clock.unix_timestamp,
         });
 
@@ -559,6 +815,92 @@ pub struct Subscribe<'info> {
     pub system_program: Program<'info, System>,
 }
 
+/// Subscribe with Arcium MXE encryption
+/// This account structure includes all required Arcium accounts for queue_computation
+#[queue_computation_accounts("set_subscription_active", payer)]
+#[derive(Accounts)]
+#[instruction(
+    computation_offset: u64,
+    encrypted_user_commitment: [u8; 32],
+    membership_commitment: [u8; 32],
+    nonce: u128
+)]
+pub struct SubscribeWithArcium<'info> {
+    /// The payer for the transaction (user subscribing)
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    /// MXE Account - Arcium MXE configuration
+    #[account(address = derive_mxe_pda!())]
+    pub mxe_account: Account<'info, MXEAccount>,
+
+    /// Mempool Account
+    /// CHECK: Validated by Arcium program
+    #[account(mut, address = derive_mempool_pda!(mxe_account, SublyError::InvalidMxeAccount))]
+    pub mempool_account: UncheckedAccount<'info>,
+
+    /// Executing Pool
+    /// CHECK: Validated by Arcium program
+    #[account(mut, address = derive_execpool_pda!(mxe_account, SublyError::InvalidMxeAccount))]
+    pub executing_pool: UncheckedAccount<'info>,
+
+    /// Computation Account
+    /// CHECK: Validated by Arcium program
+    #[account(mut, address = derive_comp_pda!(computation_offset, mxe_account, SublyError::InvalidMxeAccount))]
+    pub computation_account: UncheckedAccount<'info>,
+
+    /// Computation Definition Account for set_subscription_active
+    #[account(address = derive_comp_def_pda!(comp_def_offsets::SET_SUBSCRIPTION_ACTIVE))]
+    pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
+
+    /// Cluster Account
+    #[account(mut, address = derive_cluster_pda!(mxe_account, SublyError::InvalidMxeAccount))]
+    pub cluster_account: Account<'info, Cluster>,
+
+    /// Fee Pool Account
+    #[account(mut, address = ARCIUM_FEE_POOL_ACCOUNT_ADDRESS)]
+    pub pool_account: Account<'info, FeePool>,
+
+    /// Clock Account
+    #[account(address = ARCIUM_CLOCK_ACCOUNT_ADDRESS)]
+    pub clock_account: Account<'info, ClockAccount>,
+
+    /// Sign PDA for CPI signing
+    #[account(
+        init_if_needed,
+        space = 9,
+        payer = payer,
+        seeds = [arcium_anchor::SIGN_PDA_SEED],
+        bump,
+    )]
+    pub sign_pda_account: Account<'info, SignerAccount>,
+
+    /// System Program
+    pub system_program: Program<'info, System>,
+
+    /// Arcium Program
+    pub arcium_program: Program<'info, Arcium>,
+
+    // --- Custom accounts for this instruction ---
+
+    /// The plan being subscribed to
+    #[account(
+        mut,
+        constraint = plan_account.is_active @ SublyError::PlanNotActive
+    )]
+    pub plan_account: Account<'info, Plan>,
+
+    /// The subscription account PDA to create
+    #[account(
+        init,
+        payer = payer,
+        space = Subscription::SPACE,
+        seeds = [SUBSCRIPTION_SEED, plan_account.key().as_ref(), membership_commitment.as_ref()],
+        bump
+    )]
+    pub subscription_account: Account<'info, Subscription>,
+}
+
 #[derive(Accounts)]
 pub struct GetSubscriptionCount<'info> {
     /// The plan to get subscription count for
@@ -584,6 +926,86 @@ pub struct CancelSubscription<'info> {
     pub subscription_account: Account<'info, Subscription>,
 }
 
+/// Cancel subscription with Arcium MXE encryption
+/// This account structure includes all required Arcium accounts for queue_computation
+#[queue_computation_accounts("set_subscription_cancelled", payer)]
+#[derive(Accounts)]
+#[instruction(computation_offset: u64)]
+pub struct CancelSubscriptionWithArcium<'info> {
+    /// The payer for the transaction (user cancelling)
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    /// MXE Account - Arcium MXE configuration
+    #[account(address = derive_mxe_pda!())]
+    pub mxe_account: Account<'info, MXEAccount>,
+
+    /// Mempool Account
+    /// CHECK: Validated by Arcium program
+    #[account(mut, address = derive_mempool_pda!(mxe_account, SublyError::InvalidMxeAccount))]
+    pub mempool_account: UncheckedAccount<'info>,
+
+    /// Executing Pool
+    /// CHECK: Validated by Arcium program
+    #[account(mut, address = derive_execpool_pda!(mxe_account, SublyError::InvalidMxeAccount))]
+    pub executing_pool: UncheckedAccount<'info>,
+
+    /// Computation Account
+    /// CHECK: Validated by Arcium program
+    #[account(mut, address = derive_comp_pda!(computation_offset, mxe_account, SublyError::InvalidMxeAccount))]
+    pub computation_account: UncheckedAccount<'info>,
+
+    /// Computation Definition Account for set_subscription_cancelled
+    #[account(address = derive_comp_def_pda!(comp_def_offsets::SET_SUBSCRIPTION_CANCELLED))]
+    pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
+
+    /// Cluster Account
+    #[account(mut, address = derive_cluster_pda!(mxe_account, SublyError::InvalidMxeAccount))]
+    pub cluster_account: Account<'info, Cluster>,
+
+    /// Fee Pool Account
+    #[account(mut, address = ARCIUM_FEE_POOL_ACCOUNT_ADDRESS)]
+    pub pool_account: Account<'info, FeePool>,
+
+    /// Clock Account
+    #[account(address = ARCIUM_CLOCK_ACCOUNT_ADDRESS)]
+    pub clock_account: Account<'info, ClockAccount>,
+
+    /// Sign PDA for CPI signing
+    #[account(
+        init_if_needed,
+        space = 9,
+        payer = payer,
+        seeds = [arcium_anchor::SIGN_PDA_SEED],
+        bump,
+    )]
+    pub sign_pda_account: Account<'info, SignerAccount>,
+
+    /// System Program
+    pub system_program: Program<'info, System>,
+
+    /// Arcium Program
+    pub arcium_program: Program<'info, Arcium>,
+
+    // --- Custom accounts for this instruction ---
+
+    /// The subscription to cancel
+    #[account(
+        mut,
+        constraint = subscription_account.is_active @ SublyError::SubscriptionNotActive,
+        seeds = [SUBSCRIPTION_SEED, subscription_account.plan.as_ref(), subscription_account.membership_commitment.as_ref()],
+        bump = subscription_account.bump
+    )]
+    pub subscription_account: Account<'info, Subscription>,
+
+    /// The plan associated with the subscription (for decrementing count)
+    #[account(
+        mut,
+        address = subscription_account.plan
+    )]
+    pub plan_account: Account<'info, Plan>,
+}
+
 #[derive(Accounts)]
 pub struct DeactivatePlan<'info> {
     /// The authority (owner) of the business
@@ -607,54 +1029,250 @@ pub struct DeactivatePlan<'info> {
     pub plan_account: Account<'info, Plan>,
 }
 
+// ============================================
+// Callback Account Structures
+// ============================================
+// These structures must include the 6 standard Arcium accounts in this exact order:
+// 1. arcium_program
+// 2. comp_def_account
+// 3. mxe_account
+// 4. computation_account
+// 5. cluster_account
+// 6. instructions_sysvar
+// Custom accounts follow after the standard accounts.
+
+#[callback_accounts("increment_count")]
 #[derive(Accounts)]
 pub struct IncrementCountCallback<'info> {
+    // Standard Arcium accounts (required order)
+    /// Arcium program
+    pub arcium_program: Program<'info, Arcium>,
+
+    /// Computation definition account for increment_count
+    #[account(address = derive_comp_def_pda!(comp_def_offsets::INCREMENT_COUNT))]
+    pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
+
+    /// MXE account
+    #[account(address = derive_mxe_pda!())]
+    pub mxe_account: Account<'info, MXEAccount>,
+
+    /// Computation account
+    /// CHECK: Validated by Arcium program
+    pub computation_account: UncheckedAccount<'info>,
+
+    /// Cluster account
+    pub cluster_account: Account<'info, Cluster>,
+
+    /// Instructions sysvar
+    /// CHECK: Solana instructions sysvar
+    #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
+    pub instructions_sysvar: AccountInfo<'info>,
+
+    // Custom accounts
     /// The plan to update
     #[account(mut)]
     pub plan_account: Account<'info, Plan>,
-
-    /// CHECK: Arcium cluster account for verification
-    pub cluster_account: AccountInfo<'info>,
-
-    /// CHECK: Arcium computation account for verification
-    pub computation_account: AccountInfo<'info>,
 }
 
+#[callback_accounts("decrement_count")]
 #[derive(Accounts)]
 pub struct DecrementCountCallback<'info> {
-    /// The plan to update
+    // Standard Arcium accounts (required order)
+    pub arcium_program: Program<'info, Arcium>,
+
+    #[account(address = derive_comp_def_pda!(comp_def_offsets::DECREMENT_COUNT))]
+    pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
+
+    #[account(address = derive_mxe_pda!())]
+    pub mxe_account: Account<'info, MXEAccount>,
+
+    /// CHECK: Validated by Arcium program
+    pub computation_account: UncheckedAccount<'info>,
+
+    pub cluster_account: Account<'info, Cluster>,
+
+    /// CHECK: Solana instructions sysvar
+    #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
+    pub instructions_sysvar: AccountInfo<'info>,
+
+    // Custom accounts
     #[account(mut)]
     pub plan_account: Account<'info, Plan>,
-
-    /// CHECK: Arcium cluster account for verification
-    pub cluster_account: AccountInfo<'info>,
-
-    /// CHECK: Arcium computation account for verification
-    pub computation_account: AccountInfo<'info>,
 }
 
+#[callback_accounts("set_subscription_active")]
 #[derive(Accounts)]
-pub struct SubscribeStatusCallback<'info> {
-    /// The subscription to update
+pub struct SetSubscriptionActiveCallback<'info> {
+    // Standard Arcium accounts (required order)
+    pub arcium_program: Program<'info, Arcium>,
+
+    #[account(address = derive_comp_def_pda!(comp_def_offsets::SET_SUBSCRIPTION_ACTIVE))]
+    pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
+
+    #[account(address = derive_mxe_pda!())]
+    pub mxe_account: Account<'info, MXEAccount>,
+
+    /// CHECK: Validated by Arcium program
+    pub computation_account: UncheckedAccount<'info>,
+
+    pub cluster_account: Account<'info, Cluster>,
+
+    /// CHECK: Solana instructions sysvar
+    #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
+    pub instructions_sysvar: AccountInfo<'info>,
+
+    // Custom accounts
     #[account(mut)]
     pub subscription_account: Account<'info, Subscription>,
-
-    /// CHECK: Arcium cluster account for verification
-    pub cluster_account: AccountInfo<'info>,
-
-    /// CHECK: Arcium computation account for verification
-    pub computation_account: AccountInfo<'info>,
 }
 
+#[callback_accounts("set_subscription_cancelled")]
 #[derive(Accounts)]
-pub struct CancelStatusCallback<'info> {
-    /// The subscription to update
+pub struct SetSubscriptionCancelledCallback<'info> {
+    // Standard Arcium accounts (required order)
+    pub arcium_program: Program<'info, Arcium>,
+
+    #[account(address = derive_comp_def_pda!(comp_def_offsets::SET_SUBSCRIPTION_CANCELLED))]
+    pub comp_def_account: Account<'info, ComputationDefinitionAccount>,
+
+    #[account(address = derive_mxe_pda!())]
+    pub mxe_account: Account<'info, MXEAccount>,
+
+    /// CHECK: Validated by Arcium program
+    pub computation_account: UncheckedAccount<'info>,
+
+    pub cluster_account: Account<'info, Cluster>,
+
+    /// CHECK: Solana instructions sysvar
+    #[account(address = anchor_lang::solana_program::sysvar::instructions::ID)]
+    pub instructions_sysvar: AccountInfo<'info>,
+
+    // Custom accounts
     #[account(mut)]
     pub subscription_account: Account<'info, Subscription>,
+}
 
-    /// CHECK: Arcium cluster account for verification
-    pub cluster_account: AccountInfo<'info>,
+// ============================================
+// Init Computation Definition Account Structures
+// ============================================
 
-    /// CHECK: Arcium computation account for verification
-    pub computation_account: AccountInfo<'info>,
+#[init_computation_definition_accounts("set_subscription_active", payer)]
+#[derive(Accounts)]
+pub struct InitSetSubscriptionActiveCompDef<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    #[account(mut, address = derive_mxe_pda!())]
+    pub mxe_account: Account<'info, MXEAccount>,
+
+    /// CHECK: comp_def_account, checked by arcium program.
+    /// Can't check it here as it's not initialized yet.
+    #[account(mut)]
+    pub comp_def_account: UncheckedAccount<'info>,
+
+    pub cluster_account: Account<'info, Cluster>,
+
+    pub system_program: Program<'info, System>,
+
+    pub arcium_program: Program<'info, Arcium>,
+}
+
+#[init_computation_definition_accounts("set_subscription_cancelled", payer)]
+#[derive(Accounts)]
+pub struct InitSetSubscriptionCancelledCompDef<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    #[account(mut, address = derive_mxe_pda!())]
+    pub mxe_account: Account<'info, MXEAccount>,
+
+    /// CHECK: comp_def_account, checked by arcium program.
+    #[account(mut)]
+    pub comp_def_account: UncheckedAccount<'info>,
+
+    pub cluster_account: Account<'info, Cluster>,
+
+    pub system_program: Program<'info, System>,
+
+    pub arcium_program: Program<'info, Arcium>,
+}
+
+#[init_computation_definition_accounts("increment_count", payer)]
+#[derive(Accounts)]
+pub struct InitIncrementCountCompDef<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    #[account(mut, address = derive_mxe_pda!())]
+    pub mxe_account: Account<'info, MXEAccount>,
+
+    /// CHECK: comp_def_account, checked by arcium program.
+    #[account(mut)]
+    pub comp_def_account: UncheckedAccount<'info>,
+
+    pub cluster_account: Account<'info, Cluster>,
+
+    pub system_program: Program<'info, System>,
+
+    pub arcium_program: Program<'info, Arcium>,
+}
+
+#[init_computation_definition_accounts("decrement_count", payer)]
+#[derive(Accounts)]
+pub struct InitDecrementCountCompDef<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    #[account(mut, address = derive_mxe_pda!())]
+    pub mxe_account: Account<'info, MXEAccount>,
+
+    /// CHECK: comp_def_account, checked by arcium program.
+    #[account(mut)]
+    pub comp_def_account: UncheckedAccount<'info>,
+
+    pub cluster_account: Account<'info, Cluster>,
+
+    pub system_program: Program<'info, System>,
+
+    pub arcium_program: Program<'info, Arcium>,
+}
+
+#[init_computation_definition_accounts("initialize_count", payer)]
+#[derive(Accounts)]
+pub struct InitInitializeCountCompDef<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    #[account(mut, address = derive_mxe_pda!())]
+    pub mxe_account: Account<'info, MXEAccount>,
+
+    /// CHECK: comp_def_account, checked by arcium program.
+    #[account(mut)]
+    pub comp_def_account: UncheckedAccount<'info>,
+
+    pub cluster_account: Account<'info, Cluster>,
+
+    pub system_program: Program<'info, System>,
+
+    pub arcium_program: Program<'info, Arcium>,
+}
+
+#[init_computation_definition_accounts("initialize_subscription_status", payer)]
+#[derive(Accounts)]
+pub struct InitInitializeSubscriptionStatusCompDef<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    #[account(mut, address = derive_mxe_pda!())]
+    pub mxe_account: Account<'info, MXEAccount>,
+
+    /// CHECK: comp_def_account, checked by arcium program.
+    #[account(mut)]
+    pub comp_def_account: UncheckedAccount<'info>,
+
+    pub cluster_account: Account<'info, Cluster>,
+
+    pub system_program: Program<'info, System>,
+
+    pub arcium_program: Program<'info, Arcium>,
 }

@@ -54,6 +54,13 @@ pub struct SubscriptionStatusEncryptedEvent {
     pub timestamp: i64,
 }
 
+#[event]
+pub struct SubscriptionCancelledEvent {
+    pub subscription: Pubkey,
+    pub plan: Pubkey,
+    pub timestamp: i64,
+}
+
 // ============================================
 // Light Protocol ZK Compression Events
 // ============================================

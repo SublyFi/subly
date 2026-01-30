@@ -74,4 +74,7 @@ pub enum SublyError {
 
     #[msg("Invalid account meta data")]
     InvalidAccountMeta,
+
+    #[msg("Invalid MXE account - cluster not set")]
+    InvalidMxeAccount,
 }

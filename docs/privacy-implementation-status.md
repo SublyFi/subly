@@ -99,15 +99,24 @@ pub struct Subscription {
 
 ### SDK対応
 
+**基本MXE操作**:
 - `initializeMxe()` - MXEアカウントの初期化
 - `isMxeInitialized()` - MXE初期化状態の確認
 - `getMxePda()` - MXE PDAの取得
 - `deriveMxePda()` - MXE PDAの導出
 
+**Arcium CPI統合** (2026-01-29追加):
+- `SublyArciumClient` - Arcium CPI操作専用クライアントクラス
+- `subscribeWithArcium()` - Arcium MXE暗号化付きサブスクリプション
+- `cancelSubscriptionWithArcium()` - Arcium MXE暗号化付き解約
+- `waitForEncryptionCallback()` - 暗号化コールバック待機
+- `getArciumAccounts()` - Arciumアカウント導出ヘルパー
+
 ### ステアリングドキュメント
 
 - `.steering/20260127-arcium-mxe-integration/` - Arcium MXE統合
 - `.steering/20260127-arcium-subscription-privacy/` - サブスクリプションプライバシー
+- `.steering/20260129-arcium-cpi-integration/` - Arcium CPI統合
 
 ---
 
@@ -182,13 +191,15 @@ pub struct Subscription {
 | `#[arcium_program]`と`#[program]`の競合 | `#[program]`のみを使用、Arciumマクロは延期 | 2026-01-27 |
 | `queue_computation` APIの理解不足 | コールバック関数のみ実装、CPI統合は延期 | 2026-01-27 |
 | デプロイ時の権限エラー | 正しいkeypair (id.json)を使用 | 2026-01-27 |
+| `queue_computation` CPI統合 | `#[queue_computation_accounts]`マクロを使用してCPI実装完了 | 2026-01-29 |
+| `#[arcium_callback]`マクロ統合 | `arcium-anchor`のマクロを直接使用して統合完了 | 2026-01-29 |
 
-### 未解決（Phase 2で対応予定）
+### 未解決（今後の課題）
 
 | 問題 | 対応予定 |
 |------|----------|
-| `queue_computation` CPI統合 | Light Protocol統合と並行して調査 |
-| `#[arcium_callback]`マクロ統合 | `.arcis`ファイル生成後に再評価 |
+| Arcium localnetテスト環境のDockerタイムアウト | Anchor startup_waitの調整、またはDockerリソース増加 |
+| DevnetフルArciumインフラストラクチャ | Arciumチームと連携してDevnet MXEクラスタの設定 |
 
 ---
 

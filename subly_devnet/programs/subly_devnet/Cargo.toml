@@ -31,6 +31,7 @@ light-sdk-types = { version = "0.17", features = ["v2"] }
 light-hasher = "5.0"
 borsh = "0.10"
 borsh-derive = "0.10"
+sha2 = "0.10"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

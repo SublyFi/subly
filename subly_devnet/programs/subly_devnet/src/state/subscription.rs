@@ -28,6 +28,8 @@ pub struct Subscription {
     pub encrypted_status: [u8; 64],
     /// Nonce for status encryption
     pub status_nonce: [u8; 16],
+    /// Whether encryption is pending (waiting for Arcium callback)
+    pub pending_encryption: bool,
 }
 
 impl Subscription {
@@ -43,6 +45,7 @@ impl Subscription {
         + 16                       // nonce: u128
         + 1                        // bump: u8
         + 64                       // encrypted_status: [u8; 64]
-        + 16;                      // status_nonce: [u8; 16]
-    // Total: 250 bytes
+        + 16                       // status_nonce: [u8; 16]
+        + 1;                       // pending_encryption: bool
+    // Total: 251 bytes
 }

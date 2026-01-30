@@ -1,0 +1,108 @@
+
+action "subly_devnet_business_registered_event" "svm::deploy_subgraph" {
+    program_id = action.deploy_subly_devnet.program_id
+    program_idl = action.deploy_subly_devnet.program_idl
+    block_height = 0 // action.deploy_subly_devnet.block_height
+    event {
+        name = "BusinessRegisteredEvent"
+    }
+}
+
+action "subly_devnet_computation_queued_event" "svm::deploy_subgraph" {
+    program_id = action.deploy_subly_devnet.program_id
+    program_idl = action.deploy_subly_devnet.program_idl
+    block_height = 0 // action.deploy_subly_devnet.block_height
+    event {
+        name = "ComputationQueuedEvent"
+    }
+}
+
+action "subly_devnet_membership_verified_event" "svm::deploy_subgraph" {
+    program_id = action.deploy_subly_devnet.program_id
+    program_idl = action.deploy_subly_devnet.program_idl
+    block_height = 0 // action.deploy_subly_devnet.block_height
+    event {
+        name = "MembershipVerifiedEvent"
+    }
+}
+
+action "subly_devnet_mxe_initialized_event" "svm::deploy_subgraph" {
+    program_id = action.deploy_subly_devnet.program_id
+    program_idl = action.deploy_subly_devnet.program_idl
+    block_height = 0 // action.deploy_subly_devnet.block_height
+    event {
+        name = "MxeInitializedEvent"
+    }
+}
+
+action "subly_devnet_plan_created_event" "svm::deploy_subgraph" {
+    program_id = action.deploy_subly_devnet.program_id
+    program_idl = action.deploy_subly_devnet.program_idl
+    block_height = 0 // action.deploy_subly_devnet.block_height
+    event {
+        name = "PlanCreatedEvent"
+    }
+}
+
+action "subly_devnet_subscription_cancelled_event" "svm::deploy_subgraph" {
+    program_id = action.deploy_subly_devnet.program_id
+    program_idl = action.deploy_subly_devnet.program_idl
+    block_height = 0 // action.deploy_subly_devnet.block_height
+    event {
+        name = "SubscriptionCancelledEvent"
+    }
+}
+
+action "subly_devnet_subscription_count_updated_event" "svm::deploy_subgraph" {
+    program_id = action.deploy_subly_devnet.program_id
+    program_idl = action.deploy_subly_devnet.program_idl
+    block_height = 0 // action.deploy_subly_devnet.block_height
+    event {
+        name = "SubscriptionCountUpdatedEvent"
+    }
+}
+
+action "subly_devnet_subscription_created_event" "svm::deploy_subgraph" {
+    program_id = action.deploy_subly_devnet.program_id
+    program_idl = action.deploy_subly_devnet.program_idl
+    block_height = 0 // action.deploy_subly_devnet.block_height
+    event {
+        name = "SubscriptionCreatedEvent"
+    }
+}
+
+action "subly_devnet_subscription_migrated_to_zk_event" "svm::deploy_subgraph" {
+    program_id = action.deploy_subly_devnet.program_id
+    program_idl = action.deploy_subly_devnet.program_idl
+    block_height = 0 // action.deploy_subly_devnet.block_height
+    event {
+        name = "SubscriptionMigratedToZkEvent"
+    }
+}
+
+action "subly_devnet_subscription_status_encrypted_event" "svm::deploy_subgraph" {
+    program_id = action.deploy_subly_devnet.program_id
+    program_idl = action.deploy_subly_devnet.program_idl
+    block_height = 0 // action.deploy_subly_devnet.block_height
+    event {
+        name = "SubscriptionStatusEncryptedEvent"
+    }
+}
+
+action "subly_devnet_zk_subscription_cancelled_event" "svm::deploy_subgraph" {
+    program_id = action.deploy_subly_devnet.program_id
+    program_idl = action.deploy_subly_devnet.program_idl
+    block_height = 0 // action.deploy_subly_devnet.block_height
+    event {
+        name = "ZkSubscriptionCancelledEvent"
+    }
+}
+
+action "subly_devnet_zk_subscription_created_event" "svm::deploy_subgraph" {
+    program_id = action.deploy_subly_devnet.program_id
+    program_idl = action.deploy_subly_devnet.program_idl
+    block_height = 0 // action.deploy_subly_devnet.block_height
+    event {
+        name = "ZkSubscriptionCreatedEvent"
+    }
+}

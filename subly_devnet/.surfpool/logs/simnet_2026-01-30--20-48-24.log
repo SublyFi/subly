@@ -1,0 +1,44 @@
+[2026-01-30--20-48-24 INFO actix_server::builder] starting 5 workers
+[2026-01-30--20-48-24 INFO actix_server::server] Tokio runtime found; starting in existing Tokio runtime
+[2026-01-30--20-48-24 INFO actix_server::server] starting service: "actix-web-service-127.0.0.1:18488", workers: 5, listening on: 127.0.0.1:18488
+[2026-01-30--20-48-24 INFO parity_ws] Listening for new connections on 127.0.0.1:8900.
+[2026-01-30--20-48-24 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:58616.
+[2026-01-30--20-48-24 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:58617.
+[2026-01-30--20-48-24 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:58618.
+[2026-01-30--20-48-32 INFO txtx::svm::deploy_program] [Recovery Instructions] - An ephemeral authority account will be created and funded to write to the buffer account.
+[2026-01-30--20-48-32 INFO txtx::svm::deploy_program] [Recovery Instructions] - Please save the following information in case the deployment fails and the account needs to be recovered:
+[2026-01-30--20-48-32 INFO txtx::svm::deploy_program] [Recovery Instructions] - Ephemeral authority public key: ExPtwvnL76qDrpFDVCeHy9wXFGe49ecrT7zNycnJDUyh
+[2026-01-30--20-48-32 INFO txtx::svm::deploy_program] [Recovery Instructions] - Ephemeral authority secret key: [163, 73, 226, 202, 158, 173, 2, 19, 35, 238, 183, 236, 125, 61, 227, 48, 173, 164, 248, 0, 252, 204, 96, 143, 80, 189, 199, 228, 49, 30, 39, 93, 207, 88, 195, 65, 199, 185, 139, 133, 166, 95, 138, 118, 91, 129, 7, 87, 114, 44, 6, 203, 41, 236, 144, 74, 252, 235, 120, 155, 50, 95, 18, 116]
+[2026-01-30--20-48-33 INFO txtx::svm::deploy_program] Account Created - Ephemeral authority account created and funded to write to buffer
+[2026-01-30--20-48-33 INFO txtx::svm::deploy_program] [Recovery Instructions] - Creating program buffer account at pubkey 4sQuS9mC7BATTH3wF9RRzenswJ94bX33DvYtVmWbNCC7
+[2026-01-30--20-48-33 INFO txtx::svm::deploy_program] Account Created - Program buffer account created
+[2026-01-30--20-48-43 INFO txtx::svm::deploy_program] Buffer Ready - Writing to buffer account is complete
+[2026-01-30--20-48-44 INFO txtx::svm::deploy_program] Program Created - Program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_program] Complete - Ephemeral authority account closed and leftover funds returned to payer
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph BusinessRegisteredEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph ZkSubscriptionCreatedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph ComputationQueuedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph MembershipVerifiedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph SubscriptionCancelledEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph SubscriptionCountUpdatedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph PlanCreatedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph MxeInitializedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph SubscriptionCreatedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph SubscriptionMigratedToZkEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph SubscriptionStatusEncryptedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph ZkSubscriptionCancelledEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--20-48-45 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--20-49-59 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:61022.
+[2026-01-30--20-49-59 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:61023.
+[2026-01-30--20-49-59 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:61024.

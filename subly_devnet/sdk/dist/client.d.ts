@@ -54,4 +54,75 @@ export declare class SublyZkClient {
      */
     private buildAndSendMigrateToZkTx;
 }
+/**
+ * Subly Arcium Client for interacting with MXE-encrypted subscriptions
+ *
+ * This client provides methods to:
+ * - Subscribe with Arcium MXE encryption (subscribe_with_arcium)
+ * - Cancel subscriptions with encryption (cancel_subscription_with_arcium)
+ * - Query encrypted subscription status
+ */
+export declare class SublyArciumClient {
+    private connection;
+    private programId;
+    constructor(rpcUrl: string, programId?: PublicKey);
+    /**
+     * Subscribe to a plan with Arcium MXE encryption
+     *
+     * This method:
+     * 1. Generates a computation offset for the Arcium queue
+     * 2. Derives all necessary Arcium PDA accounts
+     * 3. Builds and sends the subscribe_with_arcium transaction
+     *
+     * The actual encryption happens in the Arcium MXE network, and the
+     * encrypted status will be set via callback.
+     */
+    subscribeWithArcium(user: Keypair, planAccount: PublicKey, encryptedUserCommitment: Uint8Array, membershipCommitment: Uint8Array, nonce: bigint): Promise<{
+        signature: string;
+        computationOffset: bigint;
+        subscriptionAccount: PublicKey;
+    }>;
+    /**
+     * Cancel a subscription with Arcium MXE encryption
+     *
+     * This method queues a set_subscription_cancelled computation in the Arcium network.
+     */
+    cancelSubscriptionWithArcium(user: Keypair, subscriptionAccount: PublicKey, planAccount: PublicKey): Promise<{
+        signature: string;
+        computationOffset: bigint;
+    }>;
+    /**
+     * Get subscription account data
+     */
+    getSubscription(subscriptionAccount: PublicKey): Promise<{
+        plan: PublicKey;
+        isActive: boolean;
+        pendingEncryption: boolean;
+        encryptedStatus: Uint8Array;
+    } | null>;
+    /**
+     * Wait for encryption callback to complete
+     */
+    waitForEncryptionCallback(subscriptionAccount: PublicKey, timeoutMs?: number, pollIntervalMs?: number): Promise<boolean>;
+    /**
+     * Calculate instruction discriminator (SHA256 hash of "global:{name}")
+     */
+    private calculateDiscriminator;
+    /**
+     * Encode subscribe_with_arcium instruction data
+     */
+    private encodeSubscribeWithArciumData;
+    /**
+     * Encode cancel_subscription_with_arcium instruction data
+     */
+    private encodeCancelSubscriptionWithArciumData;
+    /**
+     * Derive subscription PDA
+     */
+    deriveSubscriptionPda(planAccount: PublicKey, membershipCommitment: Uint8Array): [PublicKey, number];
+    /**
+     * Get MXE account PDA
+     */
+    getMxeAccountPda(): PublicKey;
+}
 //# sourceMappingURL=client.d.ts.map
