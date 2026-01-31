@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(repository-structure)",
+      "Skill(repository-structure:*)"
+    ]
+  }
+}
