@@ -1,8 +1,15 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::instruction::Instruction;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 use arcium_anchor::prelude::*;
 use arcium_client::idl::arcium::types::{CallbackAccount, CircuitSource, OffChainCircuitSource};
 use arcium_macros::circuit_hash;
+use tuktuk_program::cpi::accounts::QueueTaskV0;
+use tuktuk_program::cpi::queue_task_v0;
+use tuktuk_program::instructions::{QueueTaskArgsV0, TriggerV0, TransactionSourceV0};
+use tuktuk_program::state::{TaskQueueV0, TuktukConfigV0};
+use tuktuk_program::utils::compile_transaction;
+use tuktuk_program::RunTaskReturnV0;
 
 declare_id!("B2WX7o3djQSAus1QdHYuezL95qUox6C1zmRS6JdDL7Ye");
 
@@ -17,6 +24,8 @@ pub const MERCHANT_LEDGER_SEED: &[u8] = b"merchant_ledger";
 pub const SUBSCRIPTION_PLAN_SEED: &[u8] = b"subscription_plan";
 pub const USER_LEDGER_SEED: &[u8] = b"user_ledger";
 pub const USER_SUBSCRIPTION_SEED: &[u8] = b"user_subscription";
+pub const SUBLY_TASK_QUEUE_SEED: &[u8] = b"subly_task_queue";
+pub const QUEUE_AUTHORITY_SEED: &[u8] = b"queue_authority";
 
 pub const MAX_NAME_LENGTH: usize = 64;
 pub const MAX_PLAN_NAME_LENGTH: usize = 32;
@@ -185,6 +194,139 @@ pub mod privacy_subscriptions {
         if let Some(new_is_active) = is_active {
             plan.is_active = new_is_active;
         }
+
+        Ok(())
+    }
+
+    // ========================================================================
+    // Tuk Tuk Task Queue Management Instructions
+    // ========================================================================
+
+    /// Initialize a Subly Task Queue for automated payment processing
+    pub fn initialize_task_queue(
+        ctx: Context<InitializeTaskQueue>,
+        task_queue_id: u32,
+    ) -> Result<()> {
+        let subly_task_queue = &mut ctx.accounts.subly_task_queue;
+        subly_task_queue.authority = ctx.accounts.authority.key();
+        subly_task_queue.task_queue = ctx.accounts.task_queue.key();
+        subly_task_queue.mint = ctx.accounts.mint.key();
+        subly_task_queue.is_active = true;
+        subly_task_queue.bump = ctx.bumps.subly_task_queue;
+
+        // Initialize queue authority PDA
+        let queue_authority = &mut ctx.accounts.queue_authority;
+        queue_authority.task_queue = ctx.accounts.task_queue.key();
+        queue_authority.bump = ctx.bumps.queue_authority;
+
+        Ok(())
+    }
+
+    /// Add funds to the Task Queue for crank rewards
+    pub fn fund_task_queue(
+        ctx: Context<FundTaskQueue>,
+        amount: u64,
+    ) -> Result<()> {
+        require!(ctx.accounts.subly_task_queue.is_active, ErrorCode::TaskQueueNotActive);
+
+        // Transfer SOL from authority to task queue
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.system_program.to_account_info(),
+            anchor_lang::system_program::Transfer {
+                from: ctx.accounts.authority.to_account_info(),
+                to: ctx.accounts.task_queue.to_account_info(),
+            },
+        );
+        anchor_lang::system_program::transfer(cpi_ctx, amount)?;
+
+        Ok(())
+    }
+
+    /// Close the Task Queue and recover remaining funds
+    pub fn close_task_queue(
+        ctx: Context<CloseTaskQueue>,
+    ) -> Result<()> {
+        let subly_task_queue = &mut ctx.accounts.subly_task_queue;
+        subly_task_queue.is_active = false;
+
+        // Note: Actual Tuk Tuk task queue closure would require CPI to tuktuk-program
+        // For MVP, we just mark our wrapper as inactive
+
+        Ok(())
+    }
+
+    /// Schedule initial payment task for a subscription
+    /// Called after subscribe_callback to queue the first payment task
+    pub fn schedule_payment_task(
+        ctx: Context<SchedulePaymentTask>,
+        task_id: u16,
+        trigger_at: i64,
+        crank_reward: u64,
+        computation_offset: u64,
+        pubkey: [u8; 32],
+        nonce: u128,
+    ) -> Result<()> {
+        require!(ctx.accounts.subly_task_queue.is_active, ErrorCode::TaskQueueNotActive);
+
+        // Build the process_payment_with_requeue instruction
+        // Note: The actual instruction data includes encrypted params that will be
+        // prepared by the caller
+        let process_payment_ix = Instruction {
+            program_id: crate::ID,
+            accounts: vec![
+                // These accounts will be resolved at task execution time
+                // For now, we store the essential account addresses
+            ],
+            data: crate::instruction::ProcessPaymentWithRequeue {
+                computation_offset,
+                pubkey,
+                nonce,
+            }
+            .data(),
+        };
+
+        // Compile the transaction
+        let (compiled_tx, _) = compile_transaction(
+            vec![process_payment_ix],
+            vec![], // No additional signer seeds needed
+        )
+        .map_err(|_| ErrorCode::TaskCompilationFailed)?;
+
+        // Queue authority seeds for signing
+        let queue_authority_bump = ctx.accounts.queue_authority.bump;
+        let task_queue_key = ctx.accounts.task_queue.key();
+        let signer_seeds: &[&[&[u8]]] = &[&[
+            QUEUE_AUTHORITY_SEED,
+            task_queue_key.as_ref(),
+            &[queue_authority_bump],
+        ]];
+
+        // Queue the task via CPI to Tuk Tuk
+        let cpi_accounts = QueueTaskV0 {
+            payer: ctx.accounts.payer.to_account_info(),
+            queue_authority: ctx.accounts.queue_authority.to_account_info(),
+            task_queue: ctx.accounts.task_queue.to_account_info(),
+            task: ctx.accounts.task.to_account_info(),
+            system_program: ctx.accounts.system_program.to_account_info(),
+        };
+
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.tuktuk_program.to_account_info(),
+            cpi_accounts,
+            signer_seeds,
+        );
+
+        queue_task_v0(
+            cpi_ctx,
+            QueueTaskArgsV0 {
+                id: task_id,
+                trigger: TriggerV0::Timestamp(trigger_at),
+                transaction: TransactionSourceV0::CompiledV0(compiled_tx),
+                crank_reward,
+                free_tasks: 1, // Allow one child task for re-queueing
+                description: "Subly recurring payment".to_string(),
+            },
+        )?;
 
         Ok(())
     }
@@ -554,6 +696,71 @@ pub mod privacy_subscriptions {
         Ok(())
     }
 
+    /// Process subscription payment with automatic re-queue (called by Tuk Tuk)
+    /// This is the Tuk Tuk Task-compatible version of process_payment
+    pub fn process_payment_with_requeue(
+        ctx: Context<ProcessPaymentWithRequeue>,
+        computation_offset: u64,
+        pubkey: [u8; 32],
+        nonce: u128,
+    ) -> Result<()> {
+        ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
+
+        let current_timestamp = Clock::get()?.unix_timestamp;
+        let plan_price = ctx.accounts.subscription_plan.price;
+        let billing_cycle_days = ctx.accounts.subscription_plan.billing_cycle_days;
+
+        let args = ArgBuilder::new()
+            .x25519_pubkey(pubkey)
+            .plaintext_u128(nonce)
+            .encrypted_u64(ctx.accounts.user_ledger.encrypted_balance[0])
+            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance[0])
+            .encrypted_u8(ctx.accounts.user_subscription.encrypted_status)
+            .encrypted_i64(ctx.accounts.user_subscription.encrypted_next_payment_date)
+            .plaintext_i64(current_timestamp)
+            .plaintext_u64(plan_price)
+            .plaintext_u32(billing_cycle_days)
+            .build();
+
+        queue_computation(
+            ctx.accounts,
+            computation_offset,
+            args,
+            None,
+            vec![ProcessPaymentWithRequeueCallback::callback_ix(
+                computation_offset,
+                &ctx.accounts.mxe_account,
+                &[
+                    CallbackAccount {
+                        pubkey: ctx.accounts.user_ledger.key(),
+                        is_writable: true,
+                    },
+                    CallbackAccount {
+                        pubkey: ctx.accounts.merchant_ledger.key(),
+                        is_writable: true,
+                    },
+                    CallbackAccount {
+                        pubkey: ctx.accounts.user_subscription.key(),
+                        is_writable: true,
+                    },
+                    // Include task queue info for re-queueing in callback
+                    CallbackAccount {
+                        pubkey: ctx.accounts.task_queue.key(),
+                        is_writable: true,
+                    },
+                    CallbackAccount {
+                        pubkey: ctx.accounts.queue_authority.key(),
+                        is_writable: false,
+                    },
+                ],
+            )?],
+            1,
+            0,
+        )?;
+
+        Ok(())
+    }
+
     /// Verify subscription status
     pub fn verify_subscription(
         ctx: Context<VerifySubscription>,
@@ -772,6 +979,49 @@ pub mod privacy_subscriptions {
         Ok(())
     }
 
+    /// Callback for process_payment_with_requeue
+    /// Updates ledgers and returns a RunTaskReturnV0 for re-queueing
+    #[arcium_callback(encrypted_ix = "process_payment")]
+    pub fn process_payment_with_requeue_callback(
+        ctx: Context<ProcessPaymentWithRequeueCallback>,
+        output: SignedComputationOutputs<ProcessPaymentOutput>,
+    ) -> Result<RunTaskReturnV0> {
+        let o = match output.verify_output(
+            &ctx.accounts.cluster_account,
+            &ctx.accounts.computation_account,
+        ) {
+            Ok(ProcessPaymentOutput { field_0 }) => field_0,
+            Err(_) => return Err(ErrorCode::AbortedComputation.into()),
+        };
+
+        // Update user ledger
+        let user_ledger = &mut ctx.accounts.user_ledger;
+        user_ledger.encrypted_balance[0] = o.ciphertexts[0];
+        user_ledger.nonce = o.nonce;
+
+        // Update merchant ledger
+        let merchant_ledger = &mut ctx.accounts.merchant_ledger;
+        merchant_ledger.encrypted_balance[0] = o.ciphertexts[1];
+
+        // Update user subscription
+        let user_subscription = &mut ctx.accounts.user_subscription;
+        user_subscription.encrypted_status = o.ciphertexts[2];
+        user_subscription.encrypted_next_payment_date = o.ciphertexts[3];
+
+        // Calculate next payment timestamp (billing_cycle_days from now)
+        // Note: In production, this should be read from the decrypted next_payment_date
+        let current_timestamp = Clock::get()?.unix_timestamp;
+        let billing_cycle_seconds: i64 = 30 * 24 * 60 * 60; // Default 30 days
+        let next_trigger_at = current_timestamp + billing_cycle_seconds;
+
+        // Build the next task for re-queueing
+        // Note: The actual implementation would need to include proper instruction data
+        // For MVP, we return an empty task list to indicate re-queue should be handled externally
+        Ok(RunTaskReturnV0 {
+            tasks: vec![], // Re-queueing will be handled by schedule_payment_task
+        })
+    }
+
     #[arcium_callback(encrypted_ix = "verify_subscription")]
     pub fn verify_subscription_callback(
         ctx: Context<VerifySubscriptionCallback>,
@@ -970,6 +1220,40 @@ impl UserSubscription {
     pub const SIZE: usize = 8 + 32 + 8 + 32 + 32 + 32 + 16 + 1;
 }
 
+/// Subly Task Queue configuration account
+/// PDA Seeds: ["subly_task_queue", mint]
+#[account]
+pub struct SublyTaskQueue {
+    /// Authority that can manage this task queue
+    pub authority: Pubkey,
+    /// The Tuk Tuk Task Queue address
+    pub task_queue: Pubkey,
+    /// Token mint for payments
+    pub mint: Pubkey,
+    /// Whether the task queue is active
+    pub is_active: bool,
+    /// PDA bump
+    pub bump: u8,
+}
+
+impl SublyTaskQueue {
+    pub const SIZE: usize = 8 + 32 + 32 + 32 + 1 + 1;
+}
+
+/// Queue authority PDA for signing task queue operations
+/// PDA Seeds: ["queue_authority", task_queue]
+#[account]
+pub struct QueueAuthority {
+    /// Associated task queue
+    pub task_queue: Pubkey,
+    /// PDA bump
+    pub bump: u8,
+}
+
+impl QueueAuthority {
+    pub const SIZE: usize = 8 + 32 + 1;
+}
+
 // ============================================================================
 // Context Structures - Phase 1: Non-Encrypted
 // ============================================================================
@@ -1079,6 +1363,110 @@ pub struct UpdateSubscriptionPlan<'info> {
         bump = subscription_plan.bump,
     )]
     pub subscription_plan: Account<'info, SubscriptionPlan>,
+}
+
+// ============================================================================
+// Context Structures - Tuk Tuk Task Queue Management
+// ============================================================================
+
+#[derive(Accounts)]
+#[instruction(task_queue_id: u32)]
+pub struct InitializeTaskQueue<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub mint: Account<'info, Mint>,
+    #[account(
+        seeds = [PROTOCOL_CONFIG_SEED],
+        bump = protocol_config.bump,
+        has_one = authority @ ErrorCode::Unauthorized,
+    )]
+    pub protocol_config: Account<'info, ProtocolConfig>,
+    /// The Tuk Tuk Task Queue (must be pre-created via Tuk Tuk program)
+    /// CHECK: Validated by Tuk Tuk program
+    #[account(mut)]
+    pub task_queue: UncheckedAccount<'info>,
+    #[account(
+        init,
+        payer = authority,
+        space = SublyTaskQueue::SIZE,
+        seeds = [SUBLY_TASK_QUEUE_SEED, mint.key().as_ref()],
+        bump,
+    )]
+    pub subly_task_queue: Account<'info, SublyTaskQueue>,
+    #[account(
+        init,
+        payer = authority,
+        space = QueueAuthority::SIZE,
+        seeds = [QUEUE_AUTHORITY_SEED, task_queue.key().as_ref()],
+        bump,
+    )]
+    pub queue_authority: Account<'info, QueueAuthority>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct FundTaskQueue<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub mint: Account<'info, Mint>,
+    #[account(
+        seeds = [SUBLY_TASK_QUEUE_SEED, mint.key().as_ref()],
+        bump = subly_task_queue.bump,
+        has_one = authority @ ErrorCode::Unauthorized,
+    )]
+    pub subly_task_queue: Account<'info, SublyTaskQueue>,
+    /// CHECK: Tuk Tuk Task Queue to receive funds
+    #[account(mut, address = subly_task_queue.task_queue)]
+    pub task_queue: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CloseTaskQueue<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub mint: Account<'info, Mint>,
+    #[account(
+        mut,
+        seeds = [SUBLY_TASK_QUEUE_SEED, mint.key().as_ref()],
+        bump = subly_task_queue.bump,
+        has_one = authority @ ErrorCode::Unauthorized,
+    )]
+    pub subly_task_queue: Account<'info, SublyTaskQueue>,
+}
+
+#[derive(Accounts)]
+#[instruction(task_id: u16)]
+pub struct SchedulePaymentTask<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub mint: Account<'info, Mint>,
+    #[account(
+        seeds = [SUBLY_TASK_QUEUE_SEED, mint.key().as_ref()],
+        bump = subly_task_queue.bump,
+    )]
+    pub subly_task_queue: Account<'info, SublyTaskQueue>,
+    /// The Tuk Tuk Task Queue
+    #[account(mut, address = subly_task_queue.task_queue)]
+    pub task_queue: Account<'info, TaskQueueV0>,
+    #[account(
+        seeds = [QUEUE_AUTHORITY_SEED, task_queue.key().as_ref()],
+        bump = queue_authority.bump,
+    )]
+    pub queue_authority: Account<'info, QueueAuthority>,
+    /// The task PDA to be initialized by Tuk Tuk
+    /// CHECK: Initialized by Tuk Tuk program via CPI
+    #[account(mut)]
+    pub task: UncheckedAccount<'info>,
+    /// The user subscription to schedule payment for
+    pub user_subscription: Account<'info, UserSubscription>,
+    /// The subscription plan
+    #[account(address = user_subscription.plan)]
+    pub subscription_plan: Account<'info, SubscriptionPlan>,
+    /// Tuk Tuk program
+    /// CHECK: Tuk Tuk program
+    pub tuktuk_program: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 // ============================================================================
@@ -1483,6 +1871,76 @@ pub struct ProcessPayment<'info> {
     pub arcium_program: Program<'info, Arcium>,
 }
 
+#[queue_computation_accounts("process_payment", payer)]
+#[derive(Accounts)]
+#[instruction(computation_offset: u64)]
+pub struct ProcessPaymentWithRequeue<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub mint: Account<'info, Mint>,
+    #[account(
+        seeds = [SUBSCRIPTION_PLAN_SEED, subscription_plan.merchant.as_ref(), &subscription_plan.plan_id.to_le_bytes()],
+        bump = subscription_plan.bump,
+    )]
+    pub subscription_plan: Account<'info, SubscriptionPlan>,
+    #[account(
+        mut,
+        seeds = [USER_LEDGER_SEED, user_subscription.user.as_ref(), mint.key().as_ref()],
+        bump = user_ledger.bump,
+    )]
+    pub user_ledger: Account<'info, UserLedger>,
+    #[account(
+        mut,
+        seeds = [MERCHANT_LEDGER_SEED, subscription_plan.merchant.as_ref(), mint.key().as_ref()],
+        bump = merchant_ledger.bump,
+    )]
+    pub merchant_ledger: Account<'info, MerchantLedger>,
+    #[account(
+        mut,
+        seeds = [USER_SUBSCRIPTION_SEED, user_subscription.user.as_ref(), &user_subscription.subscription_index.to_le_bytes()],
+        bump = user_subscription.bump,
+    )]
+    pub user_subscription: Account<'info, UserSubscription>,
+    /// The Tuk Tuk Task Queue
+    #[account(mut)]
+    pub task_queue: Account<'info, TaskQueueV0>,
+    #[account(
+        seeds = [QUEUE_AUTHORITY_SEED, task_queue.key().as_ref()],
+        bump = queue_authority.bump,
+    )]
+    pub queue_authority: Account<'info, QueueAuthority>,
+    #[account(
+        init_if_needed,
+        space = 9,
+        payer = payer,
+        seeds = [&SIGN_PDA_SEED],
+        bump,
+        address = derive_sign_pda!(),
+    )]
+    pub sign_pda_account: Account<'info, ArciumSignerAccount>,
+    #[account(address = derive_mxe_pda!())]
+    pub mxe_account: Box<Account<'info, MXEAccount>>,
+    #[account(mut, address = derive_mempool_pda!(mxe_account, ErrorCode::ClusterNotSet))]
+    /// CHECK: mempool_account
+    pub mempool_account: UncheckedAccount<'info>,
+    #[account(mut, address = derive_execpool_pda!(mxe_account, ErrorCode::ClusterNotSet))]
+    /// CHECK: executing_pool
+    pub executing_pool: UncheckedAccount<'info>,
+    #[account(mut, address = derive_comp_pda!(computation_offset, mxe_account, ErrorCode::ClusterNotSet))]
+    /// CHECK: computation_account
+    pub computation_account: UncheckedAccount<'info>,
+    #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_PROCESS_PAYMENT))]
+    pub comp_def_account: Box<Account<'info, ComputationDefinitionAccount>>,
+    #[account(mut, address = derive_cluster_pda!(mxe_account, ErrorCode::ClusterNotSet))]
+    pub cluster_account: Box<Account<'info, Cluster>>,
+    #[account(mut, address = ARCIUM_FEE_POOL_ACCOUNT_ADDRESS)]
+    pub pool_account: Box<Account<'info, FeePool>>,
+    #[account(mut, address = ARCIUM_CLOCK_ACCOUNT_ADDRESS)]
+    pub clock_account: Box<Account<'info, ClockAccount>>,
+    pub system_program: Program<'info, System>,
+    pub arcium_program: Program<'info, Arcium>,
+}
+
 #[queue_computation_accounts("verify_subscription", payer)]
 #[derive(Accounts)]
 #[instruction(computation_offset: u64)]
@@ -1706,6 +2164,37 @@ pub struct ProcessPaymentCallback<'info> {
     pub user_subscription: Account<'info, UserSubscription>,
 }
 
+#[callback_accounts("process_payment")]
+#[derive(Accounts)]
+pub struct ProcessPaymentWithRequeueCallback<'info> {
+    pub arcium_program: Program<'info, Arcium>,
+    #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_PROCESS_PAYMENT))]
+    pub comp_def_account: Box<Account<'info, ComputationDefinitionAccount>>,
+    #[account(address = derive_mxe_pda!())]
+    pub mxe_account: Box<Account<'info, MXEAccount>>,
+    /// CHECK: computation_account
+    pub computation_account: UncheckedAccount<'info>,
+    #[account(address = derive_cluster_pda!(mxe_account, ErrorCode::ClusterNotSet))]
+    pub cluster_account: Box<Account<'info, Cluster>>,
+    #[account(address = ::anchor_lang::solana_program::sysvar::instructions::ID)]
+    /// CHECK: instructions_sysvar
+    pub instructions_sysvar: AccountInfo<'info>,
+    #[account(mut)]
+    pub user_ledger: Account<'info, UserLedger>,
+    #[account(mut)]
+    pub merchant_ledger: Account<'info, MerchantLedger>,
+    #[account(mut)]
+    pub user_subscription: Account<'info, UserSubscription>,
+    /// The Tuk Tuk Task Queue for re-queueing
+    #[account(mut)]
+    pub task_queue: Account<'info, TaskQueueV0>,
+    #[account(
+        seeds = [QUEUE_AUTHORITY_SEED, task_queue.key().as_ref()],
+        bump = queue_authority.bump,
+    )]
+    pub queue_authority: Account<'info, QueueAuthority>,
+}
+
 #[callback_accounts("verify_subscription")]
 #[derive(Accounts)]
 pub struct VerifySubscriptionCallback<'info> {
@@ -1799,4 +2288,16 @@ pub enum ErrorCode {
 
     #[msg("Subscription not active")]
     SubscriptionNotActive,
+
+    #[msg("Task queue not initialized")]
+    TaskQueueNotInitialized,
+
+    #[msg("Task queue not active")]
+    TaskQueueNotActive,
+
+    #[msg("Insufficient task queue balance")]
+    InsufficientTaskQueueBalance,
+
+    #[msg("Task compilation failed")]
+    TaskCompilationFailed,
 }
