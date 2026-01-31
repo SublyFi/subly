@@ -280,22 +280,47 @@ export const VaultProvider: FC<VaultProviderProps> = ({ children }) => {
       },
 
       executeScheduledTransfer: async (transferId: PublicKey) => {
+        if (!walletAddress) {
+          throw new Error("Wallet not connected");
+        }
+
         const transfers = getStoredTransfers();
         const transfer = transfers.find(
           (t) => t.transferId === transferId.toBase58()
         );
 
-        if (transfer) {
-          transfer.lastExecuted = Date.now();
-          setStoredTransfers(transfers);
+        if (!transfer) {
+          throw new Error("Transfer not found");
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Call backend API to execute the transfer via Privacy Cash
+        const res = await fetch("/api/transfers/execute", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            walletAddress,
+            transferId: transfer.transferId,
+            recipientAddress: transfer.recipient,
+            amount: transfer.amount,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to execute transfer");
+        }
+
+        // Update local storage with execution time
+        transfer.lastExecuted = Date.now();
+        setStoredTransfers(transfers);
+
+        console.log("Transfer executed:", data.tx);
 
         return {
-          signature: `execute_${Date.now()}`,
+          signature: data.tx,
           success: true,
-          privacyCashTx: `pc_${Date.now()}`,
+          privacyCashTx: data.tx,
         };
       },
     };

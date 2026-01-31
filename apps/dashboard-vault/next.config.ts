@@ -3,9 +3,15 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   transpilePackages: ["@subly/vault-sdk"],
 
-  // Mark Privacy Cash SDK as external for server-only usage
+  // Mark SDKs with WASM/native dependencies as external for server-only usage
   // This prevents the SDK from being bundled and allows Node.js to handle WASM
-  serverExternalPackages: ["privacycash", "@lightprotocol/hasher.rs"],
+  serverExternalPackages: [
+    "privacycash",
+    "@lightprotocol/hasher.rs",
+    "@kamino-finance/klend-sdk",
+    "@orca-so/whirlpools-core",
+    "@solana/kit",
+  ],
 
   // Turbopack configuration (Next.js 16+)
   turbopack: {

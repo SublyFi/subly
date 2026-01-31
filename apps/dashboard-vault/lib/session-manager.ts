@@ -11,7 +11,8 @@
  */
 
 import { getConfig } from './config';
-import { Keypair } from '@solana/web3.js';
+import { Keypair, PublicKey } from '@solana/web3.js';
+import { PROGRAM_ID } from '@subly/vault-sdk';
 
 // Privacy Cash SDK types
 interface PrivacyCashClient {
@@ -33,6 +34,10 @@ interface Session {
   client: PrivacyCashClient;
   walletAddress: string;
   derivedPublicKey: string; // The derived keypair's public key (for funding)
+  /** Vault secret for user commitment (32 bytes) - deterministically derived from signature */
+  vaultSecret: Uint8Array;
+  /** User commitment derived from vaultSecret and Shield Pool */
+  userCommitment: Uint8Array;
   createdAt: number;
   expiresAt: number;
 }
@@ -77,7 +82,7 @@ function startCleanupInterval(): void {
 export async function initializeSession(
   walletAddress: string,
   signature: Uint8Array
-): Promise<{ success: boolean; expiresAt: number; derivedPublicKey: string }> {
+): Promise<{ success: boolean; expiresAt: number; derivedPublicKey: string; userCommitment: string }> {
   const config = getConfig();
 
   try {
@@ -109,11 +114,29 @@ export async function initializeSession(
     // Get the derived public key (this is the address users need to fund for deposits)
     const derivedPublicKey = keypair.publicKey.toBase58();
 
+    // Derive Vault secret deterministically from signature (using different salt)
+    // This ensures the same user always gets the same secret
+    const vaultSecret = new Uint8Array(
+      crypto.createHash('sha256')
+        .update(Buffer.concat([signature, Buffer.from('subly-vault-secret')]))
+        .digest()
+    );
+
+    // Derive user commitment from vaultSecret and Shield Pool address
+    // commitment = hash(secret || pool_id)
+    const [shieldPoolPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from('shield_pool')],
+      new PublicKey(PROGRAM_ID)
+    );
+    const userCommitment = deriveUserCommitment(vaultSecret, shieldPoolPda);
+
     // Store session
     sessions.set(walletAddress, {
       client,
       walletAddress,
       derivedPublicKey,
+      vaultSecret,
+      userCommitment,
       createdAt: now,
       expiresAt,
     });
@@ -123,14 +146,36 @@ export async function initializeSession(
 
     console.log(`Session initialized for wallet: ${walletAddress.slice(0, 8)}...`);
     console.log(`Derived Privacy Cash address: ${derivedPublicKey}`);
+    console.log(`User commitment: ${Buffer.from(userCommitment).toString('hex').slice(0, 16)}...`);
 
-    return { success: true, expiresAt, derivedPublicKey };
+    return {
+      success: true,
+      expiresAt,
+      derivedPublicKey,
+      userCommitment: Buffer.from(userCommitment).toString('hex'),
+    };
   } catch (error) {
     console.error('Failed to initialize Privacy Cash session:', error);
     throw new Error(
       `Failed to initialize Privacy Cash: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
+}
+
+/**
+ * Derive user commitment from secret and pool address
+ * Uses SHA-512 for compatibility with Vault SDK
+ */
+function deriveUserCommitment(secret: Uint8Array, poolId: PublicKey): Uint8Array {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const crypto = require('crypto');
+
+  // Concatenate secret and pool_id (matching Vault SDK's generateCommitment)
+  const data = Buffer.concat([Buffer.from(secret), poolId.toBuffer()]);
+
+  // Hash using SHA-512 then take first 32 bytes (matching Vault SDK behavior with nacl.hash)
+  const hash = crypto.createHash('sha512').update(data).digest();
+  return new Uint8Array(hash.slice(0, 32));
 }
 
 /**
@@ -228,4 +273,48 @@ export function getSessionInfo(walletAddress: string): {
     expiresAt: session.expiresAt,
     remainingMs: Math.max(0, session.expiresAt - now),
   };
+}
+
+/**
+ * Get the Vault secret for a user's session
+ * This is the 32-byte secret used to derive user commitments and nullifiers
+ *
+ * @param walletAddress - User's wallet address
+ * @returns Vault secret or null if session not found/expired
+ */
+export function getVaultSecret(walletAddress: string): Uint8Array | null {
+  const session = sessions.get(walletAddress);
+
+  if (!session) {
+    return null;
+  }
+
+  if (session.expiresAt < Date.now()) {
+    sessions.delete(walletAddress);
+    return null;
+  }
+
+  return session.vaultSecret;
+}
+
+/**
+ * Get the user commitment for a user's session
+ * This is the 32-byte commitment used to identify the user in the Shield Pool
+ *
+ * @param walletAddress - User's wallet address
+ * @returns User commitment or null if session not found/expired
+ */
+export function getUserCommitment(walletAddress: string): Uint8Array | null {
+  const session = sessions.get(walletAddress);
+
+  if (!session) {
+    return null;
+  }
+
+  if (session.expiresAt < Date.now()) {
+    sessions.delete(walletAddress);
+    return null;
+  }
+
+  return session.userCommitment;
 }

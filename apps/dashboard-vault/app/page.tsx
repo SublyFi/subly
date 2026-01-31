@@ -6,6 +6,7 @@ import { useVault } from "@/hooks/useVault";
 import { useTransfers } from "@/hooks/useTransfers";
 import { BalanceCard } from "@/components/balance/BalanceCard";
 import { YieldCard } from "@/components/balance/YieldCard";
+import { KaminoDepositForm } from "@/components/kamino/KaminoDepositForm";
 import Link from "next/link";
 import { truncateAddress, INTERVAL_LABELS } from "@/lib/constants";
 
@@ -73,6 +74,11 @@ export default function DashboardPage() {
       <div className="grid md:grid-cols-2 gap-6 mb-8">
         <BalanceCard />
         <YieldCard />
+      </div>
+
+      {/* Kamino Deposit Section */}
+      <div className="grid md:grid-cols-2 gap-6 mb-8">
+        <KaminoDepositForm />
       </div>
 
       {/* Active Transfers Section */}
