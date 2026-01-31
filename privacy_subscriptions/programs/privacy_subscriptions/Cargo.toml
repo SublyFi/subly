@@ -25,6 +25,7 @@ anchor-spl = { version = "0.32.1", features = ["token"] }
 arcium-client = { default-features = false, version = "=0.6.3" }
 arcium-macros = "=0.6.3"
 arcium-anchor = "=0.6.3"
+tuktuk-program = { git = "https://github.com/helium/tuktuk", rev = "1b281ae0189e96dfaf27c7206ad2e72b98a5fb34" }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

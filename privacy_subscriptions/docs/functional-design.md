@@ -1076,64 +1076,183 @@ graph TD
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## 8. Clockwork Cron 設計
+## 8. Tuk Tuk 自動支払い設計
 
-### 8.1 ジョブ構成
+Tuk Tuk は Helium が開発したオンチェーン自動化エンジンです。Clockwork のシャットダウン後の代替として採用しました。
+
+### 8.1 アーキテクチャ概要
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    定期支払いトリガーアーキテクチャ                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │  Tuk Tuk 統合（オンチェーン自動化）                                   │   │
+│  │                                                                       │   │
+│  │  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────────┐   │   │
+│  │  │ Subscribe   │───>│ Task Queue  │───>│ Tuk Tuk Crank Turner    │   │   │
+│  │  │ (初回登録)  │    │ (タスク追加)│    │ (タスク実行)            │   │   │
+│  │  └─────────────┘    └─────────────┘    └───────────┬─────────────┘   │   │
+│  │                                                    │                  │   │
+│  │                                                    ▼                  │   │
+│  │  ┌─────────────────────────────────────────────────────────────────┐ │   │
+│  │  │ process_payment → Arcium MPC → callback → 自己再キューイング    │ │   │
+│  │  │                                           (次回支払いをスケジュール)│ │   │
+│  │  └─────────────────────────────────────────────────────────────────┘ │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │  手動トリガースクリプト（バッチ処理）                                 │   │
+│  │                                                                       │   │
+│  │  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────────┐   │   │
+│  │  │ SDK/Script  │───>│ 全サブスク  │───>│ 期日到来をフィルタ       │   │   │
+│  │  │ (管理者実行)│    │ 取得        │    │                          │   │   │
+│  │  └─────────────┘    └─────────────┘    └───────────┬─────────────┘   │   │
+│  │                                                    │                  │   │
+│  │                                                    ▼                  │   │
+│  │  ┌─────────────────────────────────────────────────────────────────┐ │   │
+│  │  │ process_payment を順次呼び出し → 結果ログ出力                   │ │   │
+│  │  └─────────────────────────────────────────────────────────────────┘ │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 8.2 新規アカウント構造
+
+#### SublyTaskQueue
+
+Task Queue のラッパーアカウント。Subly プログラムと Tuk Tuk Task Queue を紐付けます。
 
 ```rust
-// 毎日 00:00 UTC に実行
-pub fn create_payment_cron_job(
-    ctx: Context<CreatePaymentCronJob>,
-) -> Result<()> {
-    // Clockwork Thread を作成
-    let trigger = Trigger::Cron {
-        schedule: "0 0 * * *".to_string(),
-        skippable: true,
-    };
-
-    // process_payment を呼び出すスレッドを作成
-    clockwork_sdk::cpi::thread_create(
-        ctx.accounts.to_thread_create(),
-        "subly_payment_processor".to_string(),
-        trigger,
-        vec![
-            Instruction {
-                program_id: ctx.accounts.subly_program.key(),
-                accounts: vec![/* ... */],
-                data: subly::instruction::ProcessPaymentBatch {}.data(),
-            }
-        ],
-    )?;
-
-    Ok(())
+#[account]
+pub struct SublyTaskQueue {
+    /// 管理者
+    pub authority: Pubkey,
+    /// Tuk Tuk Task Queue のアドレス
+    pub task_queue: Pubkey,
+    /// 使用するトークンミント
+    pub mint: Pubkey,
+    /// 有効フラグ
+    pub is_active: bool,
+    /// PDA bump
+    pub bump: u8,
 }
 ```
 
-### 8.2 バッチ処理フロー
+**PDA Seeds**: `["subly_task_queue", mint]`
 
+#### QueueAuthority
+
+タスクキュー操作の署名用 PDA。
+
+```rust
+#[account]
+pub struct QueueAuthority {
+    /// 関連する Task Queue
+    pub task_queue: Pubkey,
+    /// PDA bump
+    pub bump: u8,
+}
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Daily Payment Processing                                        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  1. Clockwork triggers at 00:00 UTC                              │
-│     │                                                            │
-│     ▼                                                            │
-│  2. process_payment_batch instruction called                     │
-│     │                                                            │
-│     ▼                                                            │
-│  3. Iterate through UserSubscription accounts                    │
-│     │  (using getProgramAccounts with filters)                   │
-│     │                                                            │
-│     ▼                                                            │
-│  4. For each subscription:                                       │
-│     ├── Queue process_payment to Arcium                          │
-│     └── Arcium callback updates ledgers                          │
-│                                                                  │
-│  Note: Due to compute limits, batch size is limited              │
-│        Multiple transactions may be needed                       │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+
+**PDA Seeds**: `["queue_authority", task_queue]`
+
+### 8.3 新規インストラクション
+
+#### initialize_task_queue
+
+```rust
+pub fn initialize_task_queue(
+    ctx: Context<InitializeTaskQueue>,
+    task_queue_id: u32,
+) -> Result<()>
+```
+
+#### fund_task_queue
+
+```rust
+pub fn fund_task_queue(
+    ctx: Context<FundTaskQueue>,
+    amount: u64,
+) -> Result<()>
+```
+
+#### close_task_queue
+
+```rust
+pub fn close_task_queue(
+    ctx: Context<CloseTaskQueue>,
+) -> Result<()>
+```
+
+#### schedule_payment_task
+
+```rust
+pub fn schedule_payment_task(
+    ctx: Context<SchedulePaymentTask>,
+    task_id: u16,
+    trigger_at: i64,
+    crank_reward: u64,
+    computation_offset: u64,
+    pubkey: [u8; 32],
+    nonce: u128,
+) -> Result<()>
+```
+
+#### process_payment_with_requeue
+
+```rust
+pub fn process_payment_with_requeue(
+    ctx: Context<ProcessPaymentWithRequeue>,
+    computation_offset: u64,
+    pubkey: [u8; 32],
+    nonce: u128,
+) -> Result<()>
+```
+
+### 8.4 自己再キューイングフロー
+
+```mermaid
+sequenceDiagram
+    participant TQ as Task Queue
+    participant CT as Crank Turner
+    participant Program as Subly Program
+    participant Arcium as Arcium MPC
+
+    Note over TQ: タスク実行時刻到来
+    CT->>TQ: run_task()
+    TQ->>Program: process_payment_with_requeue()
+    Program->>Arcium: queue_computation(process_payment)
+    Arcium->>Arcium: MPC 計算実行
+    Arcium->>Program: process_payment_callback()
+    Program->>Program: 帳簿更新
+    Program->>Program: 次回支払いタスク作成
+    Program-->>TQ: RunTaskReturnV0 { tasks: [next_task] }
+    TQ->>TQ: 次回タスクをキューに追加
+```
+
+### 8.5 手動トリガースクリプト
+
+Tuk Tuk に加えて、管理者が手動で支払いを処理するためのスクリプトを提供します。
+
+```bash
+# 期日到来サブスクリプションの支払いをトリガー
+npx ts-node scripts/trigger-payments.ts \
+  --rpc https://api.devnet.solana.com \
+  --keypair ./admin-keypair.json \
+  --mint So11111111111111111111111111111111111111112 \
+  --look-ahead 3600 \
+  --concurrency 5
+
+# Task Queue のセットアップ
+npx ts-node scripts/setup-task-queue.ts \
+  --rpc https://api.devnet.solana.com \
+  --keypair ./admin-keypair.json \
+  --mint So11111111111111111111111111111111111111112 \
+  --min-crank-reward 10000 \
+  --initial-funding 1000000000
 ```
 
 ---

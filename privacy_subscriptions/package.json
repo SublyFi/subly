@@ -2,11 +2,15 @@
   "license": "ISC",
   "scripts": {
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
-    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
+    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
+    "trigger-payments": "ts-node scripts/trigger-payments.ts",
+    "setup-task-queue": "ts-node scripts/setup-task-queue.ts"
   },
   "dependencies": {
     "@arcium-hq/client": "0.6.3",
-    "@coral-xyz/anchor": "^0.32.1"
+    "@coral-xyz/anchor": "^0.32.1",
+    "@solana/web3.js": "^1.95.0",
+    "commander": "^12.0.0"
   },
   "devDependencies": {
     "chai": "^4.3.4",
@@ -15,7 +19,9 @@
     "@types/bn.js": "^5.1.0",
     "@types/chai": "^4.3.0",
     "@types/mocha": "^9.0.0",
+    "@types/node": "^20.0.0",
     "typescript": "^5.7.3",
-    "prettier": "^2.6.2"
+    "prettier": "^2.6.2",
+    "ts-node": "^10.9.2"
   }
 }

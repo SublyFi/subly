@@ -38,8 +38,12 @@ privacy_subscriptions/
 │       ├── hooks/               # カスタムフック
 │       ├── lib/                 # ユーティリティ
 │       └── types/               # 型定義
+├── scripts/                     # 運用・管理スクリプト
+│   ├── trigger-payments.ts      # 手動支払いトリガースクリプト
+│   └── setup-task-queue.ts      # Task Queue セットアップスクリプト
 ├── tests/                       # 統合テスト
-│   └── privacy_subscriptions.ts # TypeScriptテストファイル
+│   ├── privacy_subscriptions.ts # メイン統合テスト
+│   └── task-queue.ts            # Task Queue テスト
 ├── migrations/                  # デプロイマイグレーション
 │   └── deploy.ts                # デプロイスクリプト
 ├── build/                       # ビルド成果物（Arcis回路）
@@ -381,6 +385,32 @@ app/
 | 事業者   | Claim 操作（収益引き出し）             |
 | 事業者   | SDK 設定ガイド                         |
 
+### scripts/ (運用・管理スクリプト)
+
+**役割**: Task Queue セットアップや手動支払いトリガーなど、運用・管理用の TypeScript スクリプト。
+
+**配置ファイル**:
+
+- `trigger-payments.ts`: 期日到来サブスクリプションの手動支払いトリガー
+- `setup-task-queue.ts`: Tuk Tuk Task Queue の初期化・資金追加
+
+**命名規則**:
+
+- ファイル名: kebab-case（`trigger-payments.ts`）
+- 関数名: camelCase（`triggerPayment`）
+
+**依存関係**:
+
+- 依存可能: `@solana/web3.js`, `@coral-xyz/anchor`, `commander`
+- 依存禁止: なし
+
+**実行方法**:
+
+```bash
+npm run trigger-payments -- --rpc <URL> --keypair <path> --mint <address>
+npm run setup-task-queue -- --rpc <URL> --keypair <path> --mint <address>
+```
+
 ### tests/ (統合テスト)
 
 **役割**: Anchor フレームワークを使用した統合テスト。ローカルバリデータ + Arcium MXE での E2E テスト。
@@ -403,7 +433,8 @@ app/
 
 ```
 tests/
-└── privacy_subscriptions.ts  # 全テストケース
+├── privacy_subscriptions.ts  # メイン統合テスト
+└── task-queue.ts             # Task Queue テスト（Tuk Tuk 統合）
 ```
 
 **拡張時（テスト分割）**:
@@ -415,7 +446,8 @@ tests/
 ├── merchant.test.ts          # 事業者フローテスト
 ├── user.test.ts              # ユーザーフローテスト
 ├── subscription.test.ts      # サブスクリプションテスト
-└── payment.test.ts           # 支払い処理テスト
+├── payment.test.ts           # 支払い処理テスト
+└── task-queue.test.ts        # Task Queue/自動支払いテスト
 ```
 
 ### build/ (ビルド成果物)
@@ -547,6 +579,7 @@ runbooks/
 | SDK ソース               | `sdk/src/`             | camelCase  | `client.ts`                |
 | Dashboard ページ         | `app/src/app/`         | kebab-case | `dashboard/page.tsx`       |
 | Dashboard コンポーネント | `app/src/components/`  | PascalCase | `PlanCard.tsx`             |
+| 運用スクリプト           | `scripts/`             | kebab-case | `trigger-payments.ts`      |
 | 統合テスト               | `tests/`               | snake_case | `privacy_subscriptions.ts` |
 | マイグレーション         | `migrations/`          | camelCase  | `deploy.ts`                |
 
@@ -752,3 +785,4 @@ use crate::state::ledger;
 | 2025-01-31 | 1.1        | SDK、Dashboard を初期実装スコープとして正式記載                      | -      |
 | 2025-01-31 | 1.2        | Dashboard にユーザー向け機能（Deposit/Withdraw、サブスク管理）を追加 | -      |
 | 2025-01-31 | 1.3        | プロジェクト構造ツリーとディレクトリ詳細の整合性を修正               | -      |
+| 2026-02-01 | 1.4        | scripts/、tests/task-queue.ts を追加（Tuk Tuk 統合）                 | -      |
