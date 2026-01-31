@@ -1,0 +1,47 @@
+{
+  "name": "@subly/sdk",
+  "version": "0.1.0",
+  "description": "Subly Privacy Subscriptions SDK - TypeScript client for privacy-preserving subscriptions on Solana",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "solana",
+    "subscription",
+    "privacy",
+    "arcium",
+    "anchor"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@arcium-hq/client": "0.6.3",
+    "@coral-xyz/anchor": "^0.32.0",
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.90.0",
+    "bn.js": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.1.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.7.3",
+    "vitest": "^1.0.0"
+  },
+  "peerDependencies": {
+    "@coral-xyz/anchor": "^0.32.0",
+    "@solana/web3.js": "^1.90.0"
+  }
+}
