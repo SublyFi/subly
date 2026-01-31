@@ -21,8 +21,8 @@ pub enum ErrorCode {
     #[msg("The computation was aborted")]
     AbortedComputation,
 }
-use arcium_client::idl::arcium::types::CallbackAccount;
-use arcium_macros::{arcium_program, arcium_callback, callback_accounts, init_computation_definition_accounts};
+use arcium_client::idl::arcium::types::{CallbackAccount, CircuitSource, OffChainCircuitSource};
+use arcium_macros::{arcium_program, arcium_callback, callback_accounts, circuit_hash, init_computation_definition_accounts};
 use constants::*;
 use errors::SublyError;
 use events::*;
@@ -79,7 +79,14 @@ pub mod subly_devnet {
     pub fn init_set_subscription_active_comp_def(
         ctx: Context<InitSetSubscriptionActiveCompDef>,
     ) -> Result<()> {
-        arcium::init_comp_def(ctx.accounts, None, None)?;
+        arcium::init_comp_def(
+            ctx.accounts,
+            Some(CircuitSource::OffChain(OffChainCircuitSource {
+                source: "https://subly-arcium-bucket-2.s3.us-east-1.amazonaws.com/set_subscription_active.arcis".to_string(),
+                hash: circuit_hash!("set_subscription_active"),
+            })),
+            None,
+        )?;
         Ok(())
     }
 
@@ -87,7 +94,14 @@ pub mod subly_devnet {
     pub fn init_set_subscription_cancelled_comp_def(
         ctx: Context<InitSetSubscriptionCancelledCompDef>,
     ) -> Result<()> {
-        arcium::init_comp_def(ctx.accounts, None, None)?;
+        arcium::init_comp_def(
+            ctx.accounts,
+            Some(CircuitSource::OffChain(OffChainCircuitSource {
+                source: "https://subly-arcium-bucket-2.s3.us-east-1.amazonaws.com/set_subscription_cancelled.arcis".to_string(),
+                hash: circuit_hash!("set_subscription_cancelled"),
+            })),
+            None,
+        )?;
         Ok(())
     }
 
@@ -95,7 +109,14 @@ pub mod subly_devnet {
     pub fn init_increment_count_comp_def(
         ctx: Context<InitIncrementCountCompDef>,
     ) -> Result<()> {
-        arcium::init_comp_def(ctx.accounts, None, None)?;
+        arcium::init_comp_def(
+            ctx.accounts,
+            Some(CircuitSource::OffChain(OffChainCircuitSource {
+                source: "https://subly-arcium-bucket-2.s3.us-east-1.amazonaws.com/increment_count.arcis".to_string(),
+                hash: circuit_hash!("increment_count"),
+            })),
+            None,
+        )?;
         Ok(())
     }
 
@@ -103,7 +124,14 @@ pub mod subly_devnet {
     pub fn init_decrement_count_comp_def(
         ctx: Context<InitDecrementCountCompDef>,
     ) -> Result<()> {
-        arcium::init_comp_def(ctx.accounts, None, None)?;
+        arcium::init_comp_def(
+            ctx.accounts,
+            Some(CircuitSource::OffChain(OffChainCircuitSource {
+                source: "https://subly-arcium-bucket-2.s3.us-east-1.amazonaws.com/decrement_count.arcis".to_string(),
+                hash: circuit_hash!("decrement_count"),
+            })),
+            None,
+        )?;
         Ok(())
     }
 
@@ -111,7 +139,14 @@ pub mod subly_devnet {
     pub fn init_initialize_count_comp_def(
         ctx: Context<InitInitializeCountCompDef>,
     ) -> Result<()> {
-        arcium::init_comp_def(ctx.accounts, None, None)?;
+        arcium::init_comp_def(
+            ctx.accounts,
+            Some(CircuitSource::OffChain(OffChainCircuitSource {
+                source: "https://subly-arcium-bucket-2.s3.us-east-1.amazonaws.com/initialize_count.arcis".to_string(),
+                hash: circuit_hash!("initialize_count"),
+            })),
+            None,
+        )?;
         Ok(())
     }
 
@@ -119,7 +154,14 @@ pub mod subly_devnet {
     pub fn init_initialize_subscription_status_comp_def(
         ctx: Context<InitInitializeSubscriptionStatusCompDef>,
     ) -> Result<()> {
-        arcium::init_comp_def(ctx.accounts, None, None)?;
+        arcium::init_comp_def(
+            ctx.accounts,
+            Some(CircuitSource::OffChain(OffChainCircuitSource {
+                source: "https://subly-arcium-bucket-2.s3.us-east-1.amazonaws.com/initialize_subscription_status.arcis".to_string(),
+                hash: circuit_hash!("initialize_subscription_status"),
+            })),
+            None,
+        )?;
         Ok(())
     }
 
@@ -336,7 +378,6 @@ pub mod subly_devnet {
             ctx.accounts,
             computation_offset,
             args,
-            None, // No callback server
             vec![callback_ix],
             DEFAULT_NUM_CALLBACK_TXS,
             DEFAULT_CU_PRICE_MICRO,
@@ -430,7 +471,6 @@ pub mod subly_devnet {
             ctx.accounts,
             computation_offset,
             args,
-            None,
             vec![callback_ix],
             DEFAULT_NUM_CALLBACK_TXS,
             DEFAULT_CU_PRICE_MICRO,
@@ -863,7 +903,7 @@ pub struct SubscribeWithArcium<'info> {
     pub pool_account: Box<Account<'info, FeePool>>,
 
     /// Clock Account
-    #[account(address = ARCIUM_CLOCK_ACCOUNT_ADDRESS)]
+    #[account(mut, address = ARCIUM_CLOCK_ACCOUNT_ADDRESS)]
     pub clock_account: Box<Account<'info, ClockAccount>>,
 
     /// Sign PDA for CPI signing
@@ -874,7 +914,7 @@ pub struct SubscribeWithArcium<'info> {
         seeds = [arcium_anchor::SIGN_PDA_SEED],
         bump,
     )]
-    pub sign_pda_account: Account<'info, SignerAccount>,
+    pub sign_pda_account: Account<'info, ArciumSignerAccount>,
 
     /// System Program
     pub system_program: Program<'info, System>,
@@ -970,7 +1010,7 @@ pub struct CancelSubscriptionWithArcium<'info> {
     pub pool_account: Box<Account<'info, FeePool>>,
 
     /// Clock Account
-    #[account(address = ARCIUM_CLOCK_ACCOUNT_ADDRESS)]
+    #[account(mut, address = ARCIUM_CLOCK_ACCOUNT_ADDRESS)]
     pub clock_account: Box<Account<'info, ClockAccount>>,
 
     /// Sign PDA for CPI signing
@@ -981,7 +1021,7 @@ pub struct CancelSubscriptionWithArcium<'info> {
         seeds = [arcium_anchor::SIGN_PDA_SEED],
         bump,
     )]
-    pub sign_pda_account: Account<'info, SignerAccount>,
+    pub sign_pda_account: Account<'info, ArciumSignerAccount>,
 
     /// System Program
     pub system_program: Program<'info, System>,
@@ -1174,6 +1214,13 @@ pub struct InitSetSubscriptionActiveCompDef<'info> {
 
     pub cluster_account: Account<'info, Cluster>,
 
+    /// CHECK: Address lookup table, validated by Arcium program
+    #[account(mut)]
+    pub address_lookup_table: UncheckedAccount<'info>,
+
+    /// CHECK: Address Lookup Table program
+    pub lut_program: UncheckedAccount<'info>,
+
     pub system_program: Program<'info, System>,
 
     pub arcium_program: Program<'info, Arcium>,
@@ -1193,6 +1240,13 @@ pub struct InitSetSubscriptionCancelledCompDef<'info> {
     pub comp_def_account: UncheckedAccount<'info>,
 
     pub cluster_account: Account<'info, Cluster>,
+
+    /// CHECK: Address lookup table, validated by Arcium program
+    #[account(mut)]
+    pub address_lookup_table: UncheckedAccount<'info>,
+
+    /// CHECK: Address Lookup Table program
+    pub lut_program: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,
 
@@ -1214,6 +1268,13 @@ pub struct InitIncrementCountCompDef<'info> {
 
     pub cluster_account: Account<'info, Cluster>,
 
+    /// CHECK: Address lookup table, validated by Arcium program
+    #[account(mut)]
+    pub address_lookup_table: UncheckedAccount<'info>,
+
+    /// CHECK: Address Lookup Table program
+    pub lut_program: UncheckedAccount<'info>,
+
     pub system_program: Program<'info, System>,
 
     pub arcium_program: Program<'info, Arcium>,
@@ -1233,6 +1294,13 @@ pub struct InitDecrementCountCompDef<'info> {
     pub comp_def_account: UncheckedAccount<'info>,
 
     pub cluster_account: Account<'info, Cluster>,
+
+    /// CHECK: Address lookup table, validated by Arcium program
+    #[account(mut)]
+    pub address_lookup_table: UncheckedAccount<'info>,
+
+    /// CHECK: Address Lookup Table program
+    pub lut_program: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,
 
@@ -1254,6 +1322,13 @@ pub struct InitInitializeCountCompDef<'info> {
 
     pub cluster_account: Account<'info, Cluster>,
 
+    /// CHECK: Address lookup table, validated by Arcium program
+    #[account(mut)]
+    pub address_lookup_table: UncheckedAccount<'info>,
+
+    /// CHECK: Address Lookup Table program
+    pub lut_program: UncheckedAccount<'info>,
+
     pub system_program: Program<'info, System>,
 
     pub arcium_program: Program<'info, Arcium>,
@@ -1273,6 +1348,13 @@ pub struct InitInitializeSubscriptionStatusCompDef<'info> {
     pub comp_def_account: UncheckedAccount<'info>,
 
     pub cluster_account: Account<'info, Cluster>,
+
+    /// CHECK: Address lookup table, validated by Arcium program
+    #[account(mut)]
+    pub address_lookup_table: UncheckedAccount<'info>,
+
+    /// CHECK: Address Lookup Table program
+    pub lut_program: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,
 

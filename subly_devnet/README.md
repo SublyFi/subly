@@ -119,3 +119,37 @@ pub struct InitAddTogetherCompDef<'info> {
     // ... other required accounts
 }
 ```
+
+```
+yukikimura@YukinoMacBook-Pro subly_devnet % arcium deploy --cluster-offset 123 --recovery-set-size 4 --keypair-path ~/.config/solana/id.json --rpc-url "https://devnet.helius-rpc.com/?api-key=8725da20-c68a-48f9-bac4-bed8f6e9fa0a"
+Deploying and initializing MXE...
+Deploying cluster: https://devnet.helius-rpc.com/?api-key=8725da20-c68a-48f9-bac4-bed8f6e9fa0a
+Upgrade authority: /Users/yukikimura/.config/solana/id.json
+Deploying program "subly_devnet"...
+Program path: /Users/yukikimura/work/solana-privacy/subly-devnet/subly_devnet/target/deploy/subly_devnet.so...
+Program Id: 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA
+
+Signature: 3GGMEDehtMjCtGFD4Vd8w7BY6Bkv27AXa7GDJRJ7dFBeLTStK6tMeWnJB5n1D3ZagQsCuq4Qf4mmuDagycfEd8ch
+
+Waiting for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA to be confirmed...
+Program confirmed on-chain
+Idl data length: 7109 bytes
+Step 0/7109
+Step 600/7109
+Step 1200/7109
+Step 1800/7109
+Step 2400/7109
+Step 3000/7109
+Step 3600/7109
+Step 4200/7109
+Step 4800/7109
+Step 5400/7109
+Step 6000/7109
+Step 6600/7109
+Idl account ATeW527XKpzBJLucBy8qrYjHCqEFCjC6PpBufybCCPqm successfully upgraded
+Deploy success
+
+thread 'main' panicked at /Users/runner/work/arcium-tooling/arcium-tooling/client/src/transactions.rs:573:10:
+called `Result::unwrap()` on an `Err` value: SolanaClientError(Error { request: Some(SendTransaction), kind: RpcError(RpcResponseError { code: -32002, message: "Transaction simulation failed: Error processing Instruction 1: custom program error: 0xbc4", data: SendTransactionPreflightFailure(RpcSimulateTransactionResult { err: Some(InstructionError(1, Custom(3012))), logs: Some(["Program Arcj82pX7HxYKLR92qvgZUAd7vGS1k4hQvAFcPATFdEQ invoke [1]", "Program log: Instruction: InitMxePart1", "Program 11111111111111111111111111111111 invoke [2]", "Program 11111111111111111111111111111111 success", "Program Arcj82pX7HxYKLR92qvgZUAd7vGS1k4hQvAFcPATFdEQ consumed 6605 of 400000 compute units", "Program Arcj82pX7HxYKLR92qvgZUAd7vGS1k4hQvAFcPATFdEQ success", "Program Arcj82pX7HxYKLR92qvgZUAd7vGS1k4hQvAFcPATFdEQ invoke [1]", "Program log: Instruction: InitMxePart2", "Program log: AnchorError caused by account: clock. Error Code: AccountNotInitialized. Error Number: 3012. Error Message: The program expected this account to be already initialized.", "Program Arcj82pX7HxYKLR92qvgZUAd7vGS1k4hQvAFcPATFdEQ consumed 13053 of 393395 compute units", "Program Arcj82pX7HxYKLR92qvgZUAd7vGS1k4hQvAFcPATFdEQ failed: custom program error: 0xbc4"]), accounts: None, units_consumed: Some(19658), loaded_accounts_data_size: Some(2408318), return_data: None, inner_instructions: None, replacement_blockhash: None }) }) })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+```

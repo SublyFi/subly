@@ -145,7 +145,7 @@ export function deriveClusterPda(mxeAccount: PublicKey): PublicKey {
  */
 export function deriveSignPda(programId: PublicKey): PublicKey {
   const [pda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("SignerAccount")],
+    [Buffer.from("ArciumSignerAccount")],
     programId
   );
   return pda;
