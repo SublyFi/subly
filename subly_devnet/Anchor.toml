@@ -8,6 +8,9 @@ skip-lint = false
 [programs.localnet]
 subly_devnet = "2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA"
 
+[programs.devnet]
+subly_devnet = "2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA"
+
 [registry]
 url = "https://api.apr.dev"
 
@@ -16,7 +19,18 @@ cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [test]
-startup_wait = 60000
+startup_wait = 1200000
 
 [scripts]
+# Run all tests (basic functionality + Arcium structure validation)
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 \"tests/**/*.ts\""
+
+[test.validator]
+bind_address = "127.0.0.1"
+
+[[test.genesis]]
+address = "F3G6Q9tRicyznCqcZLydJ6RxkwDSBeHWM458J7V6aeyk"
+program = "/Users/yukikimura/work/solana-privacy/subly-devnet/subly_devnet/artifacts/arcium_program_0.5.4.so"
+[[test.genesis]]
+address = "L2TExMFKdjpN9kozasaurPirfHy9P8sbXoAN1qA3S95"
+program = "artifacts/lighthouse.so"

@@ -1,8 +1,8 @@
-use arcis_imports::*;
+use arcis::*;
 
 #[encrypted]
 mod circuits {
-    use arcis_imports::*;
+    use arcis::*;
 
     /// Input for subscription count operations
     /// The count is stored as u64 and encrypted with MXE key
@@ -78,7 +78,9 @@ mod circuits {
     /// Used when a user cancels their subscription
     /// Updates encrypted status with is_active=0 and cancelled_at=cancel_timestamp
     #[instruction]
-    pub fn set_subscription_cancelled(input_ctxt: Enc<Mxe, CancelInput>) -> Enc<Mxe, SubscriptionStatus> {
+    pub fn set_subscription_cancelled(
+        input_ctxt: Enc<Mxe, CancelInput>,
+    ) -> Enc<Mxe, SubscriptionStatus> {
         let input = input_ctxt.to_arcis();
         let status = SubscriptionStatus {
             is_active: 0,

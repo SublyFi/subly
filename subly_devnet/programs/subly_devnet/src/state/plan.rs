@@ -28,6 +28,8 @@ pub struct Plan {
     pub plan_nonce: u64,
     /// PDA bump
     pub bump: u8,
+    /// Whether count encryption is pending (waiting for Arcium callback)
+    pub pending_count_encryption: bool,
 }
 
 impl Plan {
@@ -44,6 +46,7 @@ impl Plan {
         + 32                       // encrypted_subscription_count: [u8; 32]
         + 16                       // nonce: u128
         + 8                        // plan_nonce: u64
-        + 1;                       // bump: u8
-    // Total: 246 bytes
+        + 1                        // bump: u8
+        + 1;                       // pending_count_encryption: bool
+    // Total: 247 bytes
 }

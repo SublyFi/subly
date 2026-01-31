@@ -1,0 +1,92 @@
+[2026-01-30--22-39-39 INFO actix_server::builder] starting 5 workers
+[2026-01-30--22-39-39 INFO actix_server::server] Tokio runtime found; starting in existing Tokio runtime
+[2026-01-30--22-39-39 INFO actix_server::server] starting service: "actix-web-service-127.0.0.1:18488", workers: 5, listening on: 127.0.0.1:18488
+[2026-01-30--22-39-39 INFO parity_ws] Listening for new connections on 127.0.0.1:8900.
+[2026-01-30--22-39-39 INFO txtx::svm::deploy_program] [Recovery Instructions] - An ephemeral authority account will be created and funded to write to the buffer account.
+[2026-01-30--22-39-39 INFO txtx::svm::deploy_program] [Recovery Instructions] - Please save the following information in case the deployment fails and the account needs to be recovered:
+[2026-01-30--22-39-39 INFO txtx::svm::deploy_program] [Recovery Instructions] - Ephemeral authority public key: EtmtPNySg1TKbHrPcd1G6SNXiEoX3ctAqsynzZA34iPr
+[2026-01-30--22-39-39 INFO txtx::svm::deploy_program] [Recovery Instructions] - Ephemeral authority secret key: [165, 63, 216, 238, 112, 220, 8, 164, 197, 135, 160, 241, 34, 17, 9, 154, 100, 90, 185, 80, 1, 91, 176, 62, 5, 57, 215, 17, 85, 183, 237, 250, 206, 107, 77, 212, 154, 222, 222, 32, 30, 82, 145, 0, 175, 112, 163, 9, 63, 60, 164, 236, 139, 98, 28, 69, 25, 1, 180, 104, 204, 86, 190, 169]
+[2026-01-30--22-39-40 INFO txtx::svm::deploy_program] Account Created - Ephemeral authority account created and funded to write to buffer
+[2026-01-30--22-39-40 INFO txtx::svm::deploy_program] [Recovery Instructions] - Creating program buffer account at pubkey FUGMs3BcE3ZLvjWq2FFycSg1Vi4W4x3JLCSEdp8kXrv8
+[2026-01-30--22-39-40 INFO txtx::svm::deploy_program] Account Created - Program buffer account created
+[2026-01-30--22-39-48 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:58842.
+[2026-01-30--22-39-48 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:58843.
+[2026-01-30--22-39-48 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:58844.
+[2026-01-30--22-39-48 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-48 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-48 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:58993.
+[2026-01-30--22-39-49 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-49 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-49 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-49 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-49 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-49 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-49 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-49 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-49 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-49 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-49 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-49 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-49 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-49 ERROR litesvm] Program account 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA is not executable.
+[2026-01-30--22-39-50 INFO txtx::svm::deploy_program] Buffer Ready - Writing to buffer account is complete
+[2026-01-30--22-39-50 INFO txtx::svm::deploy_program] Program Created - Program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--22-39-51 INFO txtx::svm::deploy_program] Complete - Ephemeral authority account closed and leftover funds returned to payer
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph BusinessRegisteredEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph ZkSubscriptionCancelledEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph ComputationQueuedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph MembershipVerifiedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph PlanCreatedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph MxeInitializedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph SubscriptionCancelledEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph SubscriptionCreatedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph SubscriptionMigratedToZkEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph ZkSubscriptionCreatedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph SubscriptionCountUpdatedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Subgraph SubscriptionStatusEncryptedEvent for program 2iPghUjvt1JKPP6Sht6cR576DVmAjciGprNJQZhc5avA has been deployed
+[2026-01-30--22-39-52 INFO txtx::svm::deploy_subgraph] Subgraph Deployed - Your subgraph can be reached at "http://127.0.0.1:18488/accounts"
+[2026-01-30--22-40-08 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59236.
+[2026-01-30--22-40-08 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59237.
+[2026-01-30--22-40-08 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59238.
+[2026-01-30--22-40-08 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59243.
+[2026-01-30--22-40-11 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59245.
+[2026-01-30--22-40-13 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59247.
+[2026-01-30--22-43-00 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59395.
+[2026-01-30--22-43-00 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59396.
+[2026-01-30--22-43-00 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59397.
+[2026-01-30--22-45-15 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59662.
+[2026-01-30--22-45-15 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59663.
+[2026-01-30--22-45-15 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59664.
+[2026-01-30--22-45-27 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59689.
+[2026-01-30--22-45-29 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59696.
+[2026-01-30--22-45-32 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59697.
+[2026-01-30--22-48-33 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59954.
+[2026-01-30--22-48-33 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59953.
+[2026-01-30--22-48-33 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59955.
+[2026-01-30--22-48-45 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59979.
+[2026-01-30--22-48-47 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59988.
+[2026-01-30--22-48-50 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:59991.
+[2026-01-30--22-52-21 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:60255.
+[2026-01-30--22-52-21 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:60256.
+[2026-01-30--22-52-21 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:60257.
+[2026-01-30--22-54-40 INFO actix_server::server] SIGTERM received; starting graceful shutdown
+[2026-01-30--22-54-40 INFO actix_server::worker] shutting down idle worker
+[2026-01-30--22-54-40 INFO actix_server::worker] shutting down idle worker
+[2026-01-30--22-54-40 INFO actix_server::worker] shutting down idle worker
+[2026-01-30--22-54-40 INFO actix_server::worker] shutting down idle worker
+[2026-01-30--22-54-40 INFO actix_server::worker] shutting down idle worker
+[2026-01-30--22-54-40 INFO actix_server::accept] accept thread stopped
+[2026-01-30--22-54-48 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:60748.
+[2026-01-30--22-54-48 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:60749.
+[2026-01-30--22-54-48 INFO parity_ws::io] Accepted a new tcp connection from 127.0.0.1:60750.
