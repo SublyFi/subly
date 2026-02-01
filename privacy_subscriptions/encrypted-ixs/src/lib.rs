@@ -21,14 +21,13 @@ mod circuits {
     }
 
     /// Subscribe circuit input
+    /// Simplified: only essential encrypted fields for subscription creation
     pub struct SubscribeInput {
-        pub user_balance: u64,
-        pub merchant_balance: u64,
-        pub subscription_count: u64,
-        pub plan_pubkey: [u8; 32],
-        pub price: u64,
-        pub current_timestamp: i64,
-        pub billing_cycle_days: u32,
+        pub user_balance: u64,       // User's current encrypted balance
+        pub merchant_balance: u64,   // Merchant's current encrypted balance
+        pub price: u64,              // Subscription price (encrypted from client)
+        pub current_timestamp: i64,  // Current timestamp (plaintext)
+        pub billing_cycle_days: u32, // Billing cycle in days (plaintext)
     }
 
     /// Unsubscribe circuit input
@@ -72,15 +71,12 @@ mod circuits {
     }
 
     /// Subscribe circuit output
+    /// Returns: new_user_balance, new_merchant_balance, status, next_payment_date
     pub struct SubscribeOutput {
-        pub new_user_balance: u64,
-        pub new_merchant_balance: u64,
-        pub new_subscription_count: u64,
-        pub encrypted_plan: [u8; 32],
-        pub encrypted_status: u8,
-        pub encrypted_next_payment_date: i64,
-        pub encrypted_start_date: i64,
-        pub success: bool,
+        pub new_user_balance: u64,           // User's new encrypted balance
+        pub new_merchant_balance: u64,       // Merchant's new encrypted balance
+        pub encrypted_status: u8,            // Subscription status (0=Active, 1=Cancelled)
+        pub encrypted_next_payment_date: i64, // Next payment date timestamp
     }
 
     /// ProcessPayment circuit output
@@ -147,7 +143,7 @@ mod circuits {
     }
 
     /// Subscribe circuit: Create subscription and process initial payment
-    /// Input: Various encrypted values for user balance, merchant balance, plan info
+    /// Input: user_balance, merchant_balance, price (encrypted), timestamps (plaintext)
     /// Output: Updated balances, subscription state
     #[instruction]
     pub fn subscribe(input: Enc<Shared, SubscribeInput>) -> Enc<Shared, SubscribeOutput> {
@@ -169,30 +165,19 @@ mod circuits {
             inp.merchant_balance
         };
 
-        // Increment subscription count only if successful
-        let new_count = if has_balance {
-            inp.subscription_count + 1
-        } else {
-            inp.subscription_count
-        };
-
         // Calculate next payment date: current_timestamp + (billing_cycle_days * 86400 seconds)
         let seconds_per_day: i64 = 86400;
         let cycle_seconds = (inp.billing_cycle_days as i64) * seconds_per_day;
         let next_payment = inp.current_timestamp + cycle_seconds;
 
-        // Status: 0 = Active, 1 = Cancelled, 2 = Expired
+        // Status: 0 = Active, 1 = Cancelled
         let status: u8 = if has_balance { 0 } else { 1 };
 
         let output = SubscribeOutput {
             new_user_balance: new_user_bal,
             new_merchant_balance: new_merchant_bal,
-            new_subscription_count: new_count,
-            encrypted_plan: inp.plan_pubkey,
             encrypted_status: status,
             encrypted_next_payment_date: if has_balance { next_payment } else { 0 },
-            encrypted_start_date: if has_balance { inp.current_timestamp } else { 0 },
-            success: has_balance,
         };
 
         input.owner.from_arcis(output)

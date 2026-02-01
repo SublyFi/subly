@@ -19,7 +19,7 @@ import * as os from "os";
 const USDC_MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
 
 // Protocol fee rate in basis points (100 = 1%)
-const FEE_RATE_BPS = 100;
+const FEE_RATE_BPS = 0;
 
 // PDA Seeds (must match the program)
 const PROTOCOL_CONFIG_SEED = Buffer.from("protocol_config");
@@ -144,15 +144,25 @@ async function initializeCompDefs(
           case "withdraw":
             return program.methods.initWithdrawCompDef().accounts(baseAccounts);
           case "subscribe":
-            return program.methods.initSubscribeCompDef().accounts(baseAccounts);
+            return program.methods
+              .initSubscribeCompDef()
+              .accounts(baseAccounts);
           case "unsubscribe":
-            return program.methods.initUnsubscribeCompDef().accounts(baseAccounts);
+            return program.methods
+              .initUnsubscribeCompDef()
+              .accounts(baseAccounts);
           case "process_payment":
-            return program.methods.initProcessPaymentCompDef().accounts(baseAccounts);
+            return program.methods
+              .initProcessPaymentCompDef()
+              .accounts(baseAccounts);
           case "verify_subscription":
-            return program.methods.initVerifySubscriptionCompDef().accounts(baseAccounts);
+            return program.methods
+              .initVerifySubscriptionCompDef()
+              .accounts(baseAccounts);
           case "claim_revenue":
-            return program.methods.initClaimRevenueCompDef().accounts(baseAccounts);
+            return program.methods
+              .initClaimRevenueCompDef()
+              .accounts(baseAccounts);
           default:
             throw new Error(`Unknown comp def: ${compDefName}`);
         }
@@ -168,7 +178,9 @@ async function initializeCompDefs(
       );
 
       console.log(`       Tx: ${sig}`);
-      console.log(`[DONE] ${compDefName} CompDef initialized (offchain circuit source)\n`);
+      console.log(
+        `[DONE] ${compDefName} CompDef initialized (offchain circuit source)\n`,
+      );
 
       // Delay between transactions to avoid rate limiting
       await sleep(2000);

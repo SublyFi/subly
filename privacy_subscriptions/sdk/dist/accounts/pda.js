@@ -14,7 +14,7 @@ exports.deriveUserSubscriptionPDA = deriveUserSubscriptionPDA;
 const web3_js_1 = require("@solana/web3.js");
 const bn_js_1 = __importDefault(require("bn.js"));
 /** Default program ID for Privacy Subscriptions */
-exports.PROGRAM_ID = new web3_js_1.PublicKey('DYdc7w3bmh5KQmzznufNx72cbXf446LC5gTWi8DA8zC6');
+exports.PROGRAM_ID = new web3_js_1.PublicKey('8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2');
 /** PDA Seeds */
 exports.PROTOCOL_CONFIG_SEED = Buffer.from('protocol_config');
 exports.PROTOCOL_POOL_SEED = Buffer.from('protocol_pool');

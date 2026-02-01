@@ -4,7 +4,7 @@ use arcium_anchor::prelude::*;
 use arcium_client::idl::arcium::types::{CallbackAccount, CircuitSource, OffChainCircuitSource};
 use arcium_macros::circuit_hash;
 
-declare_id!("DYdc7w3bmh5KQmzznufNx72cbXf446LC5gTWi8DA8zC6");
+declare_id!("8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2");
 
 // ============================================================================
 // Constants
@@ -315,11 +315,14 @@ pub mod privacy_subscriptions {
         user_ledger.last_updated = Clock::get()?.unix_timestamp;
 
         // Queue computation to Arcium
+        // ArgBuilder order must match Arcis circuit's DepositInput struct:
+        //   1. current_balance (encrypted)
+        //   2. deposit_amount (encrypted)
         let args = ArgBuilder::new()
             .x25519_pubkey(pubkey)
             .plaintext_u128(nonce)
-            .encrypted_u64(encrypted_amount)
-            .encrypted_u64(user_ledger.encrypted_balance[0])
+            .encrypted_u64(user_ledger.encrypted_balance[0])  // current_balance
+            .encrypted_u64(encrypted_amount)                   // deposit_amount
             .build();
 
         queue_computation(
@@ -355,11 +358,14 @@ pub mod privacy_subscriptions {
         let user_ledger = &mut ctx.accounts.user_ledger;
         user_ledger.last_updated = Clock::get()?.unix_timestamp;
 
+        // ArgBuilder order must match Arcis circuit's WithdrawInput struct:
+        //   1. current_balance (encrypted)
+        //   2. withdraw_amount (encrypted)
         let args = ArgBuilder::new()
             .x25519_pubkey(pubkey)
             .plaintext_u128(nonce)
-            .encrypted_u64(user_ledger.encrypted_balance[0])
-            .encrypted_u64(encrypted_amount)
+            .encrypted_u64(user_ledger.encrypted_balance[0])  // current_balance
+            .encrypted_u64(encrypted_amount)                   // withdraw_amount
             .build();
 
         queue_computation(
@@ -424,14 +430,20 @@ pub mod privacy_subscriptions {
         let current_timestamp = Clock::get()?.unix_timestamp;
         let billing_cycle_days = ctx.accounts.subscription_plan.billing_cycle_days;
 
+        // ArgBuilder order must match Arcis circuit's SubscribeInput struct:
+        //   1. user_balance (encrypted)
+        //   2. merchant_balance (encrypted)
+        //   3. price (encrypted)
+        //   4. current_timestamp (plaintext)
+        //   5. billing_cycle_days (plaintext)
         let args = ArgBuilder::new()
             .x25519_pubkey(pubkey)
             .plaintext_u128(nonce)
-            .encrypted_u64(user_ledger.encrypted_balance[0])
-            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance[0])
-            .encrypted_u64(encrypted_price)
-            .plaintext_i64(current_timestamp)
-            .plaintext_u32(billing_cycle_days)
+            .encrypted_u64(user_ledger.encrypted_balance[0])                   // user_balance
+            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance[0])  // merchant_balance
+            .encrypted_u64(encrypted_price)                                     // price
+            .plaintext_i64(current_timestamp)                                   // current_timestamp
+            .plaintext_u32(billing_cycle_days)                                  // billing_cycle_days
             .build();
 
         queue_computation(
@@ -473,10 +485,12 @@ pub mod privacy_subscriptions {
     ) -> Result<()> {
         ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
 
+        // ArgBuilder order must match Arcis circuit's UnsubscribeInput struct:
+        //   1. current_status (encrypted)
         let args = ArgBuilder::new()
             .x25519_pubkey(pubkey)
             .plaintext_u128(nonce)
-            .encrypted_u8(ctx.accounts.user_subscription.encrypted_status)
+            .encrypted_u8(ctx.accounts.user_subscription.encrypted_status)  // current_status
             .build();
 
         queue_computation(
@@ -512,16 +526,24 @@ pub mod privacy_subscriptions {
         let plan_price = ctx.accounts.subscription_plan.price;
         let billing_cycle_days = ctx.accounts.subscription_plan.billing_cycle_days;
 
+        // ArgBuilder order must match Arcis circuit's ProcessPaymentInput struct:
+        //   1. user_balance (encrypted)
+        //   2. merchant_balance (encrypted)
+        //   3. subscription_status (encrypted)
+        //   4. next_payment_date (encrypted)
+        //   5. current_timestamp (plaintext)
+        //   6. plan_price (plaintext)
+        //   7. billing_cycle_days (plaintext)
         let args = ArgBuilder::new()
             .x25519_pubkey(pubkey)
             .plaintext_u128(nonce)
-            .encrypted_u64(ctx.accounts.user_ledger.encrypted_balance[0])
-            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance[0])
-            .encrypted_u8(ctx.accounts.user_subscription.encrypted_status)
-            .encrypted_i64(ctx.accounts.user_subscription.encrypted_next_payment_date)
-            .plaintext_i64(current_timestamp)
-            .plaintext_u64(plan_price)
-            .plaintext_u32(billing_cycle_days)
+            .encrypted_u64(ctx.accounts.user_ledger.encrypted_balance[0])               // user_balance
+            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance[0])           // merchant_balance
+            .encrypted_u8(ctx.accounts.user_subscription.encrypted_status)              // subscription_status
+            .encrypted_i64(ctx.accounts.user_subscription.encrypted_next_payment_date)  // next_payment_date
+            .plaintext_i64(current_timestamp)                                           // current_timestamp
+            .plaintext_u64(plan_price)                                                  // plan_price
+            .plaintext_u32(billing_cycle_days)                                          // billing_cycle_days
             .build();
 
         queue_computation(
@@ -565,12 +587,16 @@ pub mod privacy_subscriptions {
 
         let current_timestamp = Clock::get()?.unix_timestamp;
 
+        // ArgBuilder order must match Arcis circuit's VerifySubscriptionInput struct:
+        //   1. subscription_status (encrypted)
+        //   2. next_payment_date (encrypted)
+        //   3. current_timestamp (plaintext)
         let args = ArgBuilder::new()
             .x25519_pubkey(pubkey)
             .plaintext_u128(nonce)
-            .encrypted_u8(ctx.accounts.user_subscription.encrypted_status)
-            .encrypted_i64(ctx.accounts.user_subscription.encrypted_next_payment_date)
-            .plaintext_i64(current_timestamp)
+            .encrypted_u8(ctx.accounts.user_subscription.encrypted_status)              // subscription_status
+            .encrypted_i64(ctx.accounts.user_subscription.encrypted_next_payment_date)  // next_payment_date
+            .plaintext_i64(current_timestamp)                                           // current_timestamp
             .build();
 
         queue_computation(
@@ -601,11 +627,14 @@ pub mod privacy_subscriptions {
         require!(ctx.accounts.merchant.is_active, ErrorCode::MerchantNotActive);
         ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
 
+        // ArgBuilder order must match Arcis circuit's ClaimRevenueInput struct:
+        //   1. current_balance (encrypted)
+        //   2. claim_amount (encrypted)
         let args = ArgBuilder::new()
             .x25519_pubkey(pubkey)
             .plaintext_u128(nonce)
-            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance[0])
-            .encrypted_u64(encrypted_amount)
+            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance[0])  // current_balance
+            .encrypted_u64(encrypted_amount)                                    // claim_amount
             .build();
 
         queue_computation(
@@ -777,18 +806,18 @@ pub mod privacy_subscriptions {
         ctx: Context<VerifySubscriptionCallback>,
         output: SignedComputationOutputs<VerifySubscriptionOutput>,
     ) -> Result<()> {
-        let _o = match output.verify_output(
+        // VerifySubscriptionOutput.field_0 is a revealed bool (not encrypted)
+        let o = match output.verify_output(
             &ctx.accounts.cluster_account,
             &ctx.accounts.computation_account,
         ) {
-            Ok(o) => o,
+            Ok(VerifySubscriptionOutput { field_0 }) => field_0,
             Err(_) => return Err(ErrorCode::AbortedComputation.into()),
         };
 
-        // The result is a revealed boolean, emitted as an event
-        // Note: actual bool extraction depends on output format
+        // Emit the revealed boolean result
         emit!(SubscriptionVerified {
-            is_valid: true, // Would extract from output
+            is_valid: o,
         });
 
         Ok(())

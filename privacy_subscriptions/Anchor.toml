@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-privacy_subscriptions = "DYdc7w3bmh5KQmzznufNx72cbXf446LC5gTWi8DA8zC6"
+privacy_subscriptions = "8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2"
 
 [programs.localnet]
 privacy_subscriptions = "B2WX7o3djQSAus1QdHYuezL95qUox6C1zmRS6JdDL7Ye"
@@ -15,7 +15,7 @@ privacy_subscriptions = "B2WX7o3djQSAus1QdHYuezL95qUox6C1zmRS6JdDL7Ye"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "https://devnet.helius-rpc.com/?api-key=8725da20-c68a-48f9-bac4-bed8f6e9fa0a"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

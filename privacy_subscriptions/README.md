@@ -121,11 +121,11 @@ pub struct InitAddTogetherCompDef<'info> {
 ```
 
 ```
-Program Id: DYdc7w3bmh5KQmzznufNx72cbXf446LC5gTWi8DA8zC6
+Program Id: 8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2
 
 Signature: 4ykqe7Pip1uEZHSzDxgkJoY7inLYR5csu2F6Z3r8TiurAVTcTCnmEQfubfCvPor3uecezHRffTEwqSdj4qXTkRPR
 
-Waiting for program DYdc7w3bmh5KQmzznufNx72cbXf446LC5gTWi8DA8zC6 to be confirmed...
+Waiting for program 8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2 to be confirmed...
 Program confirmed on-chain
 Idl data length: 5408 bytes
 Step 0/5408
@@ -153,7 +153,7 @@ $ /Users/yukikimura/work/solana-privacy/sublyfi/subly/privacy_subscriptions/node
 ╚════════════════════════════════════════════════════════════╝
 
 --- Configuration ---
-Program ID: DYdc7w3bmh5KQmzznufNx72cbXf446LC5gTWi8DA8zC6
+Program ID: 8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2
 Cluster: https://api.devnet.solana.com
 USDC Mint: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
 Fee Rate: 100 bps (1%)
@@ -209,4 +209,108 @@ Balance: 7.476995162 SOL
 
 ✨  Done in 17.38s.
 yukikimura@YukinoMacBook-Pro privacy_subscriptions %
+```
+
+```
+Program Id: 8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2
+
+Signature: uPnrxGEbG4RTSgFmThcMMkKiWMKRsBkezicwTH3sMyF8aCNJ2ZabXZTcQX3wXrxxViEx2Cm9PBvHzEcoTmJWS9a
+
+Waiting for program 8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2 to be confirmed...
+Program confirmed on-chain
+Idl data length: 5408 bytes
+Step 0/5408
+Step 600/5408
+Step 1200/5408
+Step 1800/5408
+Step 2400/5408
+Step 3000/5408
+Step 3600/5408
+Step 4200/5408
+Step 4800/5408
+Step 5400/5408
+Idl account 2iG1TvwNV12PhTuPnV9rQNBJE9iHUepjCMyEgKKM2VGG successfully upgraded
+Deploy success
+MXE initialized: 4ngbG3nDYcrqG1S6y7FGUedLcV1VdcbzTPsX8LcmkwvjQGtahzDKGt6DZdeLPmatQd12ZQxzMQZozCY7mL3aDQNN
+✅ MXE deployed and initialized successfully
+```
+
+```
+yukikimura@YukinoMacBook-Pro privacy_subscriptions % anchor run initialize
+yarn run v1.22.22
+$ /Users/yukikimura/work/solana-privacy/sublyfi/subly/privacy_subscriptions/node_modules/.bin/ts-node scripts/initialize.ts
+╔════════════════════════════════════════════════════════════╗
+║       Privacy Subscriptions - Initialization Script        ║
+╚════════════════════════════════════════════════════════════╝
+
+--- Configuration ---
+Program ID: 8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2
+Cluster: https://devnet.helius-rpc.com/?api-key=8725da20-c68a-48f9-bac4-bed8f6e9fa0a
+USDC Mint: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+Fee Rate: 0 bps (0%)
+Authority: nHSjCbSd3XD3UwGy5uAAUqEfDf4kBDYaJZ4eF82nCDZ
+Balance: 10.225194211 SOL
+
+=== Initializing Computation Definitions ===
+
+[INIT] Initializing deposit CompDef...
+       PDA: 6Rrn2BjJg6oX2Huon7rj9ZpKBHnUun9RAZ7BPrcbgnvp
+       Tx: 25pQXdAhBpqz4MTnX2JwaVXPfadNnd4tPZAayZHKVJBTVhQQ3oGnMmwyrVwEcxC4CPGRsy4jDr9dRjhAUDVJkXzP
+[DONE] deposit CompDef initialized (offchain circuit source)
+
+[INIT] Initializing withdraw CompDef...
+       PDA: byWh9DnYxkUpgS5iYur2Dit7J4zkb1GwCGnwaczNHvU
+       Tx: 4afwe9XYMxKvxSkGyk3ZwUW7oSsoivARLejujaNveJrK3RFdqPRxt7GE6KgWiGKEwjfMVFJoUE4zkuuZzZe5knKB
+[DONE] withdraw CompDef initialized (offchain circuit source)
+
+[INIT] Initializing subscribe CompDef...
+       PDA: F2h8u49d8fa2STcvDcrTADYiNCnfLhF6tU2g1gWNDiK4
+       Tx: 5PhU8wdjxNFYqNexQLoqL99UgSktbEESDrcka5DYj8pmpXoGEvKQ224LkWzQEzJfZYb6BHteRSN8Xf1RB2PLnBLZ
+[DONE] subscribe CompDef initialized (offchain circuit source)
+
+[INIT] Initializing unsubscribe CompDef...
+       PDA: 2CLwTRoChrvcWnWsAfgjLcMLeFgsydoPoaTTTMPveuCW
+       Tx: 3A9QbVwWTY1YyMCEMDVFBZitFEgmne17mH6YjHtc5GgKHo5TpxqTdEdBVbkkVsi9Y2PMNBz2j39K5kUCKTqSxatu
+[DONE] unsubscribe CompDef initialized (offchain circuit source)
+
+[INIT] Initializing process_payment CompDef...
+       PDA: 6KbjPqqRDWhLFHB3sXv29QMxjnAiigY8qgZKmwJFUXYK
+       Tx: 3Z83vsYWoDZTfvefspSCD5ouLHvpwx84cosrSod5iCvvYjbfTFD6TtyachQM7sCLtECicnSAEfJBXSZntBgnpc7y
+[DONE] process_payment CompDef initialized (offchain circuit source)
+
+[INIT] Initializing verify_subscription CompDef...
+       PDA: 4htJEY2EXCMAWRLcvkLGbZo9rL6ADzgR3QNDYgZYtrmZ
+       Tx: 258ZGsUV6H1TZHqEqWzzuEa8rej7JBk9RjdBtGby4cACiCuqWvfk1cAmzxYFT7RFgsiMG3BrhxT6ZKTYZPwKUkVF
+[DONE] verify_subscription CompDef initialized (offchain circuit source)
+
+[INIT] Initializing claim_revenue CompDef...
+       PDA: DjxwochUCAFCWRVTaZKXto55CY4JoypEPtdriQYEbY2V
+       Tx: 3X6REti5yYRrJR8D8HVU2H9FSvmVyCXZtR38FFbWXPmGkkr1u4iuwzdpR3sKxyydRpZexyssUg5oxGTKmT4v2xG8
+[DONE] claim_revenue CompDef initialized (offchain circuit source)
+
+
+=== Initializing Protocol ===
+
+[INIT] Initializing protocol with fee rate: 0 bps
+       Authority: nHSjCbSd3XD3UwGy5uAAUqEfDf4kBDYaJZ4eF82nCDZ
+       Config PDA: DM2Sww87KMVNXFvvGbExucevAWpbSFgn8eFWGsaDohcF
+       Tx: 2SUsgm1SygTHpGgUqz5mrUpUp4bjuhxiTRwPRcfMuysEmb5FuM73K9V8x2ZzXAPiUyQeakPJ1PFf4ChgcTkkq348
+[DONE] Protocol initialized
+
+
+=== Initializing Token Pool ===
+
+[INIT] Initializing pool for mint: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+       Pool PDA: 8NFiNVidws7n9uyZgUqXoNBaL5yRZGpJtoE4AwuJH2do
+       Pool Token Account: 4qeJuTFhkKHQyy5eqWc54qNaJCJKfKNDgqqJGdutVbBw
+       Tx: QMYQhKaDiZUCQRqFHXvffPybEcdTyP1UCNBYLVKRhcRwrjAWPNFzHdBfepp61LFKsgjLoTBxjX3rC6B9focwRDK
+[DONE] Pool initialized
+
+       Pool token account keypair saved to: ./pool-token-account-4zMMC9sr.json
+
+╔════════════════════════════════════════════════════════════╗
+║              Initialization Complete!                      ║
+╚════════════════════════════════════════════════════════════╝
+
+✨  Done in 30.96s.
 ```

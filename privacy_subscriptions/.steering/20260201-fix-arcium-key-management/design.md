@@ -1,8 +1,8 @@
-# 設計書: Arcium秘密鍵管理の修正
+# 設計書: Arcium暗号化・復号化の修正
 
 ## 概要
 
-Arcium暗号化コンテキストの秘密鍵をランダム生成から決定論的導出に変更し、Deposit後のBalance復号化とWithdraw操作を正常化する。
+Arcium暗号化コンテキストの秘密鍵をランダム生成から決定論的導出に変更し（Phase 1: 完了）、ArgBuilder引数順序をArcis回路と整合させ（Phase 2: 新規）、Deposit後のBalance復号化とWithdraw操作を正常化する。
 
 ## 問題分析
 
@@ -154,3 +154,163 @@ const cipher = new RescueCipher(sharedSecret);
 2. **署名拒否**: エラーメッセージが表示されること
 3. **ウォレット切り替え**: 異なるウォレットでは異なるキーが生成されること
 4. **複数タブ**: 同じウォレットなら同じキーが生成されること
+
+---
+
+## Phase 2: ArgBuilder引数順序の修正
+
+### 問題分析
+
+ArgBuilderパターンドキュメントより:
+> The order of arguments **must match** the circuit's `.idarc` descriptor exactly.
+
+現在、AnchorプログラムのArgBuilder引数順序がArcis回路の期待と一致していない。
+
+### 各命令の現状と修正内容
+
+#### 1. deposit命令
+
+**Arcis回路** (`encrypted-ixs/src/lib.rs:12-15`):
+```rust
+pub struct DepositInput {
+    pub current_balance: u64,  // フィールド1
+    pub deposit_amount: u64,   // フィールド2
+}
+```
+
+**現在のArgBuilder** (`lib.rs:318-323`):
+```rust
+let args = ArgBuilder::new()
+    .x25519_pubkey(pubkey)
+    .plaintext_u128(nonce)
+    .encrypted_u64(encrypted_amount)              // ❌ deposit_amount (フィールド2)
+    .encrypted_u64(user_ledger.encrypted_balance[0])  // ❌ current_balance (フィールド1)
+    .build();
+```
+
+**修正後**:
+```rust
+let args = ArgBuilder::new()
+    .x25519_pubkey(pubkey)
+    .plaintext_u128(nonce)
+    .encrypted_u64(user_ledger.encrypted_balance[0])  // ✅ current_balance (フィールド1)
+    .encrypted_u64(encrypted_amount)              // ✅ deposit_amount (フィールド2)
+    .build();
+```
+
+#### 2. withdraw命令
+
+**Arcis回路** (`encrypted-ixs/src/lib.rs:18-21`):
+```rust
+pub struct WithdrawInput {
+    pub current_balance: u64,  // フィールド1
+    pub withdraw_amount: u64,  // フィールド2
+}
+```
+
+**現在のArgBuilder** (`lib.rs:358-363`):
+```rust
+let args = ArgBuilder::new()
+    .x25519_pubkey(pubkey)
+    .plaintext_u128(nonce)
+    .encrypted_u64(user_ledger.encrypted_balance[0])  // ✅ current_balance
+    .encrypted_u64(encrypted_amount)                  // ✅ withdraw_amount
+    .build();
+```
+
+**→ 順序は正しい。変更不要。**
+
+#### 3. subscribe命令
+
+**Arcis回路** (`encrypted-ixs/src/lib.rs:24-32`):
+```rust
+pub struct SubscribeInput {
+    pub user_balance: u64,          // フィールド1
+    pub merchant_balance: u64,      // フィールド2
+    pub subscription_count: u64,    // フィールド3 ← 存在するが使われていない？
+    pub plan_pubkey: [u8; 32],      // フィールド4 ← 存在するが使われていない？
+    pub price: u64,                 // フィールド5
+    pub current_timestamp: i64,     // フィールド6 (plaintext)
+    pub billing_cycle_days: u32,    // フィールド7 (plaintext)
+}
+```
+
+**現在のArgBuilder** (`lib.rs:427-435`):
+```rust
+let args = ArgBuilder::new()
+    .x25519_pubkey(pubkey)
+    .plaintext_u128(nonce)
+    .encrypted_u64(user_ledger.encrypted_balance[0])            // user_balance
+    .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance[0])  // merchant_balance
+    .encrypted_u64(encrypted_price)                              // price
+    .plaintext_i64(current_timestamp)
+    .plaintext_u32(billing_cycle_days)
+    .build();
+```
+
+**→ subscription_count, plan_pubkey が不足している可能性あり。回路との整合性を詳細確認が必要。**
+
+#### 4. process_payment命令
+
+**Arcis回路** (`encrypted-ixs/src/lib.rs:40-48`):
+```rust
+pub struct ProcessPaymentInput {
+    pub user_balance: u64,          // フィールド1
+    pub merchant_balance: u64,      // フィールド2
+    pub subscription_status: u8,    // フィールド3
+    pub next_payment_date: i64,     // フィールド4
+    pub current_timestamp: i64,     // フィールド5 (plaintext)
+    pub plan_price: u64,            // フィールド6 (plaintext)
+    pub billing_cycle_days: u32,    // フィールド7 (plaintext)
+}
+```
+
+**現在のArgBuilder** (`lib.rs:515-525`):
+```rust
+let args = ArgBuilder::new()
+    .x25519_pubkey(pubkey)
+    .plaintext_u128(nonce)
+    .encrypted_u64(ctx.accounts.user_ledger.encrypted_balance[0])     // user_balance
+    .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance[0]) // merchant_balance
+    .encrypted_u8(ctx.accounts.user_subscription.encrypted_status)    // subscription_status
+    .encrypted_i64(ctx.accounts.user_subscription.encrypted_next_payment_date) // next_payment_date
+    .plaintext_i64(current_timestamp)
+    .plaintext_u64(plan_price)
+    .plaintext_u32(billing_cycle_days)
+    .build();
+```
+
+**→ 順序は正しそう。確認が必要。**
+
+#### 5. claim_revenue命令
+
+**Arcis回路** (`encrypted-ixs/src/lib.rs:58-61`):
+```rust
+pub struct ClaimRevenueInput {
+    pub current_balance: u64,  // フィールド1
+    pub claim_amount: u64,     // フィールド2
+}
+```
+
+**現在のArgBuilder** (`lib.rs:604-609`):
+```rust
+let args = ArgBuilder::new()
+    .x25519_pubkey(pubkey)
+    .plaintext_u128(nonce)
+    .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance[0])  // current_balance
+    .encrypted_u64(encrypted_amount)                                    // claim_amount
+    .build();
+```
+
+**→ 順序は正しい。変更不要。**
+
+### 実装方針
+
+1. **deposit命令のArgBuilder順序を修正** - 最も優先度が高い
+2. **他の命令の確認** - 実際にビルドして整合性を確認
+
+### セキュリティ考慮事項
+
+- ArgBuilder順序の変更はオンチェーンプログラムの変更であり、デプロイが必要
+- 既存のユーザーデータには影響しない（暗号化済みデータの構造は変わらない）
+- ただし、修正前にデポジットされたデータは引き続き復号化に失敗する可能性あり
