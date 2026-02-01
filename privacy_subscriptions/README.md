@@ -119,3 +119,27 @@ pub struct InitAddTogetherCompDef<'info> {
     // ... other required accounts
 }
 ```
+
+```
+Program Id: DYdc7w3bmh5KQmzznufNx72cbXf446LC5gTWi8DA8zC6
+
+Signature: 4ykqe7Pip1uEZHSzDxgkJoY7inLYR5csu2F6Z3r8TiurAVTcTCnmEQfubfCvPor3uecezHRffTEwqSdj4qXTkRPR
+
+Waiting for program DYdc7w3bmh5KQmzznufNx72cbXf446LC5gTWi8DA8zC6 to be confirmed...
+Program confirmed on-chain
+Idl data length: 5408 bytes
+Step 0/5408
+Step 600/5408
+Step 1200/5408
+Step 1800/5408
+Step 2400/5408
+Step 3000/5408
+Step 3600/5408
+Step 4200/5408
+Step 4800/5408
+Step 5400/5408
+Idl account created: D5SUdre419GjKDp7zDNRr7PcRUxVkeaC4D2fr3eWjKXt
+Deploy success
+MXE initialized: F8QanhaRiHeAFhEojGc8sQvuJeKu7vWFT92JYxd7TU84JRARoakms9JaCrZPNeEs5PyBJp7CDk8HGSaxb14ZcDq
+✅ MXE deployed and initialized successfully
+```
