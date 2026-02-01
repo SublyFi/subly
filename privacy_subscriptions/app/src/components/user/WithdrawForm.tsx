@@ -4,7 +4,7 @@ import { FC, useState, FormEvent } from "react";
 import { ArrowUpFromLine } from "lucide-react";
 import { useWithdraw } from "@/hooks/useWithdraw";
 import { TransactionStatus } from "@/components/common/TransactionStatus";
-import { lamportsToSol } from "@/lib/format";
+import { unitsToUsdc } from "@/lib/format";
 
 interface WithdrawFormProps {
   maxBalance?: bigint | null;
@@ -18,7 +18,7 @@ export const WithdrawForm: FC<WithdrawFormProps> = ({
   const [amount, setAmount] = useState("");
   const { mutate, state, error, signature, reset } = useWithdraw();
 
-  const maxBalanceSOL = maxBalance ? lamportsToSol(maxBalance) : null;
+  const maxBalanceUSDC = maxBalance ? unitsToUsdc(maxBalance) : null;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -29,7 +29,7 @@ export const WithdrawForm: FC<WithdrawFormProps> = ({
     }
 
     // Check if amount exceeds balance
-    if (maxBalanceSOL !== null && parsedAmount > maxBalanceSOL) {
+    if (maxBalanceUSDC !== null && parsedAmount > maxBalanceUSDC) {
       return;
     }
 
@@ -41,8 +41,8 @@ export const WithdrawForm: FC<WithdrawFormProps> = ({
   };
 
   const handleMax = () => {
-    if (maxBalanceSOL !== null) {
-      setAmount(maxBalanceSOL.toString());
+    if (maxBalanceUSDC !== null) {
+      setAmount(maxBalanceUSDC.toString());
     }
   };
 
@@ -54,7 +54,7 @@ export const WithdrawForm: FC<WithdrawFormProps> = ({
   const parsedAmount = parseFloat(amount) || 0;
   const isValidAmount = amount !== "" && parsedAmount > 0;
   const exceedsBalance =
-    maxBalanceSOL !== null && parsedAmount > maxBalanceSOL;
+    maxBalanceUSDC !== null && parsedAmount > maxBalanceUSDC;
 
   if (state === "success") {
     return (
@@ -77,7 +77,7 @@ export const WithdrawForm: FC<WithdrawFormProps> = ({
           htmlFor="withdraw-amount"
           className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
         >
-          Amount (SOL)
+          Amount (USDC)
         </label>
         <div className="relative">
           <input
@@ -95,7 +95,7 @@ export const WithdrawForm: FC<WithdrawFormProps> = ({
                 : "border-gray-300 dark:border-gray-600"
             }`}
           />
-          {maxBalanceSOL !== null && (
+          {maxBalanceUSDC !== null && (
             <button
               type="button"
               onClick={handleMax}
@@ -108,7 +108,7 @@ export const WithdrawForm: FC<WithdrawFormProps> = ({
         </div>
         {exceedsBalance && (
           <p className="mt-1 text-sm text-error-500">
-            Insufficient balance. Max: {maxBalanceSOL?.toFixed(4)} SOL
+            Insufficient balance. Max: {maxBalanceUSDC?.toFixed(4)} USDC
           </p>
         )}
       </div>

@@ -75,14 +75,14 @@ export interface UseMutationResult<T = void> {
  * Deposit parameters
  */
 export interface DepositParams {
-  amount: number; // SOL amount
+  amount: number; // USDC amount
 }
 
 /**
  * Withdraw parameters
  */
 export interface WithdrawParams {
-  amount: number; // SOL amount
+  amount: number; // USDC amount
 }
 
 /**

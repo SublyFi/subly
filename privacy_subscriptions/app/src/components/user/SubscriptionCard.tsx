@@ -3,7 +3,7 @@
 import { FC, useState } from "react";
 import { Calendar, Clock, AlertTriangle, X } from "lucide-react";
 import { UserSubscription } from "@/types";
-import { formatSOL, formatDate } from "@/lib/format";
+import { formatUSDC, formatDate } from "@/lib/format";
 import { useUnsubscribe } from "@/hooks/useUnsubscribe";
 import { TransactionStatus } from "@/components/common/TransactionStatus";
 
@@ -60,7 +60,7 @@ export const SubscriptionCard: FC<SubscriptionCardProps> = ({
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4" />
                 <span>
-                  {formatSOL(subscription.paymentAmount)} SOL / month
+                  {formatUSDC(subscription.paymentAmount)} USDC / month
                 </span>
               </div>
             </div>

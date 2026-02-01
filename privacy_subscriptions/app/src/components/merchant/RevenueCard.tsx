@@ -1,6 +1,6 @@
 "use client";
 
-import { formatSOLWithSymbol } from "@/lib/format";
+import { formatUSDCWithSymbol } from "@/lib/format";
 
 interface RevenueCardProps {
   title: string;
@@ -40,7 +40,7 @@ export function RevenueCard({
       <div className="bg-gray-800 rounded-xl p-6">
         <p className="text-sm text-gray-400 mb-2">{title}</p>
         <div className="flex items-center justify-between">
-          <p className="text-2xl font-bold text-gray-500">***.** SOL</p>
+          <p className="text-2xl font-bold text-gray-500">***.** USDC</p>
           <button
             onClick={onDecrypt}
             disabled={isDecrypting}
@@ -105,7 +105,7 @@ export function RevenueCard({
     <div className="bg-gray-800 rounded-xl p-6">
       <p className="text-sm text-gray-400 mb-2">{title}</p>
       <p className="text-2xl font-bold text-white">
-        {amount !== null ? formatSOLWithSymbol(amount) : "0.0000 SOL"}
+        {amount !== null ? formatUSDCWithSymbol(amount) : "0.0000 USDC"}
       </p>
     </div>
   );

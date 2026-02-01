@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { SubscriptionPlan, CreatePlanData } from "@/types";
-import { solToLamports, lamportsToSol } from "@/lib/format";
+import { usdcToUnits, unitsToUsdc } from "@/lib/format";
 
 interface PlanFormProps {
   mode: "create" | "edit";
@@ -32,8 +32,8 @@ export function PlanForm({
   isSubmitting = false,
 }: PlanFormProps) {
   const [name, setName] = useState(initialData?.name ?? "");
-  const [priceSOL, setPriceSOL] = useState(
-    initialData?.price ? lamportsToSol(initialData.price).toString() : ""
+  const [priceUSDC, setPriceUSDC] = useState(
+    initialData?.price ? unitsToUsdc(initialData.price).toString() : ""
   );
   const [billingCycleDays, setBillingCycleDays] = useState(
     initialData?.billingCycleDays?.toString() ?? "30"
@@ -62,8 +62,8 @@ export function PlanForm({
     }
 
     // Price validation
-    const priceValue = parseFloat(priceSOL);
-    if (!priceSOL || isNaN(priceValue)) {
+    const priceValue = parseFloat(priceUSDC);
+    if (!priceUSDC || isNaN(priceValue)) {
       newErrors.price = "Price is required";
     } else if (priceValue <= 0) {
       newErrors.price = "Price must be greater than 0";
@@ -90,7 +90,7 @@ export function PlanForm({
 
     const data: CreatePlanData = {
       name: name.trim(),
-      price: BigInt(solToLamports(parseFloat(priceSOL))),
+      price: BigInt(usdcToUnits(parseFloat(priceUSDC))),
       billingCycleDays: parseInt(billingCycleDays, 10),
     };
 
@@ -139,14 +139,14 @@ export function PlanForm({
           htmlFor="price"
           className="block text-sm font-medium text-gray-300 mb-2"
         >
-          Price (SOL)
+          Price (USDC)
         </label>
         <div className="relative">
           <input
             type="number"
             id="price"
-            value={priceSOL}
-            onChange={(e) => setPriceSOL(e.target.value)}
+            value={priceUSDC}
+            onChange={(e) => setPriceUSDC(e.target.value)}
             placeholder="0.00"
             step="0.001"
             min="0"
@@ -158,7 +158,7 @@ export function PlanForm({
             disabled={isSubmitting}
           />
           <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
-            SOL
+            USDC
           </span>
         </div>
         {errors.price && (

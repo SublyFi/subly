@@ -1,39 +1,45 @@
-import { LAMPORTS_PER_SOL, MAX_DISPLAY_DECIMALS } from "./constants";
+import { USDC_UNITS_PER_TOKEN, MAX_DISPLAY_DECIMALS } from "./constants";
 
 /**
- * Convert lamports to SOL
+ * Convert smallest units to USDC (human-readable)
  */
-export const lamportsToSol = (lamports: number | bigint): number => {
-  return Number(lamports) / LAMPORTS_PER_SOL;
+export const unitsToUsdc = (units: number | bigint): number => {
+  return Number(units) / USDC_UNITS_PER_TOKEN;
 };
 
 /**
- * Convert SOL to lamports
+ * Convert USDC (human-readable) to smallest units
  */
-export const solToLamports = (sol: number): number => {
-  return Math.floor(sol * LAMPORTS_PER_SOL);
+export const usdcToUnits = (usdc: number): number => {
+  return Math.floor(usdc * USDC_UNITS_PER_TOKEN);
 };
 
 /**
- * Format SOL amount for display
+ * Format USDC amount for display
  */
-export const formatSOL = (
-  lamports: number | bigint,
+export const formatUSDC = (
+  units: number | bigint,
   decimals: number = MAX_DISPLAY_DECIMALS
 ): string => {
-  const sol = lamportsToSol(lamports);
-  return sol.toFixed(decimals);
+  const usdc = unitsToUsdc(units);
+  return usdc.toFixed(decimals);
 };
 
 /**
- * Format SOL amount with symbol
+ * Format USDC amount with symbol
  */
-export const formatSOLWithSymbol = (
-  lamports: number | bigint,
+export const formatUSDCWithSymbol = (
+  units: number | bigint,
   decimals: number = MAX_DISPLAY_DECIMALS
 ): string => {
-  return `${formatSOL(lamports, decimals)} SOL`;
+  return `${formatUSDC(units, decimals)} USDC`;
 };
+
+// Legacy aliases for backward compatibility
+export const lamportsToSol = unitsToUsdc;
+export const solToLamports = usdcToUnits;
+export const formatSOL = formatUSDC;
+export const formatSOLWithSymbol = formatUSDCWithSymbol;
 
 /**
  * Shorten a Solana address for display

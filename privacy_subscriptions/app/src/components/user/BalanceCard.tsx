@@ -2,7 +2,7 @@
 
 import { FC } from "react";
 import { RefreshCw, Eye, EyeOff, Lock } from "lucide-react";
-import { formatSOL } from "@/lib/format";
+import { formatUSDC } from "@/lib/format";
 import { UseBalanceResult } from "@/hooks/useBalance";
 
 interface BalanceCardProps {
@@ -53,9 +53,9 @@ export const BalanceCard: FC<BalanceCardProps> = ({ balanceResult }) => {
         {isDecrypted && decryptedLamports !== null ? (
           <div className="flex items-baseline gap-2">
             <span className="text-4xl font-bold text-gray-900 dark:text-white">
-              {formatSOL(decryptedLamports)}
+              {formatUSDC(decryptedLamports)}
             </span>
-            <span className="text-xl text-gray-500 dark:text-gray-400">SOL</span>
+            <span className="text-xl text-gray-500 dark:text-gray-400">USDC</span>
           </div>
         ) : (
           <div className="text-4xl font-bold text-gray-400 dark:text-gray-600">

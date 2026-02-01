@@ -11,3 +11,5 @@ encrypted-ixs/src/main.rs
 artifacts/
 .next/
 .env
+.env.local
+.env.development.local

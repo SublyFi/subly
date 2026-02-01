@@ -4,7 +4,7 @@ use arcium_anchor::prelude::*;
 use arcium_client::idl::arcium::types::{CallbackAccount, CircuitSource, OffChainCircuitSource};
 use arcium_macros::circuit_hash;
 
-declare_id!("B2WX7o3djQSAus1QdHYuezL95qUox6C1zmRS6JdDL7Ye");
+declare_id!("DYdc7w3bmh5KQmzznufNx72cbXf446LC5gTWi8DA8zC6");
 
 // ============================================================================
 // Constants

@@ -1,7 +1,7 @@
 "use client";
 
 import { SubscriptionPlan } from "@/types";
-import { formatSOLWithSymbol } from "@/lib/format";
+import { formatUSDCWithSymbol } from "@/lib/format";
 
 interface PlanCardProps {
   plan: SubscriptionPlan;
@@ -46,7 +46,7 @@ export function PlanCard({
 
       <div className="mb-6">
         <p className="text-3xl font-bold text-white">
-          {formatSOLWithSymbol(plan.price)}
+          {formatUSDCWithSymbol(plan.price)}
         </p>
         <p className="text-sm text-gray-400">
           per {getBillingCycleLabel(plan.billingCycleDays).toLowerCase()}

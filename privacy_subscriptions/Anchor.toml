@@ -5,6 +5,9 @@ package_manager = "yarn"
 resolution = true
 skip-lint = false
 
+[programs.devnet]
+privacy_subscriptions = "DYdc7w3bmh5KQmzznufNx72cbXf446LC5gTWi8DA8zC6"
+
 [programs.localnet]
 privacy_subscriptions = "B2WX7o3djQSAus1QdHYuezL95qUox6C1zmRS6JdDL7Ye"
 
@@ -12,8 +15,9 @@ privacy_subscriptions = "B2WX7o3djQSAus1QdHYuezL95qUox6C1zmRS6JdDL7Ye"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
+initialize = "yarn run ts-node scripts/initialize.ts"
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 \"tests/**/*.ts\""

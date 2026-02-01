@@ -52,7 +52,7 @@ export function SubscribedDashboard() {
           </div>
           <div className="text-right">
             <p className="text-4xl font-bold">{plan.priceDisplay}</p>
-            <p className="text-green-100">SOL / {plan.cycleDisplay}</p>
+            <p className="text-green-100">USDC / {plan.cycleDisplay}</p>
           </div>
         </div>
 
@@ -157,7 +157,7 @@ export function SubscribedDashboard() {
                     <div>
                       <p className="font-medium text-gray-900 dark:text-white">{p.name}</p>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {p.priceDisplay} SOL / {p.cycleDisplay}
+                        {p.priceDisplay} USDC / {p.cycleDisplay}
                       </p>
                     </div>
                     <button className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm rounded-lg transition-colors">

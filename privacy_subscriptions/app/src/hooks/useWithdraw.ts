@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { TransactionState, WithdrawParams, UseMutationResult } from "@/types";
-import { solToLamports } from "@/lib/format";
+import { usdcToUnits } from "@/lib/format";
 import { useArcium } from "@/components/providers/ArciumProvider";
 import { executeWithdraw } from "@/lib/transactions";
 
@@ -55,9 +55,9 @@ export const useWithdraw = (): UseMutationResult<WithdrawParams> => {
       setSignature(null);
 
       try {
-        // Convert SOL to lamports
-        const lamports = solToLamports(params.amount);
-        const amount = BigInt(lamports);
+        // Convert USDC to smallest units
+        const units = usdcToUnits(params.amount);
+        const amount = BigInt(units);
 
         // Execute the withdraw transaction
         // The MPC will verify that balance >= amount

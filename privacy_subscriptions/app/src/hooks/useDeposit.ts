@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { TransactionState, DepositParams, UseMutationResult } from "@/types";
-import { solToLamports } from "@/lib/format";
+import { usdcToUnits } from "@/lib/format";
 import { useArcium } from "@/components/providers/ArciumProvider";
 import { executeDeposit } from "@/lib/transactions";
 
@@ -55,9 +55,9 @@ export const useDeposit = (): UseMutationResult<DepositParams> => {
       setSignature(null);
 
       try {
-        // Convert SOL to lamports
-        const lamports = solToLamports(params.amount);
-        const amount = BigInt(lamports);
+        // Convert USDC to smallest units
+        const units = usdcToUnits(params.amount);
+        const amount = BigInt(units);
 
         // Execute the deposit transaction
         const sig = await executeDeposit(

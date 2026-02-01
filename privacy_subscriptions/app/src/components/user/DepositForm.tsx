@@ -56,7 +56,7 @@ export const DepositForm: FC<DepositFormProps> = ({ onSuccess }) => {
           htmlFor="deposit-amount"
           className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
         >
-          Amount (SOL)
+          Amount (USDC)
         </label>
         <input
           id="deposit-amount"

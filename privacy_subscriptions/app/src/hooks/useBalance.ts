@@ -9,13 +9,14 @@ import { decryptBalance } from "@/lib/arcium";
 
 export interface UseBalanceResult {
   balance: Balance;
+  needsSignature: boolean;
   refresh: () => Promise<void>;
   decrypt: () => Promise<void>;
 }
 
 export const useBalance = (): UseBalanceResult => {
   const { publicKey, connected } = useWallet();
-  const { arciumContext, program, initialize, isInitializing } = useArcium();
+  const { arciumContext, program, initialize, isInitializing, needsSignature, error: arciumError } = useArcium();
 
   const [balance, setBalance] = useState<Balance>({
     lamports: BigInt(0),
@@ -179,8 +180,14 @@ export const useBalance = (): UseBalanceResult => {
     }
   }, [arciumContext, encryptedData.encryptedBalance, balance.isDecrypted, balance.isLoading, decrypt]);
 
+  // Include Arcium error in balance error if relevant
+  const effectiveBalance: Balance = arciumError && !balance.error
+    ? { ...balance, error: arciumError }
+    : balance;
+
   return {
-    balance,
+    balance: effectiveBalance,
+    needsSignature,
     refresh,
     decrypt,
   };

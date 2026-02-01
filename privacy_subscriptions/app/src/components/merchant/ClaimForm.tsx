@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useClaim } from "@/hooks/useClaim";
-import { formatSOLWithSymbol, solToLamports, lamportsToSol } from "@/lib/format";
+import { formatUSDCWithSymbol, usdcToUnits, unitsToUsdc } from "@/lib/format";
 import { ClaimState } from "@/types";
 
 interface ClaimFormProps {
@@ -21,16 +21,16 @@ const CLAIM_STATE_MESSAGES: Record<ClaimState, string> = {
 
 export function ClaimForm({ availableBalance, onSuccess }: ClaimFormProps) {
   const { claim, state, error, txSignature, reset } = useClaim();
-  const [amountSOL, setAmountSOL] = useState("");
+  const [amountUSDC, setAmountUSDC] = useState("");
 
-  const parsedAmount = parseFloat(amountSOL);
-  const amountLamports = !isNaN(parsedAmount) ? BigInt(solToLamports(parsedAmount)) : BigInt(0);
+  const parsedAmount = parseFloat(amountUSDC);
+  const amountUnits = !isNaN(parsedAmount) ? BigInt(usdcToUnits(parsedAmount)) : BigInt(0);
 
   const isValidAmount =
     !isNaN(parsedAmount) &&
     parsedAmount > 0 &&
     availableBalance !== null &&
-    amountLamports <= availableBalance;
+    amountUnits <= availableBalance;
 
   const isProcessing =
     state === "encrypting" || state === "sending" || state === "waiting_mpc";
@@ -41,9 +41,9 @@ export function ClaimForm({ availableBalance, onSuccess }: ClaimFormProps) {
     if (!isValidAmount) return;
 
     try {
-      await claim(amountLamports);
+      await claim(amountUnits);
       onSuccess?.();
-      setAmountSOL("");
+      setAmountUSDC("");
     } catch {
       // Error is handled by the hook
     }
@@ -51,13 +51,13 @@ export function ClaimForm({ availableBalance, onSuccess }: ClaimFormProps) {
 
   const handleMaxClick = () => {
     if (availableBalance !== null) {
-      setAmountSOL(lamportsToSol(availableBalance).toString());
+      setAmountUSDC(unitsToUsdc(availableBalance).toString());
     }
   };
 
   const handleReset = () => {
     reset();
-    setAmountSOL("");
+    setAmountUSDC("");
   };
 
   // Success state
@@ -153,7 +153,7 @@ export function ClaimForm({ availableBalance, onSuccess }: ClaimFormProps) {
         <p className="text-sm text-gray-400 mb-1">Available Balance</p>
         <p className="text-xl font-bold text-white">
           {availableBalance !== null
-            ? formatSOLWithSymbol(availableBalance)
+            ? formatUSDCWithSymbol(availableBalance)
             : "Not decrypted"}
         </p>
       </div>
@@ -170,8 +170,8 @@ export function ClaimForm({ availableBalance, onSuccess }: ClaimFormProps) {
           <input
             type="number"
             id="claimAmount"
-            value={amountSOL}
-            onChange={(e) => setAmountSOL(e.target.value)}
+            value={amountUSDC}
+            onChange={(e) => setAmountUSDC(e.target.value)}
             placeholder="0.00"
             step="0.001"
             min="0"
@@ -187,12 +187,12 @@ export function ClaimForm({ availableBalance, onSuccess }: ClaimFormProps) {
             >
               MAX
             </button>
-            <span className="text-gray-400">SOL</span>
+            <span className="text-gray-400">USDC</span>
           </div>
         </div>
-        {!isValidAmount && amountSOL && (
+        {!isValidAmount && amountUSDC && (
           <p className="mt-1 text-sm text-red-400">
-            {availableBalance !== null && amountLamports > availableBalance
+            {availableBalance !== null && amountUnits > availableBalance
               ? "Amount exceeds available balance"
               : "Enter a valid amount greater than 0"}
           </p>

@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Skill(repository-structure)",
-      "Skill(repository-structure:*)"
+      "Skill(repository-structure:*)",
+      "Skill(solana-dev)",
+      "Skill(solana-dev:*)",
+      "Skill(arcium-dev-skills)",
+      "Skill(arcium-dev-skills:*)"
     ]
   }
 }

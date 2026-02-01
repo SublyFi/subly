@@ -70,7 +70,7 @@ export function PlanCard({ plan, isCurrentPlan = false, isPopular = false }: Pla
           {plan.priceDisplay}
         </span>
         <span className="text-gray-500 dark:text-gray-400 ml-1">
-          SOL/{plan.cycleDisplay}
+          USDC/{plan.cycleDisplay}
         </span>
       </div>
 

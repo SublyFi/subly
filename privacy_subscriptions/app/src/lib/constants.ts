@@ -10,9 +10,9 @@ export const ARCIUM_PROGRAM_ID = new PublicKey(
   process.env.NEXT_PUBLIC_ARCIUM_PROGRAM_ID || "arcm2q7TLNUFpKtTg6Fv8mzJVLhVAAEDvPXYLfuiXjN"
 );
 
-// Token Mint (Wrapped SOL)
+// Token Mint (Devnet USDC)
 export const TOKEN_MINT = new PublicKey(
-  process.env.NEXT_PUBLIC_TOKEN_MINT || "So11111111111111111111111111111111111111112"
+  process.env.NEXT_PUBLIC_TOKEN_MINT || "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
 );
 
 // Arcium Configuration
@@ -43,8 +43,8 @@ export const COMP_DEF_OFFSETS = {
 } as const;
 
 // Token decimals
-export const SOL_DECIMALS = 9;
-export const LAMPORTS_PER_SOL = 1_000_000_000;
+export const USDC_DECIMALS = 6;
+export const USDC_UNITS_PER_TOKEN = 1_000_000;
 
 // UI Constants
 export const MAX_DISPLAY_DECIMALS = 4;
@@ -52,6 +52,8 @@ export const MAX_DISPLAY_DECIMALS = 4;
 // Transaction confirmation
 export const CONFIRMATION_COMMITMENT = "confirmed" as const;
 
-// Arcium fixed addresses
-export const ARCIUM_POOL_ADDRESS = new PublicKey("9Mwcvx2dLMZ4qxaAgLQ8ykpRtMfW1BQFUTdE4zXkD8kz");
-export const ARCIUM_CLOCK_ADDRESS = new PublicKey("ArcCLK11111111111111111111111111111111111111");
+// Arcium fixed addresses (from @arcium-hq/client)
+// Fee pool: getFeePoolAccAddress()
+export const ARCIUM_POOL_ADDRESS = new PublicKey("G2sRWJvi3xoyh5k2gY49eG9L8YhAEWQPtNb1zb1GXTtC");
+// Clock: getClockAccAddress()
+export const ARCIUM_CLOCK_ADDRESS = new PublicKey("7EbMUTLo5DjdzbN7s8BXeZwXzEwNQb1hScfRvWg8a6ot");

@@ -143,3 +143,70 @@ Deploy success
 MXE initialized: F8QanhaRiHeAFhEojGc8sQvuJeKu7vWFT92JYxd7TU84JRARoakms9JaCrZPNeEs5PyBJp7CDk8HGSaxb14ZcDq
 ✅ MXE deployed and initialized successfully
 ```
+
+```
+yukikimura@YukinoMacBook-Pro privacy_subscriptions % anchor run initialize
+yarn run v1.22.22
+$ /Users/yukikimura/work/solana-privacy/sublyfi/subly/privacy_subscriptions/node_modules/.bin/ts-node scripts/initialize.ts
+╔════════════════════════════════════════════════════════════╗
+║       Privacy Subscriptions - Initialization Script        ║
+╚════════════════════════════════════════════════════════════╝
+
+--- Configuration ---
+Program ID: DYdc7w3bmh5KQmzznufNx72cbXf446LC5gTWi8DA8zC6
+Cluster: https://api.devnet.solana.com
+USDC Mint: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+Fee Rate: 100 bps (1%)
+Authority: nHSjCbSd3XD3UwGy5uAAUqEfDf4kBDYaJZ4eF82nCDZ
+Balance: 7.476995162 SOL
+
+=== Initializing Computation Definitions ===
+
+[SKIP] deposit CompDef already initialized
+[SKIP] withdraw CompDef already initialized
+[SKIP] subscribe CompDef already initialized
+[SKIP] unsubscribe CompDef already initialized
+[INIT] Initializing process_payment CompDef...
+       PDA: GA41HHA6Jm1Aupe8i8mmpGbxkzx7hh2LC3LTf6FP64Ks
+       Tx: 4qcZzjPFANuFS1777PVbwpf9LUZbMFNdo8juR5vgF7urDVAqw8scv4UT23grqpDyoCd8ckzvPKYjUxaRYDJ8czgd
+[DONE] process_payment CompDef initialized (offchain circuit source)
+
+[INIT] Initializing verify_subscription CompDef...
+       PDA: HjNXwUr5915ETKZf5Vvb6KV84tKL4oxzmenCK7WPJjqi
+       Tx: 3ZNEv7zbKxdRZAJMNABQb3fXZqQUtt4oX42WVCznePAgz9LqFZXzwu4acaZadgfypRqQyaqJ2UdF2eQrgZzXerdm
+[DONE] verify_subscription CompDef initialized (offchain circuit source)
+
+[INIT] Initializing claim_revenue CompDef...
+       PDA: 8z2nQVne833Z3vX9fD3YYr4hxhoqFscJ9bJmT3eFE4yZ
+       [RETRY] claim_revenue attempt 1/3 failed, retrying in 3000ms...
+       [RETRY] claim_revenue attempt 2/3 failed, retrying in 3000ms...
+       Tx: 4pNbKzt8aymvoBzTy19ppqJQwB8SbSssVsvoAAS7tvoNqTKCAokqtFPwn47vBUXGvivEtkgd4vjYdHyCLexDJJvP
+[DONE] claim_revenue CompDef initialized (offchain circuit source)
+
+
+=== Initializing Protocol ===
+
+[INIT] Initializing protocol with fee rate: 100 bps
+       Authority: nHSjCbSd3XD3UwGy5uAAUqEfDf4kBDYaJZ4eF82nCDZ
+       Config PDA: 3zsurq61stSM9ykdATC4J9MkPGX8oUAhb3x6rpBXHZkS
+       Tx: VsypLyxh8no6DfSXswm9dKzmm7E7GLcDjfcKpYoKSmM1tZebfQcv3v1LsejL9xyuXS2xKFm2aCikt6hK8fSxdry
+[DONE] Protocol initialized
+
+
+=== Initializing Token Pool ===
+
+[INIT] Initializing pool for mint: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+       Pool PDA: 8VvS2FarQWTX57DXihyJGVfk3D6df8odsmYkndYB5hDs
+       Pool Token Account: HRaAUbo7LPor1oQY5H1V7r3TrvFxSFhNaELpLpzwfntK
+       Tx: 5szAwoW5i27NXwLA5eYi5evgNMQGmTWAL3rNb1Wskg7vRshAd85nVAYtMUbfuSjf7StRf5ioKXuva8H5QuY6cwpZ
+[DONE] Pool initialized
+
+       Pool token account keypair saved to: ./pool-token-account-4zMMC9sr.json
+
+╔════════════════════════════════════════════════════════════╗
+║              Initialization Complete!                      ║
+╚════════════════════════════════════════════════════════════╝
+
+✨  Done in 17.38s.
+yukikimura@YukinoMacBook-Pro privacy_subscriptions %
+```

@@ -31,13 +31,13 @@ export interface SubscriptionState {
 export type LoadingState = 'idle' | 'loading' | 'success' | 'error';
 
 /**
- * Format lamports to SOL display string
+ * Format USDC units to display string (USDC has 6 decimals)
  */
 export function formatLamportsToSol(lamports: BN): string {
-  const sol = lamports.toNumber() / 1_000_000_000;
-  return sol.toLocaleString('en-US', {
+  const usdc = lamports.toNumber() / 1_000_000;
+  return usdc.toLocaleString('en-US', {
     minimumFractionDigits: 2,
-    maximumFractionDigits: 9,
+    maximumFractionDigits: 6,
   });
 }
 
