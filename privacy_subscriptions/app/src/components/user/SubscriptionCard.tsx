@@ -20,7 +20,10 @@ export const SubscriptionCard: FC<SubscriptionCardProps> = ({
   const { mutate, state, error, signature, reset } = useUnsubscribe();
 
   const handleUnsubscribe = async () => {
-    await mutate({ subscriptionPubkey: subscription.publicKey });
+    await mutate({
+      subscriptionPubkey: subscription.publicKey,
+      subscriptionIndex: subscription.subscriptionIndex,
+    });
     if (state === "success" && onUnsubscribed) {
       onUnsubscribed();
     }

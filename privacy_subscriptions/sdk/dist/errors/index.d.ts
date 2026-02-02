@@ -25,7 +25,9 @@ export declare enum SublyErrorCode {
     /** Plan is not active */
     PlanNotActive = "PLAN_NOT_ACTIVE",
     /** User already subscribed to this plan */
-    AlreadySubscribed = "ALREADY_SUBSCRIBED"
+    AlreadySubscribed = "ALREADY_SUBSCRIBED",
+    /** Wallet does not support signMessage */
+    WalletNotSupported = "WALLET_NOT_SUPPORTED"
 }
 /**
  * Custom error class for Subly SDK

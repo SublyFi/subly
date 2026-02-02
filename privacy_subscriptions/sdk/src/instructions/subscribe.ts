@@ -4,6 +4,7 @@ import {
   SystemProgram,
 } from '@solana/web3.js';
 import BN from 'bn.js';
+import { BorshCoder, Idl } from '@coral-xyz/anchor';
 import { SubscriptionPlan } from '../types/plan';
 import {
   deriveUserLedgerPDA,
@@ -15,15 +16,10 @@ import {
   ARCIUM_PROGRAM_ID,
   ARCIUM_FEE_POOL_ACCOUNT,
   ARCIUM_CLOCK_ACCOUNT,
-  deriveMxePDA,
   deriveSignPDA,
-  deriveComputationDefinitionPDA,
-  deriveMempoolPDA,
-  deriveExecPoolPDA,
-  deriveComputationPDA,
-  deriveClusterPDA,
-  ArciumClientWrapper,
+  getArciumAccounts,
 } from '../encryption/arcium';
+import idl from '../idl/privacy_subscriptions.json';
 
 /**
  * Parameters for building a subscribe instruction
@@ -35,10 +31,22 @@ export interface BuildSubscribeParams {
   plan: SubscriptionPlan;
   /** User's subscription index (incrementing counter for this user) */
   subscriptionIndex: BN | number;
+  /** Encrypted plan public key (Enc<Shared, [u128; 2]>) */
+  encryptedPlan: [Uint8Array | number[], Uint8Array | number[]];
+  /** Nonce for encrypted plan */
+  encryptedPlanNonce: BN | bigint;
+  /** Encrypted plan price (Enc<Shared, u64>) */
+  encryptedPrice: Uint8Array | number[];
+  /** Nonce for encrypted price */
+  encryptedPriceNonce: BN | bigint;
+  /** Encrypted billing cycle days (Enc<Shared, u32>) */
+  encryptedBillingCycle: Uint8Array | number[];
+  /** Nonce for encrypted billing cycle */
+  encryptedBillingCycleNonce: BN | bigint;
   /** Computation offset for Arcium */
   computationOffset: BN;
-  /** Arcium client wrapper */
-  arciumClient: ArciumClientWrapper;
+  /** Arcium cluster offset */
+  clusterOffset?: number;
   /** Program ID (optional) */
   programId?: PublicKey;
 }
@@ -60,8 +68,14 @@ export async function buildSubscribeInstruction(
     user,
     plan,
     subscriptionIndex,
+    encryptedPlan,
+    encryptedPlanNonce,
+    encryptedPrice,
+    encryptedPriceNonce,
+    encryptedBillingCycle,
+    encryptedBillingCycleNonce,
     computationOffset,
-    arciumClient,
+    clusterOffset = 0,
     programId = PROGRAM_ID,
   } = params;
 
@@ -74,57 +88,50 @@ export async function buildSubscribeInstruction(
   const [merchantLedgerPDA] = deriveMerchantLedgerPDA(plan.merchant, plan.mint, programId);
   const [userSubscriptionPDA] = deriveUserSubscriptionPDA(user, subscriptionIndexBN, programId);
   const [signPDA] = deriveSignPDA(programId);
-  const [mxeAccount] = deriveMxePDA(programId);
-  const [mempoolAccount] = deriveMempoolPDA(mxeAccount);
-  const [execPoolAccount] = deriveExecPoolPDA(mxeAccount);
-  const [computationAccount] = deriveComputationPDA(computationOffset, mxeAccount);
-  const [compDefAccount] = deriveComputationDefinitionPDA('subscribe', programId);
-  const [clusterAccount] = deriveClusterPDA(mxeAccount);
-
-  // Encrypt the price for Arcium computation
-  const encryptedPrice = await arciumClient.encryptU64(plan.price);
-
-  // Build instruction data
-  // Discriminator for 'subscribe' instruction
-  const discriminator = Buffer.from([
-    // subscribe discriminator from IDL
-    // This should match the Anchor-generated discriminator
-    0xf0, 0x9e, 0x65, 0x67, 0x89, 0x6c, 0x4b, 0xd3,
-  ]);
-
-  const data = Buffer.alloc(
-    8 + // discriminator
-    8 + // computation_offset (u64)
-    8 + // subscription_index (u64)
-    32 + // encrypted_price ([u8; 32])
-    32 + // pubkey ([u8; 32])
-    16   // nonce (u128)
+  const arciumAccounts = getArciumAccounts(
+    programId,
+    'subscribe_v2',
+    computationOffset,
+    clusterOffset
   );
 
-  let offset = 0;
+  const planCiphertexts = [
+    Array.isArray(encryptedPlan[0])
+      ? encryptedPlan[0]
+      : Array.from(encryptedPlan[0]),
+    Array.isArray(encryptedPlan[1])
+      ? encryptedPlan[1]
+      : Array.from(encryptedPlan[1]),
+  ];
+  const priceCiphertext = Array.isArray(encryptedPrice)
+    ? encryptedPrice
+    : Array.from(encryptedPrice);
+  const billingCiphertext = Array.isArray(encryptedBillingCycle)
+    ? encryptedBillingCycle
+    : Array.from(encryptedBillingCycle);
 
-  // Discriminator
-  discriminator.copy(data, offset);
-  offset += 8;
+  const planNonceBN = BN.isBN(encryptedPlanNonce)
+    ? encryptedPlanNonce
+    : new BN(encryptedPlanNonce.toString());
+  const priceNonceBN = BN.isBN(encryptedPriceNonce)
+    ? encryptedPriceNonce
+    : new BN(encryptedPriceNonce.toString());
+  const billingNonceBN = BN.isBN(encryptedBillingCycleNonce)
+    ? encryptedBillingCycleNonce
+    : new BN(encryptedBillingCycleNonce.toString());
 
-  // computation_offset (u64, little-endian)
-  computationOffset.toArrayLike(Buffer, 'le', 8).copy(data, offset);
-  offset += 8;
-
-  // subscription_index (u64, little-endian)
-  subscriptionIndexBN.toArrayLike(Buffer, 'le', 8).copy(data, offset);
-  offset += 8;
-
-  // encrypted_price ([u8; 32])
-  Buffer.from(encryptedPrice.ciphertext).copy(data, offset);
-  offset += 32;
-
-  // pubkey ([u8; 32])
-  Buffer.from(encryptedPrice.pubkey).copy(data, offset);
-  offset += 32;
-
-  // nonce (u128, little-endian)
-  encryptedPrice.nonce.toArrayLike(Buffer, 'le', 16).copy(data, offset);
+  // Build instruction data using IDL coder
+  const coder = new BorshCoder(idl as Idl);
+  const data = coder.instruction.encode('subscribe', {
+    computationOffset,
+    subscriptionIndex: subscriptionIndexBN,
+    encryptedPlan: planCiphertexts,
+    encryptedPlanNonce: planNonceBN,
+    encryptedPrice: priceCiphertext,
+    encryptedPriceNonce: priceNonceBN,
+    encryptedBillingCycle: billingCiphertext,
+    encryptedBillingCycleNonce: billingNonceBN,
+  });
 
   // Build the instruction
   const keys = [
@@ -135,12 +142,12 @@ export async function buildSubscribeInstruction(
     { pubkey: merchantLedgerPDA, isSigner: false, isWritable: true },
     { pubkey: userSubscriptionPDA, isSigner: false, isWritable: true },
     { pubkey: signPDA, isSigner: false, isWritable: true },
-    { pubkey: mxeAccount, isSigner: false, isWritable: false },
-    { pubkey: mempoolAccount, isSigner: false, isWritable: true },
-    { pubkey: execPoolAccount, isSigner: false, isWritable: true },
-    { pubkey: computationAccount, isSigner: false, isWritable: true },
-    { pubkey: compDefAccount, isSigner: false, isWritable: false },
-    { pubkey: clusterAccount, isSigner: false, isWritable: true },
+    { pubkey: arciumAccounts.mxeAccount, isSigner: false, isWritable: false },
+    { pubkey: arciumAccounts.mempoolAccount, isSigner: false, isWritable: true },
+    { pubkey: arciumAccounts.executingPool, isSigner: false, isWritable: true },
+    { pubkey: arciumAccounts.computationAccount, isSigner: false, isWritable: true },
+    { pubkey: arciumAccounts.compDefAccount, isSigner: false, isWritable: false },
+    { pubkey: arciumAccounts.clusterAccount, isSigner: false, isWritable: true },
     { pubkey: ARCIUM_FEE_POOL_ACCOUNT, isSigner: false, isWritable: true },
     { pubkey: ARCIUM_CLOCK_ACCOUNT, isSigner: false, isWritable: true },
     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },

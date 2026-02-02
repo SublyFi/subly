@@ -6,10 +6,10 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-privacy_subscriptions = "8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2"
+privacy_subscriptions = "Hwmvq4rJ1P6bxHD5G6KvzteuXdMtMzpwZTT7AJb3wSa9"
 
 [programs.localnet]
-privacy_subscriptions = "B2WX7o3djQSAus1QdHYuezL95qUox6C1zmRS6JdDL7Ye"
+privacy_subscriptions = "Hwmvq4rJ1P6bxHD5G6KvzteuXdMtMzpwZTT7AJb3wSa9"
 
 [registry]
 url = "https://api.apr.dev"

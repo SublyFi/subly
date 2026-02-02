@@ -20,6 +20,8 @@ export interface SublyConfig {
   merchantWallet: PublicKey | string;
   /** Program ID (optional, defaults to deployed address) */
   programId?: PublicKey | string;
+  /** Arcium cluster offset (required for mempool/computation PDAs) */
+  arciumClusterOffset?: number;
   /** Arcium configuration (optional, defaults to devnet settings) */
   arciumConfig?: ArciumConfig;
   /** Commitment level for transactions */

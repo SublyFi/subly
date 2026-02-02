@@ -30,6 +30,8 @@ var SublyErrorCode;
     SublyErrorCode["PlanNotActive"] = "PLAN_NOT_ACTIVE";
     /** User already subscribed to this plan */
     SublyErrorCode["AlreadySubscribed"] = "ALREADY_SUBSCRIBED";
+    /** Wallet does not support signMessage */
+    SublyErrorCode["WalletNotSupported"] = "WALLET_NOT_SUPPORTED";
 })(SublyErrorCode || (exports.SublyErrorCode = SublyErrorCode = {}));
 /**
  * Custom error class for Subly SDK

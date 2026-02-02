@@ -49,7 +49,7 @@ describe('SublySDK', () => {
     it('should use default program ID', () => {
       const sdk = new SublySDK(validConfig);
 
-      expect(sdk.program.toBase58()).toBe('8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2');
+      expect(sdk.program.toBase58()).toBe('Hwmvq4rJ1P6bxHD5G6KvzteuXdMtMzpwZTT7AJb3wSa9');
     });
 
     it('should use custom program ID if provided', () => {

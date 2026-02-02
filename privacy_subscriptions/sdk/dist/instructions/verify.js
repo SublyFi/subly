@@ -6,8 +6,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildVerifySubscriptionInstruction = buildVerifySubscriptionInstruction;
 const web3_js_1 = require("@solana/web3.js");
 const bn_js_1 = __importDefault(require("bn.js"));
+const anchor_1 = require("@coral-xyz/anchor");
 const pda_1 = require("../accounts/pda");
 const arcium_1 = require("../encryption/arcium");
+const privacy_subscriptions_json_1 = __importDefault(require("../idl/privacy_subscriptions.json"));
 /**
  * Build the verify subscription instruction
  *
@@ -16,56 +18,29 @@ const arcium_1 = require("../encryption/arcium");
  * 2. The callback will emit a SubscriptionVerified event
  */
 async function buildVerifySubscriptionInstruction(params) {
-    const { payer, user, subscriptionIndex, computationOffset, arciumClient, programId = pda_1.PROGRAM_ID, } = params;
+    const { payer, user, subscriptionIndex, computationOffset, clusterOffset = 0, programId = pda_1.PROGRAM_ID, } = params;
     const subscriptionIndexBN = bn_js_1.default.isBN(subscriptionIndex)
         ? subscriptionIndex
         : new bn_js_1.default(subscriptionIndex);
     // Derive all required PDAs
     const [userSubscriptionPDA] = (0, pda_1.deriveUserSubscriptionPDA)(user, subscriptionIndexBN, programId);
     const [signPDA] = (0, arcium_1.deriveSignPDA)(programId);
-    const [mxeAccount] = (0, arcium_1.deriveMxePDA)(programId);
-    const [mempoolAccount] = (0, arcium_1.deriveMempoolPDA)(mxeAccount);
-    const [execPoolAccount] = (0, arcium_1.deriveExecPoolPDA)(mxeAccount);
-    const [computationAccount] = (0, arcium_1.deriveComputationPDA)(computationOffset, mxeAccount);
-    const [compDefAccount] = (0, arcium_1.deriveComputationDefinitionPDA)('verify_subscription', programId);
-    const [clusterAccount] = (0, arcium_1.deriveClusterPDA)(mxeAccount);
-    // Get encryption parameters
-    const nonce = arciumClient.getNonce();
-    const pubkey = arciumClient.getPublicKey();
-    // Build instruction data
-    // Discriminator for 'verify_subscription' instruction
-    const discriminator = Buffer.from([
-        // verify_subscription discriminator
-        0x9b, 0x6c, 0x0e, 0x76, 0x0b, 0x89, 0x24, 0x36,
-    ]);
-    const data = Buffer.alloc(8 + // discriminator
-        8 + // computation_offset (u64)
-        32 + // pubkey ([u8; 32])
-        16 // nonce (u128)
-    );
-    let offset = 0;
-    // Discriminator
-    discriminator.copy(data, offset);
-    offset += 8;
-    // computation_offset (u64, little-endian)
-    computationOffset.toArrayLike(Buffer, 'le', 8).copy(data, offset);
-    offset += 8;
-    // pubkey ([u8; 32])
-    Buffer.from(pubkey).copy(data, offset);
-    offset += 32;
-    // nonce (u128, little-endian)
-    nonce.toArrayLike(Buffer, 'le', 16).copy(data, offset);
+    const arciumAccounts = (0, arcium_1.getArciumAccounts)(programId, 'verify_subscription_v2', computationOffset, clusterOffset);
+    const coder = new anchor_1.BorshCoder(privacy_subscriptions_json_1.default);
+    const data = coder.instruction.encode('verify_subscription', {
+        computationOffset,
+    });
     // Build the instruction
     const keys = [
         { pubkey: payer, isSigner: true, isWritable: true },
         { pubkey: userSubscriptionPDA, isSigner: false, isWritable: false },
         { pubkey: signPDA, isSigner: false, isWritable: true },
-        { pubkey: mxeAccount, isSigner: false, isWritable: false },
-        { pubkey: mempoolAccount, isSigner: false, isWritable: true },
-        { pubkey: execPoolAccount, isSigner: false, isWritable: true },
-        { pubkey: computationAccount, isSigner: false, isWritable: true },
-        { pubkey: compDefAccount, isSigner: false, isWritable: false },
-        { pubkey: clusterAccount, isSigner: false, isWritable: true },
+        { pubkey: arciumAccounts.mxeAccount, isSigner: false, isWritable: false },
+        { pubkey: arciumAccounts.mempoolAccount, isSigner: false, isWritable: true },
+        { pubkey: arciumAccounts.executingPool, isSigner: false, isWritable: true },
+        { pubkey: arciumAccounts.computationAccount, isSigner: false, isWritable: true },
+        { pubkey: arciumAccounts.compDefAccount, isSigner: false, isWritable: false },
+        { pubkey: arciumAccounts.clusterAccount, isSigner: false, isWritable: true },
         { pubkey: arcium_1.ARCIUM_FEE_POOL_ACCOUNT, isSigner: false, isWritable: true },
         { pubkey: arcium_1.ARCIUM_CLOCK_ACCOUNT, isSigner: false, isWritable: true },
         { pubkey: web3_js_1.SystemProgram.programId, isSigner: false, isWritable: false },

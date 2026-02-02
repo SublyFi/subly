@@ -28,7 +28,7 @@ export const useBalance = (): UseBalanceResult => {
 
   // Store encrypted balance and nonce for later decryption
   const [encryptedData, setEncryptedData] = useState<{
-    encryptedBalance: number[][] | null;
+    encryptedBalance: number[] | null;
     nonce: bigint | null;
   }>({ encryptedBalance: null, nonce: null });
 
@@ -128,11 +128,9 @@ export const useBalance = (): UseBalanceResult => {
       }
 
       // Decrypt the balance using Arcium cipher
-      // The encrypted balance is a 2D array: [[u8; 32]; 2]
-      // We decrypt the first element which contains the balance
       const decrypted = decryptBalance(
         arciumContext.cipher,
-        encryptedData.encryptedBalance[0],
+        encryptedData.encryptedBalance,
         nonceBytes
       );
 

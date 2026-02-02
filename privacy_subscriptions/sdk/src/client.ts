@@ -20,9 +20,18 @@ import {
   UserLedgerData,
 } from './accounts/fetch';
 import {
-  initArciumClient,
   getNextComputationOffset,
-  ArciumClientWrapper,
+  createArciumContextFromSignature,
+  ENCRYPTION_SIGNING_MESSAGE,
+  decryptValue,
+  decryptValues,
+  nonceToBytes,
+  bytesToU128,
+  encryptValues,
+  generateNonce,
+  pubkeyToU128s,
+  u128sToPubkey,
+  ArciumContext,
 } from './encryption/arcium';
 import { buildSubscribeInstruction } from './instructions/subscribe';
 import { buildUnsubscribeInstruction } from './instructions/unsubscribe';
@@ -35,6 +44,7 @@ export interface Wallet {
   publicKey: PublicKey;
   signTransaction<T extends Transaction>(tx: T): Promise<T>;
   signAllTransactions<T extends Transaction>(txs: T[]): Promise<T[]>;
+  signMessage?: (message: Uint8Array) => Promise<Uint8Array>;
 }
 
 /**
@@ -61,7 +71,7 @@ export interface TransactionOptions {
  * const plans = await sdk.getPlans(true); // active only
  *
  * // Check user subscription status
- * const status = await sdk.checkSubscription(userWallet, planId);
+ * const status = await sdk.checkSubscription(wallet, planId);
  *
  * // Subscribe a user
  * const signature = await sdk.subscribe(planId, wallet);
@@ -71,8 +81,10 @@ export class SublySDK {
   private connection: Connection;
   private merchantWallet: PublicKey;
   private programId: PublicKey;
-  private arciumClient: ArciumClientWrapper | null = null;
   private commitment: Commitment;
+  private arciumContext: ArciumContext | null = null;
+  private arciumContextOwner: string | null = null;
+  private clusterOffset: number;
 
   /**
    * Create a new SublySDK instance
@@ -92,6 +104,7 @@ export class SublySDK {
       ? this.toPublicKey(config.programId)
       : PROGRAM_ID;
     this.commitment = config.commitment || 'confirmed';
+    this.clusterOffset = config.arciumClusterOffset ?? 0;
   }
 
   /**
@@ -127,13 +140,32 @@ export class SublySDK {
   }
 
   /**
-   * Get or initialize Arcium client
+   * Get or initialize Arcium encryption context for a wallet
    */
-  private async getArciumClient(): Promise<ArciumClientWrapper> {
-    if (!this.arciumClient) {
-      this.arciumClient = await initArciumClient(this.programId);
+  private async getArciumContext(wallet: Wallet): Promise<ArciumContext> {
+    const owner = wallet.publicKey.toBase58();
+    if (this.arciumContext && this.arciumContextOwner === owner) {
+      return this.arciumContext;
     }
-    return this.arciumClient;
+
+    if (!wallet.signMessage) {
+      throw new SublyError(
+        'Wallet does not support signMessage',
+        SublyErrorCode.WalletNotSupported
+      );
+    }
+
+    const message = new TextEncoder().encode(ENCRYPTION_SIGNING_MESSAGE);
+    const signature = await wallet.signMessage(message);
+    const context = await createArciumContextFromSignature(
+      this.connection,
+      signature,
+      this.programId
+    );
+
+    this.arciumContext = context;
+    this.arciumContextOwner = owner;
+    return context;
   }
 
   /**
@@ -188,33 +220,50 @@ export class SublySDK {
   }
 
   /**
-   * Check a user's subscription status
+   * Check a user's subscription status (decrypts the user's subscription data).
    *
-   * Note: This is a simplified implementation. In production, this would:
-   * 1. Send a verify_subscription transaction
-   * 2. Wait for the Arcium MPC callback
-   * 3. Parse the SubscriptionVerified event
-   *
-   * For now, we check if the UserSubscription account exists and is not cancelled
-   *
-   * @param userWallet - User's wallet public key
+   * @param wallet - User's wallet (requires signMessage)
    * @param planPDA - Plan account public key
    * @returns Subscription status
    */
   async checkSubscription(
-    userWallet: PublicKey | string,
+    wallet: Wallet,
     planPDA: PublicKey | string
   ): Promise<SubscriptionStatus> {
     try {
-      const user = this.toPublicKey(userWallet);
-      const plan = this.toPublicKey(planPDA);
+      const planPubkey = this.toPublicKey(planPDA);
+      const plan = await this.getPlan(planPubkey);
+      if (!plan) {
+        throw new SublyError('Plan not found', SublyErrorCode.PlanNotFound);
+      }
 
-      // Get all user subscriptions and find one matching this plan
-      // In production, this would use the verify_subscription instruction
-      // which decrypts the status via Arcium MPC
+      const user = wallet.publicKey;
+      const ledger = await fetchUserLedger(
+        this.connection,
+        user,
+        plan.mint,
+        this.programId
+      );
 
-      // For now, scan through possible subscription indices
-      for (let i = 0; i < 100; i++) {
+      if (!ledger) {
+        return SubscriptionStatus.NotSubscribed;
+      }
+
+      const context = await this.getArciumContext(wallet);
+      const ledgerNonce = nonceToBytes(ledger.nonce);
+      const subscriptionCount = decryptValue(
+        context.cipher,
+        ledger.encryptedSubscriptionCount,
+        ledgerNonce
+      );
+
+      const maxIndex = Number(subscriptionCount);
+      if (!Number.isFinite(maxIndex) || maxIndex < 0) {
+        throw new SublyError('Invalid subscription count', SublyErrorCode.ArciumError);
+      }
+
+      const limit = Math.min(maxIndex, 1000);
+      for (let i = 0; i < limit; i++) {
         const subscription = await fetchUserSubscriptionByUserAndIndex(
           this.connection,
           user,
@@ -223,17 +272,34 @@ export class SublySDK {
         );
 
         if (!subscription) {
-          // No more subscriptions for this user
-          break;
+          continue;
         }
 
-        if (subscription.plan.equals(plan)) {
-          // Found a subscription for this plan
-          // Note: In production, status would be decrypted via Arcium
-          // For now, assume active if account exists
-          return subscription.isCancelled
-            ? SubscriptionStatus.Cancelled
-            : SubscriptionStatus.Active;
+        const subNonce = nonceToBytes(subscription.nonce);
+        const [planPart1, planPart2, statusVal] = decryptValues(
+          context.cipher,
+          [
+            subscription.encryptedPlan[0],
+            subscription.encryptedPlan[1],
+            subscription.encryptedStatus,
+          ],
+          subNonce
+        );
+
+        const subscriptionPlan = u128sToPubkey([planPart1, planPart2]);
+        if (!subscriptionPlan.equals(planPubkey)) {
+          continue;
+        }
+
+        const statusNum = Number(statusVal);
+        if (statusNum === 0) {
+          return SubscriptionStatus.Active;
+        }
+        if (statusNum === 1) {
+          return SubscriptionStatus.Cancelled;
+        }
+        if (statusNum === 2) {
+          return SubscriptionStatus.Expired;
         }
       }
 
@@ -266,14 +332,13 @@ export class SublySDK {
         throw new SublyError('Plan is not active', SublyErrorCode.PlanNotActive);
       }
 
-      const arciumClient = await this.getArciumClient();
       const computationOffset = await getNextComputationOffset();
 
       // Get user's next subscription index
-      const subscriptionIndex = await this.getNextSubscriptionIndex(wallet.publicKey);
+      const subscriptionIndex = await this.getNextSubscriptionIndex(wallet, plan.mint);
 
       // Check if user already has this subscription
-      const currentStatus = await this.checkSubscription(wallet.publicKey, planPDA);
+      const currentStatus = await this.checkSubscription(wallet, planPDA);
       if (currentStatus === SubscriptionStatus.Active) {
         throw new SublyError(
           'User is already subscribed to this plan',
@@ -281,13 +346,41 @@ export class SublySDK {
         );
       }
 
+      // Encrypt plan metadata for MPC
+      const context = await this.getArciumContext(wallet);
+      const planParts = pubkeyToU128s(plan.publicKey);
+      const planNonce = generateNonce();
+      const [encryptedPlanPart1, encryptedPlanPart2] = encryptValues(
+        context.cipher,
+        [planParts[0], planParts[1]],
+        planNonce
+      );
+      const priceNonce = generateNonce();
+      const [encryptedPrice] = encryptValues(
+        context.cipher,
+        [BigInt(plan.price.toString())],
+        priceNonce
+      );
+      const billingNonce = generateNonce();
+      const [encryptedBillingCycle] = encryptValues(
+        context.cipher,
+        [BigInt(plan.billingCycleDays)],
+        billingNonce
+      );
+
       // Build subscribe instruction
       const instruction = await buildSubscribeInstruction({
         user: wallet.publicKey,
         plan,
         subscriptionIndex,
+        encryptedPlan: [encryptedPlanPart1, encryptedPlanPart2],
+        encryptedPlanNonce: bytesToU128(planNonce),
+        encryptedPrice,
+        encryptedPriceNonce: bytesToU128(priceNonce),
+        encryptedBillingCycle,
+        encryptedBillingCycleNonce: bytesToU128(billingNonce),
         computationOffset,
-        arciumClient,
+        clusterOffset: this.clusterOffset,
         programId: this.programId,
       });
 
@@ -334,7 +427,6 @@ export class SublySDK {
     options: TransactionOptions = {}
   ): Promise<TransactionSignature> {
     try {
-      const arciumClient = await this.getArciumClient();
       const computationOffset = await getNextComputationOffset();
 
       // Verify subscription exists
@@ -357,7 +449,7 @@ export class SublySDK {
         user: wallet.publicKey,
         subscriptionIndex,
         computationOffset,
-        arciumClient,
+        clusterOffset: this.clusterOffset,
         programId: this.programId,
       });
 
@@ -392,29 +484,30 @@ export class SublySDK {
 
   /**
    * Get the next subscription index for a user
-   * (scans existing subscriptions to find the next available index)
+   * (decrypts encrypted_subscription_count from the user's ledger)
    */
-  private async getNextSubscriptionIndex(user: PublicKey): Promise<BN> {
-    let index = 0;
-    while (true) {
-      const subscription = await fetchUserSubscriptionByUserAndIndex(
-        this.connection,
-        user,
-        index,
-        this.programId
-      );
-      if (!subscription) {
-        return new BN(index);
-      }
-      index++;
-      if (index > 1000) {
-        // Safety limit
-        throw new SublyError(
-          'Too many subscriptions',
-          SublyErrorCode.TransactionFailed
-        );
-      }
+  private async getNextSubscriptionIndex(wallet: Wallet, mint: PublicKey): Promise<BN> {
+    const ledger = await fetchUserLedger(
+      this.connection,
+      wallet.publicKey,
+      mint,
+      this.programId
+    );
+
+    if (!ledger) {
+      return new BN(0);
     }
+
+    const context = await this.getArciumContext(wallet);
+    const ledgerNonce = nonceToBytes(ledger.nonce);
+    const subscriptionCount = decryptValue(
+      context.cipher,
+      ledger.encryptedSubscriptionCount,
+      ledgerNonce
+    );
+
+    const nextIndex = subscriptionCount;
+    return new BN(nextIndex.toString());
   }
 
   /**

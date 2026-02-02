@@ -1,6 +1,5 @@
 import { PublicKey, TransactionInstruction } from '@solana/web3.js';
 import BN from 'bn.js';
-import { ArciumClientWrapper } from '../encryption/arcium';
 /**
  * Parameters for building a verify subscription instruction
  */
@@ -13,8 +12,8 @@ export interface BuildVerifySubscriptionParams {
     subscriptionIndex: BN | number;
     /** Computation offset for Arcium */
     computationOffset: BN;
-    /** Arcium client wrapper */
-    arciumClient: ArciumClientWrapper;
+    /** Arcium cluster offset */
+    clusterOffset?: number;
     /** Program ID (optional) */
     programId?: PublicKey;
 }

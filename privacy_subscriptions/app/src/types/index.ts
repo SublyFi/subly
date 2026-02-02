@@ -27,7 +27,7 @@ export interface Balance {
 /**
  * Subscription status
  */
-export type SubscriptionStatus = "active" | "cancelled" | "expired";
+export type SubscriptionStatus = "active" | "cancelled" | "expired" | "unknown";
 
 /**
  * User subscription information
@@ -35,10 +35,12 @@ export type SubscriptionStatus = "active" | "cancelled" | "expired";
 export interface UserSubscription {
   // Public key of the subscription account
   publicKey: PublicKey;
+  // Subscription index (unique per user)
+  subscriptionIndex: bigint;
   // Merchant public key
   merchant: PublicKey;
   // Plan public key
-  plan: PublicKey;
+  plan: PublicKey | null;
   // Encrypted plan name (decrypted for owner)
   planName: string | null;
   // Subscription status

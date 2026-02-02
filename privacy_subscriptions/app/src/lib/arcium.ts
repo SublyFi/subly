@@ -154,31 +154,90 @@ export function encryptAmount(
 }
 
 /**
- * Decrypt a balance using the Arcium cipher
+ * Decrypt one or more values using the Arcium cipher
+ */
+export function decryptValues(
+  cipher: RescueCipher,
+  encryptedValues: Array<number[] | Uint8Array>,
+  nonce: Uint8Array
+): bigint[] {
+  const ciphertexts = encryptedValues.map((value) =>
+    Array.isArray(value) ? value : Array.from(value)
+  );
+  return cipher.decrypt(ciphertexts, nonce);
+}
+
+/**
+ * Decrypt a single value using the Arcium cipher
+ */
+export function decryptValue(
+  cipher: RescueCipher,
+  encryptedValue: number[] | Uint8Array,
+  nonce: Uint8Array
+): bigint {
+  return decryptValues(cipher, [encryptedValue], nonce)[0];
+}
+
+/**
+ * Decrypt a balance (alias for decryptValue)
  */
 export function decryptBalance(
   cipher: RescueCipher,
   encryptedBalance: number[] | Uint8Array,
   nonce: Uint8Array
 ): bigint {
-  const encryptedArray = Array.isArray(encryptedBalance)
-    ? encryptedBalance
-    : Array.from(encryptedBalance);
-  const [decrypted] = cipher.decrypt([encryptedArray], nonce);
-  return decrypted;
+  return decryptValue(cipher, encryptedBalance, nonce);
+}
+
+/**
+ * Split a PublicKey into two u128 values (little-endian)
+ */
+export function pubkeyToU128s(pubkey: PublicKey): [bigint, bigint] {
+  const bytes = pubkey.toBytes();
+  const toU128 = (slice: Uint8Array): bigint => {
+    let out = BigInt(0);
+    for (let i = 0; i < slice.length; i++) {
+      out |= BigInt(slice[i]) << BigInt(8 * i);
+    }
+    return out;
+  };
+  const first = toU128(bytes.slice(0, 16));
+  const second = toU128(bytes.slice(16, 32));
+  return [first, second];
+}
+
+/**
+ * Combine two u128 values into a PublicKey (little-endian)
+ */
+export function u128sToPubkey(parts: [bigint, bigint]): PublicKey {
+  const toBytes = (value: bigint): Uint8Array => {
+    const out = new Uint8Array(16);
+    let v = value;
+    for (let i = 0; i < 16; i++) {
+      out[i] = Number(v & BigInt(0xff));
+      v >>= BigInt(8);
+    }
+    return out;
+  };
+  const first = toBytes(parts[0]);
+  const second = toBytes(parts[1]);
+  const bytes = new Uint8Array(32);
+  bytes.set(first, 0);
+  bytes.set(second, 16);
+  return new PublicKey(bytes);
 }
 
 /**
  * Mapping from numeric offset to computation definition name
  */
 const COMP_DEF_NAMES: Record<number, string> = {
-  0: "deposit",
-  1: "withdraw",
-  2: "subscribe",
-  3: "unsubscribe",
-  4: "process_payment",
-  5: "verify_subscription",
-  6: "claim_revenue",
+  1894255896: "deposit_v2",
+  2549376853: "withdraw_v2",
+  524592853: "subscribe_v2",
+  3264881130: "unsubscribe_v2",
+  930732409: "process_payment_v2",
+  1451574225: "verify_subscription_v2",
+  2315398764: "claim_revenue_v2",
 };
 
 /**

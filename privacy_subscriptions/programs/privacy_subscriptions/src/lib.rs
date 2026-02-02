@@ -4,7 +4,7 @@ use arcium_anchor::prelude::*;
 use arcium_client::idl::arcium::types::{CallbackAccount, CircuitSource, OffChainCircuitSource};
 use arcium_macros::circuit_hash;
 
-declare_id!("8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2");
+declare_id!("Hwmvq4rJ1P6bxHD5G6KvzteuXdMtMzpwZTT7AJb3wSa9");
 
 // ============================================================================
 // Constants
@@ -28,13 +28,38 @@ pub const MAX_BILLING_CYCLE_DAYS: u32 = 365;
 // Arcium Computation Definition Offsets
 // ============================================================================
 
-const COMP_DEF_OFFSET_DEPOSIT: u32 = comp_def_offset("deposit");
-const COMP_DEF_OFFSET_WITHDRAW: u32 = comp_def_offset("withdraw");
-const COMP_DEF_OFFSET_SUBSCRIBE: u32 = comp_def_offset("subscribe");
-const COMP_DEF_OFFSET_UNSUBSCRIBE: u32 = comp_def_offset("unsubscribe");
-const COMP_DEF_OFFSET_PROCESS_PAYMENT: u32 = comp_def_offset("process_payment");
-const COMP_DEF_OFFSET_VERIFY_SUBSCRIPTION: u32 = comp_def_offset("verify_subscription");
-const COMP_DEF_OFFSET_CLAIM_REVENUE: u32 = comp_def_offset("claim_revenue");
+const COMP_DEF_OFFSET_DEPOSIT: u32 = comp_def_offset("deposit_v2");
+const COMP_DEF_OFFSET_WITHDRAW: u32 = comp_def_offset("withdraw_v2");
+const COMP_DEF_OFFSET_SUBSCRIBE: u32 = comp_def_offset("subscribe_v2");
+const COMP_DEF_OFFSET_UNSUBSCRIBE: u32 = comp_def_offset("unsubscribe_v2");
+const COMP_DEF_OFFSET_PROCESS_PAYMENT: u32 = comp_def_offset("process_payment_v2");
+const COMP_DEF_OFFSET_VERIFY_SUBSCRIPTION: u32 = comp_def_offset("verify_subscription_v2");
+const COMP_DEF_OFFSET_CLAIM_REVENUE: u32 = comp_def_offset("claim_revenue_v2");
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+fn is_zero_pubkey(pubkey: &[u8; 32]) -> bool {
+    pubkey.iter().all(|b| *b == 0u8)
+}
+
+fn u128_from_le_bytes(bytes: &[u8]) -> u128 {
+    let mut out = 0u128;
+    let mut shift = 0u32;
+    for b in bytes {
+        out |= (*b as u128) << shift;
+        shift += 8;
+    }
+    out
+}
+
+fn pubkey_to_u128s(pubkey: &Pubkey) -> [u128; 2] {
+    let bytes = pubkey.to_bytes();
+    let first = u128_from_le_bytes(&bytes[0..16]);
+    let second = u128_from_le_bytes(&bytes[16..32]);
+    [first, second]
+}
 
 // ============================================================================
 // Program Module
@@ -81,7 +106,12 @@ pub mod privacy_subscriptions {
     pub fn register_merchant(
         ctx: Context<RegisterMerchant>,
         name: String,
+        encryption_pubkey: [u8; 32],
     ) -> Result<()> {
+        require!(
+            !is_zero_pubkey(&encryption_pubkey),
+            ErrorCode::InvalidEncryptionKey
+        );
         require!(name.len() <= MAX_NAME_LENGTH, ErrorCode::NameTooLong);
 
         let merchant = &mut ctx.accounts.merchant;
@@ -102,7 +132,9 @@ pub mod privacy_subscriptions {
         let merchant_ledger = &mut ctx.accounts.merchant_ledger;
         merchant_ledger.merchant = ctx.accounts.merchant.key();
         merchant_ledger.mint = ctx.accounts.mint.key();
-        merchant_ledger.encrypted_balance = [[0u8; 32]; 2];
+        merchant_ledger.encryption_pubkey = encryption_pubkey;
+        merchant_ledger.encrypted_balance = [0u8; 32];
+        merchant_ledger.encrypted_total_claimed = [0u8; 32];
         merchant_ledger.nonce = 0;
         merchant_ledger.bump = ctx.bumps.merchant_ledger;
 
@@ -197,8 +229,8 @@ pub mod privacy_subscriptions {
         init_comp_def(
             ctx.accounts,
             Some(CircuitSource::OffChain(OffChainCircuitSource {
-                source: "https://raw.githubusercontent.com/SublyFi/circuits/main/deposit.arcis".to_string(),
-                hash: circuit_hash!("deposit"),
+                source: "https://raw.githubusercontent.com/SublyFi/circuits/main/deposit_v2.arcis".to_string(),
+                hash: circuit_hash!("deposit_v2"),
             })),
             None,
         )?;
@@ -209,8 +241,8 @@ pub mod privacy_subscriptions {
         init_comp_def(
             ctx.accounts,
             Some(CircuitSource::OffChain(OffChainCircuitSource {
-                source: "https://raw.githubusercontent.com/SublyFi/circuits/main/withdraw.arcis".to_string(),
-                hash: circuit_hash!("withdraw"),
+                source: "https://raw.githubusercontent.com/SublyFi/circuits/main/withdraw_v2.arcis".to_string(),
+                hash: circuit_hash!("withdraw_v2"),
             })),
             None,
         )?;
@@ -221,8 +253,8 @@ pub mod privacy_subscriptions {
         init_comp_def(
             ctx.accounts,
             Some(CircuitSource::OffChain(OffChainCircuitSource {
-                source: "https://raw.githubusercontent.com/SublyFi/circuits/main/subscribe.arcis".to_string(),
-                hash: circuit_hash!("subscribe"),
+                source: "https://raw.githubusercontent.com/SublyFi/circuits/main/subscribe_v2.arcis".to_string(),
+                hash: circuit_hash!("subscribe_v2"),
             })),
             None,
         )?;
@@ -233,8 +265,8 @@ pub mod privacy_subscriptions {
         init_comp_def(
             ctx.accounts,
             Some(CircuitSource::OffChain(OffChainCircuitSource {
-                source: "https://raw.githubusercontent.com/SublyFi/circuits/main/unsubscribe.arcis".to_string(),
-                hash: circuit_hash!("unsubscribe"),
+                source: "https://raw.githubusercontent.com/SublyFi/circuits/main/unsubscribe_v2.arcis".to_string(),
+                hash: circuit_hash!("unsubscribe_v2"),
             })),
             None,
         )?;
@@ -245,8 +277,8 @@ pub mod privacy_subscriptions {
         init_comp_def(
             ctx.accounts,
             Some(CircuitSource::OffChain(OffChainCircuitSource {
-                source: "https://raw.githubusercontent.com/SublyFi/circuits/main/process_payment.arcis".to_string(),
-                hash: circuit_hash!("process_payment"),
+                source: "https://raw.githubusercontent.com/SublyFi/circuits/main/process_payment_v2.arcis".to_string(),
+                hash: circuit_hash!("process_payment_v2"),
             })),
             None,
         )?;
@@ -257,8 +289,8 @@ pub mod privacy_subscriptions {
         init_comp_def(
             ctx.accounts,
             Some(CircuitSource::OffChain(OffChainCircuitSource {
-                source: "https://raw.githubusercontent.com/SublyFi/circuits/main/verify_subscription.arcis".to_string(),
-                hash: circuit_hash!("verify_subscription"),
+                source: "https://raw.githubusercontent.com/SublyFi/circuits/main/verify_subscription_v2.arcis".to_string(),
+                hash: circuit_hash!("verify_subscription_v2"),
             })),
             None,
         )?;
@@ -269,8 +301,8 @@ pub mod privacy_subscriptions {
         init_comp_def(
             ctx.accounts,
             Some(CircuitSource::OffChain(OffChainCircuitSource {
-                source: "https://raw.githubusercontent.com/SublyFi/circuits/main/claim_revenue.arcis".to_string(),
-                hash: circuit_hash!("claim_revenue"),
+                source: "https://raw.githubusercontent.com/SublyFi/circuits/main/claim_revenue_v2.arcis".to_string(),
+                hash: circuit_hash!("claim_revenue_v2"),
             })),
             None,
         )?;
@@ -286,10 +318,15 @@ pub mod privacy_subscriptions {
         ctx: Context<Deposit>,
         computation_offset: u64,
         amount: u64,
+        encryption_pubkey: [u8; 32],
         encrypted_amount: [u8; 32],
-        pubkey: [u8; 32],
-        nonce: u128,
+        encrypted_amount_nonce: u128,
     ) -> Result<()> {
+        require!(
+            !is_zero_pubkey(&encryption_pubkey),
+            ErrorCode::InvalidEncryptionKey
+        );
+        require!(amount > 0, ErrorCode::InvalidAmount);
         ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
 
         // Transfer tokens from user to pool
@@ -308,29 +345,42 @@ pub mod privacy_subscriptions {
         if user_ledger.user == Pubkey::default() {
             user_ledger.user = ctx.accounts.user.key();
             user_ledger.mint = ctx.accounts.mint.key();
-            user_ledger.encrypted_balance = [[0u8; 32]; 2];
+            user_ledger.encryption_pubkey = encryption_pubkey;
+            user_ledger.encrypted_balance = [0u8; 32];
+            user_ledger.encrypted_subscription_count = [0u8; 32];
             user_ledger.nonce = 0;
             user_ledger.bump = ctx.bumps.user_ledger;
+        } else {
+            require!(
+                user_ledger.encryption_pubkey == encryption_pubkey,
+                ErrorCode::EncryptionKeyMismatch
+            );
         }
         user_ledger.last_updated = Clock::get()?.unix_timestamp;
 
+        let user_is_new = user_ledger.nonce == 0;
+
         // Queue computation to Arcium
-        // ArgBuilder order must match Arcis circuit's DepositInput struct:
-        //   1. current_balance (encrypted)
-        //   2. deposit_amount (encrypted)
+        // ArgBuilder order must match Arcis circuit's deposit parameters:
+        //   1. user_ledger (Enc<Shared, UserLedgerState>)
+        //   2. amount (Enc<Shared, u64>)
+        //   3. is_new (plaintext)
         let args = ArgBuilder::new()
-            .x25519_pubkey(pubkey)
-            .plaintext_u128(nonce)
-            .encrypted_u64(user_ledger.encrypted_balance[0])  // current_balance
-            .encrypted_u64(encrypted_amount)                   // deposit_amount
+            .x25519_pubkey(user_ledger.encryption_pubkey)
+            .plaintext_u128(user_ledger.nonce)
+            .encrypted_u64(user_ledger.encrypted_balance)               // balance
+            .encrypted_u64(user_ledger.encrypted_subscription_count)    // subscription_count
+            .x25519_pubkey(user_ledger.encryption_pubkey)
+            .plaintext_u128(encrypted_amount_nonce)
+            .encrypted_u64(encrypted_amount)                            // amount
+            .plaintext_bool(user_is_new)                                // is_new
             .build();
 
         queue_computation(
             ctx.accounts,
             computation_offset,
             args,
-            None,
-            vec![DepositCallback::callback_ix(
+            vec![DepositV2Callback::callback_ix(
                 computation_offset,
                 &ctx.accounts.mxe_account,
                 &[CallbackAccount {
@@ -349,31 +399,39 @@ pub mod privacy_subscriptions {
     pub fn withdraw(
         ctx: Context<Withdraw>,
         computation_offset: u64,
-        encrypted_amount: [u8; 32],
-        pubkey: [u8; 32],
-        nonce: u128,
+        amount: u64,
+        encryption_pubkey: [u8; 32],
     ) -> Result<()> {
+        require!(amount > 0, ErrorCode::InvalidAmount);
         ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
 
         let user_ledger = &mut ctx.accounts.user_ledger;
+        require!(
+            user_ledger.encryption_pubkey == encryption_pubkey,
+            ErrorCode::EncryptionKeyMismatch
+        );
         user_ledger.last_updated = Clock::get()?.unix_timestamp;
 
-        // ArgBuilder order must match Arcis circuit's WithdrawInput struct:
-        //   1. current_balance (encrypted)
-        //   2. withdraw_amount (encrypted)
+        let user_is_new = user_ledger.nonce == 0;
+
+        // ArgBuilder order must match Arcis circuit's withdraw parameters:
+        //   1. user_ledger (Enc<Shared, UserLedgerState>)
+        //   2. amount (plaintext)
+        //   3. is_new (plaintext)
         let args = ArgBuilder::new()
-            .x25519_pubkey(pubkey)
-            .plaintext_u128(nonce)
-            .encrypted_u64(user_ledger.encrypted_balance[0])  // current_balance
-            .encrypted_u64(encrypted_amount)                   // withdraw_amount
+            .x25519_pubkey(user_ledger.encryption_pubkey)
+            .plaintext_u128(user_ledger.nonce)
+            .encrypted_u64(user_ledger.encrypted_balance)               // balance
+            .encrypted_u64(user_ledger.encrypted_subscription_count)    // subscription_count
+            .plaintext_u64(amount)                                      // amount
+            .plaintext_bool(user_is_new)                                // is_new
             .build();
 
         queue_computation(
             ctx.accounts,
             computation_offset,
             args,
-            None,
-            vec![WithdrawCallback::callback_ix(
+            vec![WithdrawV2Callback::callback_ix(
                 computation_offset,
                 &ctx.accounts.mxe_account,
                 &[
@@ -407,20 +465,33 @@ pub mod privacy_subscriptions {
         ctx: Context<Subscribe>,
         computation_offset: u64,
         subscription_index: u64,
+        encrypted_plan: [[u8; 32]; 2],
+        encrypted_plan_nonce: u128,
         encrypted_price: [u8; 32],
-        pubkey: [u8; 32],
-        nonce: u128,
+        encrypted_price_nonce: u128,
+        encrypted_billing_cycle: [u8; 32],
+        encrypted_billing_cycle_nonce: u128,
     ) -> Result<()> {
         require!(ctx.accounts.subscription_plan.is_active, ErrorCode::PlanNotActive);
+        require!(
+            !is_zero_pubkey(&ctx.accounts.user_ledger.encryption_pubkey),
+            ErrorCode::InvalidEncryptionKey
+        );
+        require!(
+            !is_zero_pubkey(&ctx.accounts.merchant_ledger.encryption_pubkey),
+            ErrorCode::InvalidEncryptionKey
+        );
         ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
 
         // Initialize user subscription PDA
         let user_subscription = &mut ctx.accounts.user_subscription;
         user_subscription.user = ctx.accounts.user.key();
         user_subscription.subscription_index = subscription_index;
-        user_subscription.plan = ctx.accounts.subscription_plan.key();
+        user_subscription.encryption_pubkey = ctx.accounts.user_ledger.encryption_pubkey;
+        user_subscription.encrypted_plan = [[0u8; 32]; 2];
         user_subscription.encrypted_status = [0u8; 32];
         user_subscription.encrypted_next_payment_date = [0u8; 32];
+        user_subscription.encrypted_start_date = [0u8; 32];
         user_subscription.nonce = 0;
         user_subscription.bump = ctx.bumps.user_subscription;
 
@@ -429,29 +500,58 @@ pub mod privacy_subscriptions {
 
         let current_timestamp = Clock::get()?.unix_timestamp;
         let billing_cycle_days = ctx.accounts.subscription_plan.billing_cycle_days;
+        let price = ctx.accounts.subscription_plan.price;
 
-        // ArgBuilder order must match Arcis circuit's SubscribeInput struct:
-        //   1. user_balance (encrypted)
-        //   2. merchant_balance (encrypted)
-        //   3. price (encrypted)
-        //   4. current_timestamp (plaintext)
-        //   5. billing_cycle_days (plaintext)
+        let user_is_new = user_ledger.nonce == 0;
+        let merchant_is_new = ctx.accounts.merchant_ledger.nonce == 0;
+
+        let plan_bytes = pubkey_to_u128s(&ctx.accounts.subscription_plan.key());
+
+        // ArgBuilder order must match Arcis circuit's subscribe parameters:
+        //   1. user_ledger (Enc<Shared, UserLedgerState>)
+        //   2. merchant_ledger (Enc<Shared, MerchantLedgerState>)
+        //   3. plan (Enc<Shared, [u128; 2]>)
+        //   4. price (Enc<Shared, u64>)
+        //   5. billing_cycle_days (Enc<Shared, u32>)
+        //   6. current_timestamp (plaintext)
+        //   7. plan_pubkey (plaintext [u128; 2])
+        //   8. plan_price (plaintext)
+        //   9. plan_billing_cycle_days (plaintext)
+        //  10. user_is_new (plaintext)
+        //  11. merchant_is_new (plaintext)
         let args = ArgBuilder::new()
-            .x25519_pubkey(pubkey)
-            .plaintext_u128(nonce)
-            .encrypted_u64(user_ledger.encrypted_balance[0])                   // user_balance
-            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance[0])  // merchant_balance
+            .x25519_pubkey(user_ledger.encryption_pubkey)
+            .plaintext_u128(user_ledger.nonce)
+            .encrypted_u64(user_ledger.encrypted_balance)                       // user_balance
+            .encrypted_u64(user_ledger.encrypted_subscription_count)            // subscription_count
+            .x25519_pubkey(ctx.accounts.merchant_ledger.encryption_pubkey)
+            .plaintext_u128(ctx.accounts.merchant_ledger.nonce)
+            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance)      // merchant_balance
+            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_total_claimed)// total_claimed
+            .x25519_pubkey(user_ledger.encryption_pubkey)
+            .plaintext_u128(encrypted_plan_nonce)
+            .encrypted_u128(encrypted_plan[0])                                  // plan_part1
+            .encrypted_u128(encrypted_plan[1])                                  // plan_part2
+            .x25519_pubkey(user_ledger.encryption_pubkey)
+            .plaintext_u128(encrypted_price_nonce)
             .encrypted_u64(encrypted_price)                                     // price
+            .x25519_pubkey(user_ledger.encryption_pubkey)
+            .plaintext_u128(encrypted_billing_cycle_nonce)
+            .encrypted_u32(encrypted_billing_cycle)                             // billing_cycle_days
             .plaintext_i64(current_timestamp)                                   // current_timestamp
-            .plaintext_u32(billing_cycle_days)                                  // billing_cycle_days
+            .plaintext_u128(plan_bytes[0])                                      // plan_pubkey_part1
+            .plaintext_u128(plan_bytes[1])                                      // plan_pubkey_part2
+            .plaintext_u64(price)                                               // plan_price
+            .plaintext_u32(billing_cycle_days)                                  // plan_billing_cycle_days
+            .plaintext_bool(user_is_new)                                        // user_is_new
+            .plaintext_bool(merchant_is_new)                                    // merchant_is_new
             .build();
 
         queue_computation(
             ctx.accounts,
             computation_offset,
             args,
-            None,
-            vec![SubscribeCallback::callback_ix(
+            vec![SubscribeV2Callback::callback_ix(
                 computation_offset,
                 &ctx.accounts.mxe_account,
                 &[
@@ -480,25 +580,30 @@ pub mod privacy_subscriptions {
     pub fn unsubscribe(
         ctx: Context<Unsubscribe>,
         computation_offset: u64,
-        pubkey: [u8; 32],
-        nonce: u128,
     ) -> Result<()> {
         ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
+        require!(
+            !is_zero_pubkey(&ctx.accounts.user_subscription.encryption_pubkey),
+            ErrorCode::InvalidEncryptionKey
+        );
 
-        // ArgBuilder order must match Arcis circuit's UnsubscribeInput struct:
-        //   1. current_status (encrypted)
+        // ArgBuilder order must match Arcis circuit's unsubscribe parameters:
+        //   1. subscription (Enc<Shared, UserSubscriptionState>)
         let args = ArgBuilder::new()
-            .x25519_pubkey(pubkey)
-            .plaintext_u128(nonce)
-            .encrypted_u8(ctx.accounts.user_subscription.encrypted_status)  // current_status
+            .x25519_pubkey(ctx.accounts.user_subscription.encryption_pubkey)
+            .plaintext_u128(ctx.accounts.user_subscription.nonce)
+            .encrypted_u128(ctx.accounts.user_subscription.encrypted_plan[0])
+            .encrypted_u128(ctx.accounts.user_subscription.encrypted_plan[1])
+            .encrypted_u8(ctx.accounts.user_subscription.encrypted_status)
+            .encrypted_i64(ctx.accounts.user_subscription.encrypted_next_payment_date)
+            .encrypted_i64(ctx.accounts.user_subscription.encrypted_start_date)
             .build();
 
         queue_computation(
             ctx.accounts,
             computation_offset,
             args,
-            None,
-            vec![UnsubscribeCallback::callback_ix(
+            vec![UnsubscribeV2Callback::callback_ix(
                 computation_offset,
                 &ctx.accounts.mxe_account,
                 &[CallbackAccount {
@@ -517,41 +622,73 @@ pub mod privacy_subscriptions {
     pub fn process_payment(
         ctx: Context<ProcessPayment>,
         computation_offset: u64,
-        pubkey: [u8; 32],
-        nonce: u128,
     ) -> Result<()> {
         ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
+        require!(
+            !is_zero_pubkey(&ctx.accounts.user_ledger.encryption_pubkey),
+            ErrorCode::InvalidEncryptionKey
+        );
+        require!(
+            !is_zero_pubkey(&ctx.accounts.merchant_ledger.encryption_pubkey),
+            ErrorCode::InvalidEncryptionKey
+        );
+        require!(
+            !is_zero_pubkey(&ctx.accounts.user_subscription.encryption_pubkey),
+            ErrorCode::InvalidEncryptionKey
+        );
+        require!(
+            ctx.accounts.user_subscription.encryption_pubkey
+                == ctx.accounts.user_ledger.encryption_pubkey,
+            ErrorCode::EncryptionKeyMismatch
+        );
 
         let current_timestamp = Clock::get()?.unix_timestamp;
         let plan_price = ctx.accounts.subscription_plan.price;
         let billing_cycle_days = ctx.accounts.subscription_plan.billing_cycle_days;
+        let plan_bytes = pubkey_to_u128s(&ctx.accounts.subscription_plan.key());
+        let user_is_new = ctx.accounts.user_ledger.nonce == 0;
+        let merchant_is_new = ctx.accounts.merchant_ledger.nonce == 0;
 
-        // ArgBuilder order must match Arcis circuit's ProcessPaymentInput struct:
-        //   1. user_balance (encrypted)
-        //   2. merchant_balance (encrypted)
-        //   3. subscription_status (encrypted)
-        //   4. next_payment_date (encrypted)
-        //   5. current_timestamp (plaintext)
-        //   6. plan_price (plaintext)
-        //   7. billing_cycle_days (plaintext)
+        // ArgBuilder order must match Arcis circuit's process_payment parameters:
+        //   1. user_ledger (Enc<Shared, UserLedgerState>)
+        //   2. merchant_ledger (Enc<Shared, MerchantLedgerState>)
+        //   3. subscription (Enc<Shared, UserSubscriptionState>)
+        //   4. current_timestamp (plaintext)
+        //   5. plan_price (plaintext)
+        //   6. billing_cycle_days (plaintext)
+        //   7. plan_pubkey (plaintext [u128; 2])
+        //   8. user_is_new (plaintext)
+        //   9. merchant_is_new (plaintext)
         let args = ArgBuilder::new()
-            .x25519_pubkey(pubkey)
-            .plaintext_u128(nonce)
-            .encrypted_u64(ctx.accounts.user_ledger.encrypted_balance[0])               // user_balance
-            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance[0])           // merchant_balance
-            .encrypted_u8(ctx.accounts.user_subscription.encrypted_status)              // subscription_status
-            .encrypted_i64(ctx.accounts.user_subscription.encrypted_next_payment_date)  // next_payment_date
-            .plaintext_i64(current_timestamp)                                           // current_timestamp
-            .plaintext_u64(plan_price)                                                  // plan_price
-            .plaintext_u32(billing_cycle_days)                                          // billing_cycle_days
+            .x25519_pubkey(ctx.accounts.user_ledger.encryption_pubkey)
+            .plaintext_u128(ctx.accounts.user_ledger.nonce)
+            .encrypted_u64(ctx.accounts.user_ledger.encrypted_balance)               // user_balance
+            .encrypted_u64(ctx.accounts.user_ledger.encrypted_subscription_count)    // subscription_count
+            .x25519_pubkey(ctx.accounts.merchant_ledger.encryption_pubkey)
+            .plaintext_u128(ctx.accounts.merchant_ledger.nonce)
+            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance)           // merchant_balance
+            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_total_claimed)     // total_claimed
+            .x25519_pubkey(ctx.accounts.user_subscription.encryption_pubkey)
+            .plaintext_u128(ctx.accounts.user_subscription.nonce)
+            .encrypted_u128(ctx.accounts.user_subscription.encrypted_plan[0])
+            .encrypted_u128(ctx.accounts.user_subscription.encrypted_plan[1])
+            .encrypted_u8(ctx.accounts.user_subscription.encrypted_status)
+            .encrypted_i64(ctx.accounts.user_subscription.encrypted_next_payment_date)
+            .encrypted_i64(ctx.accounts.user_subscription.encrypted_start_date)
+            .plaintext_i64(current_timestamp)                                       // current_timestamp
+            .plaintext_u64(plan_price)                                              // plan_price
+            .plaintext_u32(billing_cycle_days)                                      // billing_cycle_days
+            .plaintext_u128(plan_bytes[0])                                          // plan_pubkey_part1
+            .plaintext_u128(plan_bytes[1])                                          // plan_pubkey_part2
+            .plaintext_bool(user_is_new)                                            // user_is_new
+            .plaintext_bool(merchant_is_new)                                        // merchant_is_new
             .build();
 
         queue_computation(
             ctx.accounts,
             computation_offset,
             args,
-            None,
-            vec![ProcessPaymentCallback::callback_ix(
+            vec![ProcessPaymentV2Callback::callback_ix(
                 computation_offset,
                 &ctx.accounts.mxe_account,
                 &[
@@ -580,31 +717,34 @@ pub mod privacy_subscriptions {
     pub fn verify_subscription(
         ctx: Context<VerifySubscription>,
         computation_offset: u64,
-        pubkey: [u8; 32],
-        nonce: u128,
     ) -> Result<()> {
         ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
+        require!(
+            !is_zero_pubkey(&ctx.accounts.user_subscription.encryption_pubkey),
+            ErrorCode::InvalidEncryptionKey
+        );
 
         let current_timestamp = Clock::get()?.unix_timestamp;
 
-        // ArgBuilder order must match Arcis circuit's VerifySubscriptionInput struct:
-        //   1. subscription_status (encrypted)
-        //   2. next_payment_date (encrypted)
-        //   3. current_timestamp (plaintext)
+        // ArgBuilder order must match Arcis circuit's verify_subscription parameters:
+        //   1. subscription (Enc<Shared, UserSubscriptionState>)
+        //   2. current_timestamp (plaintext)
         let args = ArgBuilder::new()
-            .x25519_pubkey(pubkey)
-            .plaintext_u128(nonce)
-            .encrypted_u8(ctx.accounts.user_subscription.encrypted_status)              // subscription_status
-            .encrypted_i64(ctx.accounts.user_subscription.encrypted_next_payment_date)  // next_payment_date
-            .plaintext_i64(current_timestamp)                                           // current_timestamp
+            .x25519_pubkey(ctx.accounts.user_subscription.encryption_pubkey)
+            .plaintext_u128(ctx.accounts.user_subscription.nonce)
+            .encrypted_u128(ctx.accounts.user_subscription.encrypted_plan[0])
+            .encrypted_u128(ctx.accounts.user_subscription.encrypted_plan[1])
+            .encrypted_u8(ctx.accounts.user_subscription.encrypted_status)
+            .encrypted_i64(ctx.accounts.user_subscription.encrypted_next_payment_date)
+            .encrypted_i64(ctx.accounts.user_subscription.encrypted_start_date)
+            .plaintext_i64(current_timestamp)
             .build();
 
         queue_computation(
             ctx.accounts,
             computation_offset,
             args,
-            None,
-            vec![VerifySubscriptionCallback::callback_ix(
+            vec![VerifySubscriptionV2Callback::callback_ix(
                 computation_offset,
                 &ctx.accounts.mxe_account,
                 &[],
@@ -620,29 +760,36 @@ pub mod privacy_subscriptions {
     pub fn claim_revenue(
         ctx: Context<ClaimRevenue>,
         computation_offset: u64,
-        encrypted_amount: [u8; 32],
-        pubkey: [u8; 32],
-        nonce: u128,
+        amount: u64,
     ) -> Result<()> {
         require!(ctx.accounts.merchant.is_active, ErrorCode::MerchantNotActive);
+        require!(amount > 0, ErrorCode::InvalidAmount);
+        require!(
+            !is_zero_pubkey(&ctx.accounts.merchant_ledger.encryption_pubkey),
+            ErrorCode::InvalidEncryptionKey
+        );
         ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
 
-        // ArgBuilder order must match Arcis circuit's ClaimRevenueInput struct:
-        //   1. current_balance (encrypted)
-        //   2. claim_amount (encrypted)
+        let merchant_is_new = ctx.accounts.merchant_ledger.nonce == 0;
+
+        // ArgBuilder order must match Arcis circuit's claim_revenue parameters:
+        //   1. merchant_ledger (Enc<Shared, MerchantLedgerState>)
+        //   2. amount (plaintext)
+        //   3. is_new (plaintext)
         let args = ArgBuilder::new()
-            .x25519_pubkey(pubkey)
-            .plaintext_u128(nonce)
-            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance[0])  // current_balance
-            .encrypted_u64(encrypted_amount)                                    // claim_amount
+            .x25519_pubkey(ctx.accounts.merchant_ledger.encryption_pubkey)
+            .plaintext_u128(ctx.accounts.merchant_ledger.nonce)
+            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_balance)          // balance
+            .encrypted_u64(ctx.accounts.merchant_ledger.encrypted_total_claimed)    // total_claimed
+            .plaintext_u64(amount)                                                  // amount
+            .plaintext_bool(merchant_is_new)                                        // is_new
             .build();
 
         queue_computation(
             ctx.accounts,
             computation_offset,
             args,
-            None,
-            vec![ClaimRevenueCallback::callback_ix(
+            vec![ClaimRevenueV2Callback::callback_ix(
                 computation_offset,
                 &ctx.accounts.mxe_account,
                 &[
@@ -675,143 +822,226 @@ pub mod privacy_subscriptions {
     // Phase 2: Encrypted Instructions - Callback Phase
     // ========================================================================
 
-    #[arcium_callback(encrypted_ix = "deposit")]
-    pub fn deposit_callback(
-        ctx: Context<DepositCallback>,
-        output: SignedComputationOutputs<DepositOutput>,
+    const SHARED_ENCRYPTED_BASE_SIZE: usize = 32 + 16;
+    const SHARED_ENCRYPTED_SIZE_2: usize = SHARED_ENCRYPTED_BASE_SIZE + (32 * 2);
+    const SHARED_ENCRYPTED_SIZE_5: usize = SHARED_ENCRYPTED_BASE_SIZE + (32 * 5);
+
+    #[derive(AnchorSerialize, AnchorDeserialize)]
+    pub struct WithdrawResult {
+        pub field_0: SharedEncryptedStruct<2>,
+        pub field_1: u64,
+    }
+
+    impl HasSize for WithdrawResult {
+        const SIZE: usize = SHARED_ENCRYPTED_SIZE_2 + 8;
+    }
+
+    #[derive(AnchorSerialize, AnchorDeserialize)]
+    pub struct ClaimRevenueResult {
+        pub field_0: SharedEncryptedStruct<2>,
+        pub field_1: u64,
+    }
+
+    impl HasSize for ClaimRevenueResult {
+        const SIZE: usize = SHARED_ENCRYPTED_SIZE_2 + 8;
+    }
+
+    #[derive(AnchorSerialize, AnchorDeserialize)]
+    pub struct SubscribeResult {
+        pub field_0: SharedEncryptedStruct<2>,
+        pub field_1: SharedEncryptedStruct<2>,
+        pub field_2: SharedEncryptedStruct<5>,
+    }
+
+    impl HasSize for SubscribeResult {
+        const SIZE: usize = (SHARED_ENCRYPTED_SIZE_2 * 2) + SHARED_ENCRYPTED_SIZE_5;
+    }
+
+    #[derive(AnchorSerialize, AnchorDeserialize)]
+    pub struct ProcessPaymentResult {
+        pub field_0: SharedEncryptedStruct<2>,
+        pub field_1: SharedEncryptedStruct<2>,
+        pub field_2: SharedEncryptedStruct<5>,
+    }
+
+    impl HasSize for ProcessPaymentResult {
+        const SIZE: usize = (SHARED_ENCRYPTED_SIZE_2 * 2) + SHARED_ENCRYPTED_SIZE_5;
+    }
+
+    #[arcium_callback(encrypted_ix = "deposit_v2")]
+    pub fn deposit_v2_callback(
+        ctx: Context<DepositV2Callback>,
+        output: SignedComputationOutputs<DepositV2Output>,
     ) -> Result<()> {
         let o = match output.verify_output(
             &ctx.accounts.cluster_account,
             &ctx.accounts.computation_account,
         ) {
-            Ok(DepositOutput { field_0 }) => field_0,
+            Ok(DepositV2Output { field_0 }) => field_0,
             Err(_) => return Err(ErrorCode::AbortedComputation.into()),
         };
 
         let user_ledger = &mut ctx.accounts.user_ledger;
-        user_ledger.encrypted_balance[0] = o.ciphertexts[0];
+        user_ledger.encrypted_balance = o.ciphertexts[0];
+        user_ledger.encrypted_subscription_count = o.ciphertexts[1];
         user_ledger.nonce = o.nonce;
 
         Ok(())
     }
 
-    #[arcium_callback(encrypted_ix = "withdraw")]
-    pub fn withdraw_callback(
-        ctx: Context<WithdrawCallback>,
-        output: SignedComputationOutputs<WithdrawOutput>,
+    #[arcium_callback(encrypted_ix = "withdraw_v2", auto_serialize = false)]
+    pub fn withdraw_v2_callback(
+        ctx: Context<WithdrawV2Callback>,
+        output: SignedComputationOutputs<WithdrawResult>,
     ) -> Result<()> {
-        let o = match output.verify_output(
+        let WithdrawResult { field_0: o, field_1: actual_amount } = match output.verify_output(
             &ctx.accounts.cluster_account,
             &ctx.accounts.computation_account,
         ) {
-            Ok(WithdrawOutput { field_0 }) => field_0,
+            Ok(result) => result,
             Err(_) => return Err(ErrorCode::AbortedComputation.into()),
         };
 
         // Update user ledger with new encrypted balance
         let user_ledger = &mut ctx.accounts.user_ledger;
-        // o contains (new_balance, actual_amount, success) as ciphertexts
-        user_ledger.encrypted_balance[0] = o.ciphertexts[0];
+        user_ledger.encrypted_balance = o.ciphertexts[0];
+        user_ledger.encrypted_subscription_count = o.ciphertexts[1];
         user_ledger.nonce = o.nonce;
 
-        // Note: actual token transfer would need to be handled differently
-        // as the amount is revealed by the MPC. For now, the amount is encrypted
-        // in the output and we trust the MPC computation result.
+        // Transfer actual amount from pool to user if approved by MPC
+        if actual_amount > 0 {
+            let protocol_pool = &ctx.accounts.protocol_pool;
+            let signer_seeds: &[&[u8]] = &[
+                PROTOCOL_POOL_SEED,
+                protocol_pool.mint.as_ref(),
+                &[protocol_pool.bump],
+            ];
+            let signer = &[signer_seeds];
+
+            let cpi_ctx = CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                anchor_spl::token::Transfer {
+                    from: ctx.accounts.pool_token_account.to_account_info(),
+                    to: ctx.accounts.user_token_account.to_account_info(),
+                    authority: ctx.accounts.protocol_pool.to_account_info(),
+                },
+                signer,
+            );
+            anchor_spl::token::transfer(cpi_ctx, actual_amount)?;
+        }
 
         Ok(())
     }
 
-    #[arcium_callback(encrypted_ix = "subscribe")]
-    pub fn subscribe_callback(
-        ctx: Context<SubscribeCallback>,
-        output: SignedComputationOutputs<SubscribeOutput>,
+    #[arcium_callback(encrypted_ix = "subscribe_v2", auto_serialize = false)]
+    pub fn subscribe_v2_callback(
+        ctx: Context<SubscribeV2Callback>,
+        output: SignedComputationOutputs<SubscribeResult>,
     ) -> Result<()> {
-        let o = match output.verify_output(
+        let SubscribeResult { field_0: user_out, field_1: merchant_out, field_2: sub_out } = match output.verify_output(
             &ctx.accounts.cluster_account,
             &ctx.accounts.computation_account,
         ) {
-            Ok(SubscribeOutput { field_0 }) => field_0,
+            Ok(result) => result,
             Err(_) => return Err(ErrorCode::AbortedComputation.into()),
         };
 
         // Update user ledger
         let user_ledger = &mut ctx.accounts.user_ledger;
-        user_ledger.encrypted_balance[0] = o.ciphertexts[0];
-        user_ledger.nonce = o.nonce;
+        user_ledger.encrypted_balance = user_out.ciphertexts[0];
+        user_ledger.encrypted_subscription_count = user_out.ciphertexts[1];
+        user_ledger.nonce = user_out.nonce;
 
         // Update merchant ledger
         let merchant_ledger = &mut ctx.accounts.merchant_ledger;
-        merchant_ledger.encrypted_balance[0] = o.ciphertexts[1];
+        merchant_ledger.encrypted_balance = merchant_out.ciphertexts[0];
+        merchant_ledger.encrypted_total_claimed = merchant_out.ciphertexts[1];
+        merchant_ledger.nonce = merchant_out.nonce;
 
         // Update user subscription
         let user_subscription = &mut ctx.accounts.user_subscription;
-        user_subscription.encrypted_status = o.ciphertexts[2];
-        user_subscription.encrypted_next_payment_date = o.ciphertexts[3];
+        user_subscription.encrypted_plan[0] = sub_out.ciphertexts[0];
+        user_subscription.encrypted_plan[1] = sub_out.ciphertexts[1];
+        user_subscription.encrypted_status = sub_out.ciphertexts[2];
+        user_subscription.encrypted_next_payment_date = sub_out.ciphertexts[3];
+        user_subscription.encrypted_start_date = sub_out.ciphertexts[4];
+        user_subscription.nonce = sub_out.nonce;
 
         Ok(())
     }
 
-    #[arcium_callback(encrypted_ix = "unsubscribe")]
-    pub fn unsubscribe_callback(
-        ctx: Context<UnsubscribeCallback>,
-        output: SignedComputationOutputs<UnsubscribeOutput>,
+    #[arcium_callback(encrypted_ix = "unsubscribe_v2")]
+    pub fn unsubscribe_v2_callback(
+        ctx: Context<UnsubscribeV2Callback>,
+        output: SignedComputationOutputs<UnsubscribeV2Output>,
     ) -> Result<()> {
         let o = match output.verify_output(
             &ctx.accounts.cluster_account,
             &ctx.accounts.computation_account,
         ) {
-            Ok(UnsubscribeOutput { field_0 }) => field_0,
+            Ok(UnsubscribeV2Output { field_0 }) => field_0,
             Err(_) => return Err(ErrorCode::AbortedComputation.into()),
         };
 
         let user_subscription = &mut ctx.accounts.user_subscription;
-        user_subscription.encrypted_status = o.ciphertexts[0];
+        user_subscription.encrypted_plan[0] = o.ciphertexts[0];
+        user_subscription.encrypted_plan[1] = o.ciphertexts[1];
+        user_subscription.encrypted_status = o.ciphertexts[2];
+        user_subscription.encrypted_next_payment_date = o.ciphertexts[3];
+        user_subscription.encrypted_start_date = o.ciphertexts[4];
         user_subscription.nonce = o.nonce;
 
         Ok(())
     }
 
-    #[arcium_callback(encrypted_ix = "process_payment")]
-    pub fn process_payment_callback(
-        ctx: Context<ProcessPaymentCallback>,
-        output: SignedComputationOutputs<ProcessPaymentOutput>,
+    #[arcium_callback(encrypted_ix = "process_payment_v2", auto_serialize = false)]
+    pub fn process_payment_v2_callback(
+        ctx: Context<ProcessPaymentV2Callback>,
+        output: SignedComputationOutputs<ProcessPaymentResult>,
     ) -> Result<()> {
-        let o = match output.verify_output(
+        let ProcessPaymentResult { field_0: user_out, field_1: merchant_out, field_2: sub_out } = match output.verify_output(
             &ctx.accounts.cluster_account,
             &ctx.accounts.computation_account,
         ) {
-            Ok(ProcessPaymentOutput { field_0 }) => field_0,
+            Ok(result) => result,
             Err(_) => return Err(ErrorCode::AbortedComputation.into()),
         };
 
         // Update user ledger
         let user_ledger = &mut ctx.accounts.user_ledger;
-        user_ledger.encrypted_balance[0] = o.ciphertexts[0];
-        user_ledger.nonce = o.nonce;
+        user_ledger.encrypted_balance = user_out.ciphertexts[0];
+        user_ledger.encrypted_subscription_count = user_out.ciphertexts[1];
+        user_ledger.nonce = user_out.nonce;
 
         // Update merchant ledger
         let merchant_ledger = &mut ctx.accounts.merchant_ledger;
-        merchant_ledger.encrypted_balance[0] = o.ciphertexts[1];
+        merchant_ledger.encrypted_balance = merchant_out.ciphertexts[0];
+        merchant_ledger.encrypted_total_claimed = merchant_out.ciphertexts[1];
+        merchant_ledger.nonce = merchant_out.nonce;
 
         // Update user subscription
         let user_subscription = &mut ctx.accounts.user_subscription;
-        user_subscription.encrypted_status = o.ciphertexts[2];
-        user_subscription.encrypted_next_payment_date = o.ciphertexts[3];
+        user_subscription.encrypted_plan[0] = sub_out.ciphertexts[0];
+        user_subscription.encrypted_plan[1] = sub_out.ciphertexts[1];
+        user_subscription.encrypted_status = sub_out.ciphertexts[2];
+        user_subscription.encrypted_next_payment_date = sub_out.ciphertexts[3];
+        user_subscription.encrypted_start_date = sub_out.ciphertexts[4];
+        user_subscription.nonce = sub_out.nonce;
 
         Ok(())
     }
 
-    #[arcium_callback(encrypted_ix = "verify_subscription")]
-    pub fn verify_subscription_callback(
-        ctx: Context<VerifySubscriptionCallback>,
-        output: SignedComputationOutputs<VerifySubscriptionOutput>,
+    #[arcium_callback(encrypted_ix = "verify_subscription_v2")]
+    pub fn verify_subscription_v2_callback(
+        ctx: Context<VerifySubscriptionV2Callback>,
+        output: SignedComputationOutputs<VerifySubscriptionV2Output>,
     ) -> Result<()> {
-        // VerifySubscriptionOutput.field_0 is a revealed bool (not encrypted)
+        // VerifySubscriptionV2Output.field_0 is a revealed bool (not encrypted)
         let o = match output.verify_output(
             &ctx.accounts.cluster_account,
             &ctx.accounts.computation_account,
         ) {
-            Ok(VerifySubscriptionOutput { field_0 }) => field_0,
+            Ok(VerifySubscriptionV2Output { field_0 }) => field_0,
             Err(_) => return Err(ErrorCode::AbortedComputation.into()),
         };
 
@@ -823,25 +1053,46 @@ pub mod privacy_subscriptions {
         Ok(())
     }
 
-    #[arcium_callback(encrypted_ix = "claim_revenue")]
-    pub fn claim_revenue_callback(
-        ctx: Context<ClaimRevenueCallback>,
-        output: SignedComputationOutputs<ClaimRevenueOutput>,
+    #[arcium_callback(encrypted_ix = "claim_revenue_v2", auto_serialize = false)]
+    pub fn claim_revenue_v2_callback(
+        ctx: Context<ClaimRevenueV2Callback>,
+        output: SignedComputationOutputs<ClaimRevenueResult>,
     ) -> Result<()> {
-        let o = match output.verify_output(
+        let ClaimRevenueResult { field_0: o, field_1: actual_amount } = match output.verify_output(
             &ctx.accounts.cluster_account,
             &ctx.accounts.computation_account,
         ) {
-            Ok(ClaimRevenueOutput { field_0 }) => field_0,
+            Ok(result) => result,
             Err(_) => return Err(ErrorCode::AbortedComputation.into()),
         };
 
         // Update merchant ledger
         let merchant_ledger = &mut ctx.accounts.merchant_ledger;
-        merchant_ledger.encrypted_balance[0] = o.ciphertexts[0];
+        merchant_ledger.encrypted_balance = o.ciphertexts[0];
+        merchant_ledger.encrypted_total_claimed = o.ciphertexts[1];
         merchant_ledger.nonce = o.nonce;
 
-        // Note: actual token transfer would be handled separately
+        // Transfer actual amount from pool to merchant if approved by MPC
+        if actual_amount > 0 {
+            let protocol_pool = &ctx.accounts.protocol_pool;
+            let signer_seeds: &[&[u8]] = &[
+                PROTOCOL_POOL_SEED,
+                protocol_pool.mint.as_ref(),
+                &[protocol_pool.bump],
+            ];
+            let signer = &[signer_seeds];
+
+            let cpi_ctx = CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                anchor_spl::token::Transfer {
+                    from: ctx.accounts.pool_token_account.to_account_info(),
+                    to: ctx.accounts.merchant_token_account.to_account_info(),
+                    authority: ctx.accounts.protocol_pool.to_account_info(),
+                },
+                signer,
+            );
+            anchor_spl::token::transfer(cpi_ctx, actual_amount)?;
+        }
 
         Ok(())
     }
@@ -913,8 +1164,12 @@ pub struct MerchantLedger {
     pub merchant: Pubkey,
     /// Token mint
     pub mint: Pubkey,
-    /// Encrypted balance (array of [u8; 32] ciphertexts)
-    pub encrypted_balance: [[u8; 32]; 2],
+    /// X25519 encryption public key (used for Enc<Shared, T>)
+    pub encryption_pubkey: [u8; 32],
+    /// Encrypted balance (Enc<Shared, u64>)
+    pub encrypted_balance: [u8; 32],
+    /// Encrypted total claimed (Enc<Shared, u64>)
+    pub encrypted_total_claimed: [u8; 32],
     /// Nonce for encryption
     pub nonce: u128,
     /// PDA bump
@@ -922,7 +1177,7 @@ pub struct MerchantLedger {
 }
 
 impl MerchantLedger {
-    pub const SIZE: usize = 8 + 32 + 32 + (32 * 2) + 16 + 1;
+    pub const SIZE: usize = 8 + 32 + 32 + 32 + 32 + 32 + 16 + 1;
 }
 
 /// Subscription plan account
@@ -961,8 +1216,12 @@ pub struct UserLedger {
     pub user: Pubkey,
     /// Token mint
     pub mint: Pubkey,
-    /// Encrypted balance (array of [u8; 32] ciphertexts)
-    pub encrypted_balance: [[u8; 32]; 2],
+    /// X25519 encryption public key (used for Enc<Shared, T>)
+    pub encryption_pubkey: [u8; 32],
+    /// Encrypted balance (Enc<Shared, u64>)
+    pub encrypted_balance: [u8; 32],
+    /// Encrypted subscription count (Enc<Shared, u64>)
+    pub encrypted_subscription_count: [u8; 32],
     /// Nonce for encryption
     pub nonce: u128,
     /// Last update timestamp
@@ -972,7 +1231,7 @@ pub struct UserLedger {
 }
 
 impl UserLedger {
-    pub const SIZE: usize = 8 + 32 + 32 + (32 * 2) + 16 + 8 + 1;
+    pub const SIZE: usize = 8 + 32 + 32 + 32 + 32 + 32 + 16 + 8 + 1;
 }
 
 /// User subscription account
@@ -983,12 +1242,16 @@ pub struct UserSubscription {
     pub user: Pubkey,
     /// Subscription index (unique per user)
     pub subscription_index: u64,
-    /// Associated plan
-    pub plan: Pubkey,
-    /// Encrypted status (0: Active, 1: Cancelled, 2: Expired)
+    /// X25519 encryption public key (used for Enc<Shared, T>)
+    pub encryption_pubkey: [u8; 32],
+    /// Encrypted plan public key (Enc<Shared, [u128; 2]>)
+    pub encrypted_plan: [[u8; 32]; 2],
+    /// Encrypted status (Enc<Shared, u8>)
     pub encrypted_status: [u8; 32],
-    /// Encrypted next payment date
+    /// Encrypted next payment date (Enc<Shared, i64>)
     pub encrypted_next_payment_date: [u8; 32],
+    /// Encrypted start date (Enc<Shared, i64>)
+    pub encrypted_start_date: [u8; 32],
     /// Nonce for encryption
     pub nonce: u128,
     /// PDA bump
@@ -996,7 +1259,7 @@ pub struct UserSubscription {
 }
 
 impl UserSubscription {
-    pub const SIZE: usize = 8 + 32 + 8 + 32 + 32 + 32 + 16 + 1;
+    pub const SIZE: usize = 8 + 32 + 8 + 32 + (32 * 2) + 32 + 32 + 32 + 16 + 1;
 }
 
 // ============================================================================
@@ -1114,7 +1377,7 @@ pub struct UpdateSubscriptionPlan<'info> {
 // Context Structures - Phase 2: Computation Definition Initialization
 // ============================================================================
 
-#[init_computation_definition_accounts("deposit", payer)]
+#[init_computation_definition_accounts("deposit_v2", payer)]
 #[derive(Accounts)]
 pub struct InitDepositCompDef<'info> {
     #[account(mut)]
@@ -1124,11 +1387,17 @@ pub struct InitDepositCompDef<'info> {
     #[account(mut)]
     /// CHECK: comp_def_account, checked by arcium program
     pub comp_def_account: UncheckedAccount<'info>,
+    #[account(mut, address = derive_mxe_lut_pda!())]
+    /// CHECK: address lookup table for the MXE program
+    pub address_lookup_table: UncheckedAccount<'info>,
+    #[account(address = ::arcium_anchor::solana_address_lookup_table_interface::program::ID)]
+    /// CHECK: address lookup table program
+    pub lut_program: UncheckedAccount<'info>,
     pub arcium_program: Program<'info, Arcium>,
     pub system_program: Program<'info, System>,
 }
 
-#[init_computation_definition_accounts("withdraw", payer)]
+#[init_computation_definition_accounts("withdraw_v2", payer)]
 #[derive(Accounts)]
 pub struct InitWithdrawCompDef<'info> {
     #[account(mut)]
@@ -1138,11 +1407,17 @@ pub struct InitWithdrawCompDef<'info> {
     #[account(mut)]
     /// CHECK: comp_def_account, checked by arcium program
     pub comp_def_account: UncheckedAccount<'info>,
+    #[account(mut, address = derive_mxe_lut_pda!())]
+    /// CHECK: address lookup table for the MXE program
+    pub address_lookup_table: UncheckedAccount<'info>,
+    #[account(address = ::arcium_anchor::solana_address_lookup_table_interface::program::ID)]
+    /// CHECK: address lookup table program
+    pub lut_program: UncheckedAccount<'info>,
     pub arcium_program: Program<'info, Arcium>,
     pub system_program: Program<'info, System>,
 }
 
-#[init_computation_definition_accounts("subscribe", payer)]
+#[init_computation_definition_accounts("subscribe_v2", payer)]
 #[derive(Accounts)]
 pub struct InitSubscribeCompDef<'info> {
     #[account(mut)]
@@ -1152,11 +1427,17 @@ pub struct InitSubscribeCompDef<'info> {
     #[account(mut)]
     /// CHECK: comp_def_account, checked by arcium program
     pub comp_def_account: UncheckedAccount<'info>,
+    #[account(mut, address = derive_mxe_lut_pda!())]
+    /// CHECK: address lookup table for the MXE program
+    pub address_lookup_table: UncheckedAccount<'info>,
+    #[account(address = ::arcium_anchor::solana_address_lookup_table_interface::program::ID)]
+    /// CHECK: address lookup table program
+    pub lut_program: UncheckedAccount<'info>,
     pub arcium_program: Program<'info, Arcium>,
     pub system_program: Program<'info, System>,
 }
 
-#[init_computation_definition_accounts("unsubscribe", payer)]
+#[init_computation_definition_accounts("unsubscribe_v2", payer)]
 #[derive(Accounts)]
 pub struct InitUnsubscribeCompDef<'info> {
     #[account(mut)]
@@ -1166,11 +1447,17 @@ pub struct InitUnsubscribeCompDef<'info> {
     #[account(mut)]
     /// CHECK: comp_def_account, checked by arcium program
     pub comp_def_account: UncheckedAccount<'info>,
+    #[account(mut, address = derive_mxe_lut_pda!())]
+    /// CHECK: address lookup table for the MXE program
+    pub address_lookup_table: UncheckedAccount<'info>,
+    #[account(address = ::arcium_anchor::solana_address_lookup_table_interface::program::ID)]
+    /// CHECK: address lookup table program
+    pub lut_program: UncheckedAccount<'info>,
     pub arcium_program: Program<'info, Arcium>,
     pub system_program: Program<'info, System>,
 }
 
-#[init_computation_definition_accounts("process_payment", payer)]
+#[init_computation_definition_accounts("process_payment_v2", payer)]
 #[derive(Accounts)]
 pub struct InitProcessPaymentCompDef<'info> {
     #[account(mut)]
@@ -1180,11 +1467,17 @@ pub struct InitProcessPaymentCompDef<'info> {
     #[account(mut)]
     /// CHECK: comp_def_account, checked by arcium program
     pub comp_def_account: UncheckedAccount<'info>,
+    #[account(mut, address = derive_mxe_lut_pda!())]
+    /// CHECK: address lookup table for the MXE program
+    pub address_lookup_table: UncheckedAccount<'info>,
+    #[account(address = ::arcium_anchor::solana_address_lookup_table_interface::program::ID)]
+    /// CHECK: address lookup table program
+    pub lut_program: UncheckedAccount<'info>,
     pub arcium_program: Program<'info, Arcium>,
     pub system_program: Program<'info, System>,
 }
 
-#[init_computation_definition_accounts("verify_subscription", payer)]
+#[init_computation_definition_accounts("verify_subscription_v2", payer)]
 #[derive(Accounts)]
 pub struct InitVerifySubscriptionCompDef<'info> {
     #[account(mut)]
@@ -1194,11 +1487,17 @@ pub struct InitVerifySubscriptionCompDef<'info> {
     #[account(mut)]
     /// CHECK: comp_def_account, checked by arcium program
     pub comp_def_account: UncheckedAccount<'info>,
+    #[account(mut, address = derive_mxe_lut_pda!())]
+    /// CHECK: address lookup table for the MXE program
+    pub address_lookup_table: UncheckedAccount<'info>,
+    #[account(address = ::arcium_anchor::solana_address_lookup_table_interface::program::ID)]
+    /// CHECK: address lookup table program
+    pub lut_program: UncheckedAccount<'info>,
     pub arcium_program: Program<'info, Arcium>,
     pub system_program: Program<'info, System>,
 }
 
-#[init_computation_definition_accounts("claim_revenue", payer)]
+#[init_computation_definition_accounts("claim_revenue_v2", payer)]
 #[derive(Accounts)]
 pub struct InitClaimRevenueCompDef<'info> {
     #[account(mut)]
@@ -1208,6 +1507,12 @@ pub struct InitClaimRevenueCompDef<'info> {
     #[account(mut)]
     /// CHECK: comp_def_account, checked by arcium program
     pub comp_def_account: UncheckedAccount<'info>,
+    #[account(mut, address = derive_mxe_lut_pda!())]
+    /// CHECK: address lookup table for the MXE program
+    pub address_lookup_table: UncheckedAccount<'info>,
+    #[account(address = ::arcium_anchor::solana_address_lookup_table_interface::program::ID)]
+    /// CHECK: address lookup table program
+    pub lut_program: UncheckedAccount<'info>,
     pub arcium_program: Program<'info, Arcium>,
     pub system_program: Program<'info, System>,
 }
@@ -1216,7 +1521,7 @@ pub struct InitClaimRevenueCompDef<'info> {
 // Context Structures - Phase 2: Queue Computation
 // ============================================================================
 
-#[queue_computation_accounts("deposit", user)]
+#[queue_computation_accounts("deposit_v2", user)]
 #[derive(Accounts)]
 #[instruction(computation_offset: u64)]
 pub struct Deposit<'info> {
@@ -1280,7 +1585,7 @@ pub struct Deposit<'info> {
     pub arcium_program: Program<'info, Arcium>,
 }
 
-#[queue_computation_accounts("withdraw", user)]
+#[queue_computation_accounts("withdraw_v2", user)]
 #[derive(Accounts)]
 #[instruction(computation_offset: u64)]
 pub struct Withdraw<'info> {
@@ -1342,7 +1647,7 @@ pub struct Withdraw<'info> {
     pub arcium_program: Program<'info, Arcium>,
 }
 
-#[queue_computation_accounts("subscribe", user)]
+#[queue_computation_accounts("subscribe_v2", user)]
 #[derive(Accounts)]
 #[instruction(computation_offset: u64, subscription_index: u64)]
 pub struct Subscribe<'info> {
@@ -1352,6 +1657,7 @@ pub struct Subscribe<'info> {
     #[account(
         seeds = [SUBSCRIPTION_PLAN_SEED, subscription_plan.merchant.as_ref(), &subscription_plan.plan_id.to_le_bytes()],
         bump = subscription_plan.bump,
+        constraint = subscription_plan.mint == mint.key() @ ErrorCode::InvalidMint,
     )]
     pub subscription_plan: Account<'info, SubscriptionPlan>,
     #[account(
@@ -1406,7 +1712,7 @@ pub struct Subscribe<'info> {
     pub arcium_program: Program<'info, Arcium>,
 }
 
-#[queue_computation_accounts("unsubscribe", user)]
+#[queue_computation_accounts("unsubscribe_v2", user)]
 #[derive(Accounts)]
 #[instruction(computation_offset: u64)]
 pub struct Unsubscribe<'info> {
@@ -1450,7 +1756,7 @@ pub struct Unsubscribe<'info> {
     pub arcium_program: Program<'info, Arcium>,
 }
 
-#[queue_computation_accounts("process_payment", payer)]
+#[queue_computation_accounts("process_payment_v2", payer)]
 #[derive(Accounts)]
 #[instruction(computation_offset: u64)]
 pub struct ProcessPayment<'info> {
@@ -1460,6 +1766,7 @@ pub struct ProcessPayment<'info> {
     #[account(
         seeds = [SUBSCRIPTION_PLAN_SEED, subscription_plan.merchant.as_ref(), &subscription_plan.plan_id.to_le_bytes()],
         bump = subscription_plan.bump,
+        constraint = subscription_plan.mint == mint.key() @ ErrorCode::InvalidMint,
     )]
     pub subscription_plan: Account<'info, SubscriptionPlan>,
     #[account(
@@ -1512,7 +1819,7 @@ pub struct ProcessPayment<'info> {
     pub arcium_program: Program<'info, Arcium>,
 }
 
-#[queue_computation_accounts("verify_subscription", payer)]
+#[queue_computation_accounts("verify_subscription_v2", payer)]
 #[derive(Accounts)]
 #[instruction(computation_offset: u64)]
 pub struct VerifySubscription<'info> {
@@ -1555,7 +1862,7 @@ pub struct VerifySubscription<'info> {
     pub arcium_program: Program<'info, Arcium>,
 }
 
-#[queue_computation_accounts("claim_revenue", wallet)]
+#[queue_computation_accounts("claim_revenue_v2", wallet)]
 #[derive(Accounts)]
 #[instruction(computation_offset: u64)]
 pub struct ClaimRevenue<'info> {
@@ -1626,9 +1933,9 @@ pub struct ClaimRevenue<'info> {
 // Context Structures - Phase 2: Callback
 // ============================================================================
 
-#[callback_accounts("deposit")]
+#[callback_accounts("deposit_v2")]
 #[derive(Accounts)]
-pub struct DepositCallback<'info> {
+pub struct DepositV2Callback<'info> {
     pub arcium_program: Program<'info, Arcium>,
     #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_DEPOSIT))]
     pub comp_def_account: Box<Account<'info, ComputationDefinitionAccount>>,
@@ -1645,9 +1952,9 @@ pub struct DepositCallback<'info> {
     pub user_ledger: Account<'info, UserLedger>,
 }
 
-#[callback_accounts("withdraw")]
+#[callback_accounts("withdraw_v2")]
 #[derive(Accounts)]
-pub struct WithdrawCallback<'info> {
+pub struct WithdrawV2Callback<'info> {
     pub arcium_program: Program<'info, Arcium>,
     #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_WITHDRAW))]
     pub comp_def_account: Box<Account<'info, ComputationDefinitionAccount>>,
@@ -1670,9 +1977,9 @@ pub struct WithdrawCallback<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-#[callback_accounts("subscribe")]
+#[callback_accounts("subscribe_v2")]
 #[derive(Accounts)]
-pub struct SubscribeCallback<'info> {
+pub struct SubscribeV2Callback<'info> {
     pub arcium_program: Program<'info, Arcium>,
     #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_SUBSCRIBE))]
     pub comp_def_account: Box<Account<'info, ComputationDefinitionAccount>>,
@@ -1693,9 +2000,9 @@ pub struct SubscribeCallback<'info> {
     pub user_subscription: Account<'info, UserSubscription>,
 }
 
-#[callback_accounts("unsubscribe")]
+#[callback_accounts("unsubscribe_v2")]
 #[derive(Accounts)]
-pub struct UnsubscribeCallback<'info> {
+pub struct UnsubscribeV2Callback<'info> {
     pub arcium_program: Program<'info, Arcium>,
     #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_UNSUBSCRIBE))]
     pub comp_def_account: Box<Account<'info, ComputationDefinitionAccount>>,
@@ -1712,9 +2019,9 @@ pub struct UnsubscribeCallback<'info> {
     pub user_subscription: Account<'info, UserSubscription>,
 }
 
-#[callback_accounts("process_payment")]
+#[callback_accounts("process_payment_v2")]
 #[derive(Accounts)]
-pub struct ProcessPaymentCallback<'info> {
+pub struct ProcessPaymentV2Callback<'info> {
     pub arcium_program: Program<'info, Arcium>,
     #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_PROCESS_PAYMENT))]
     pub comp_def_account: Box<Account<'info, ComputationDefinitionAccount>>,
@@ -1735,9 +2042,9 @@ pub struct ProcessPaymentCallback<'info> {
     pub user_subscription: Account<'info, UserSubscription>,
 }
 
-#[callback_accounts("verify_subscription")]
+#[callback_accounts("verify_subscription_v2")]
 #[derive(Accounts)]
-pub struct VerifySubscriptionCallback<'info> {
+pub struct VerifySubscriptionV2Callback<'info> {
     pub arcium_program: Program<'info, Arcium>,
     #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_VERIFY_SUBSCRIPTION))]
     pub comp_def_account: Box<Account<'info, ComputationDefinitionAccount>>,
@@ -1752,9 +2059,9 @@ pub struct VerifySubscriptionCallback<'info> {
     pub instructions_sysvar: AccountInfo<'info>,
 }
 
-#[callback_accounts("claim_revenue")]
+#[callback_accounts("claim_revenue_v2")]
 #[derive(Accounts)]
-pub struct ClaimRevenueCallback<'info> {
+pub struct ClaimRevenueV2Callback<'info> {
     pub arcium_program: Program<'info, Arcium>,
     #[account(address = derive_comp_def_pda!(COMP_DEF_OFFSET_CLAIM_REVENUE))]
     pub comp_def_account: Box<Account<'info, ComputationDefinitionAccount>>,
@@ -1811,6 +2118,9 @@ pub enum ErrorCode {
     #[msg("Invalid price (must be greater than 0)")]
     InvalidPrice,
 
+    #[msg("Invalid amount (must be greater than 0)")]
+    InvalidAmount,
+
     #[msg("Invalid billing cycle (must be 1-365 days)")]
     InvalidBillingCycle,
 
@@ -1822,6 +2132,15 @@ pub enum ErrorCode {
 
     #[msg("Plan not active")]
     PlanNotActive,
+
+    #[msg("Invalid mint")]
+    InvalidMint,
+
+    #[msg("Invalid encryption key")]
+    InvalidEncryptionKey,
+
+    #[msg("Encryption key mismatch")]
+    EncryptionKeyMismatch,
 
     #[msg("Insufficient balance")]
     InsufficientBalance,

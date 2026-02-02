@@ -1,16 +1,16 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { createAnchorProvider, getProgram } from "@/lib/anchor";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { fetchMerchantLedger } from "@/lib/merchant";
-import { createArciumContext, decryptBalance, generateNonce } from "@/lib/arcium";
+import { decryptBalance } from "@/lib/arcium";
+import { useArcium } from "@/components/providers/ArciumProvider";
 
 export interface UseRevenueReturn {
   // Total revenue (decrypted, in lamports)
   totalRevenue: bigint | null;
   // Encrypted balance data
-  encryptedBalance: number[][] | null;
+  encryptedBalance: number[] | null;
   // Whether the balance is being decrypted
   isDecrypting: boolean;
   // Whether the balance has been decrypted
@@ -29,11 +29,12 @@ export interface UseRevenueReturn {
  * Hook for managing merchant revenue data
  */
 export function useRevenue(): UseRevenueReturn {
-  const { connection } = useConnection();
   const wallet = useWallet();
+  const { arciumContext, program, initialize, isInitializing } = useArcium();
 
   const [totalRevenue, setTotalRevenue] = useState<bigint | null>(null);
-  const [encryptedBalance, setEncryptedBalance] = useState<number[][] | null>(null);
+  const [encryptedBalance, setEncryptedBalance] = useState<number[] | null>(null);
+  const [ledgerNonce, setLedgerNonce] = useState<bigint | null>(null);
   const [isDecrypting, setIsDecrypting] = useState(false);
   const [isDecrypted, setIsDecrypted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,6 +46,7 @@ export function useRevenue(): UseRevenueReturn {
   const fetchRevenueData = useCallback(async () => {
     if (!wallet.publicKey) {
       setEncryptedBalance(null);
+      setLedgerNonce(null);
       setTotalRevenue(null);
       setIsDecrypted(false);
       setIsLoading(false);
@@ -55,21 +57,25 @@ export function useRevenue(): UseRevenueReturn {
     setError(null);
 
     try {
-      const provider = createAnchorProvider(connection, wallet);
-      if (!provider) {
-        throw new Error("Failed to create provider");
+      if (!program && !isInitializing) {
+        await initialize();
       }
 
-      const program = getProgram(provider);
+      if (!program) {
+        throw new Error("Program not initialized");
+      }
+
       const ledgerData = await fetchMerchantLedger(program, wallet.publicKey);
 
       if (ledgerData) {
         setEncryptedBalance(ledgerData.encryptedBalance);
+        setLedgerNonce(BigInt(ledgerData.nonce.toString()));
         // Reset decrypted state when new data is loaded
         setIsDecrypted(false);
         setTotalRevenue(null);
       } else {
         setEncryptedBalance(null);
+        setLedgerNonce(null);
         setTotalRevenue(null);
         setIsDecrypted(false);
       }
@@ -77,17 +83,18 @@ export function useRevenue(): UseRevenueReturn {
       console.error("Error fetching revenue:", err);
       setError(err instanceof Error ? err : new Error("Failed to fetch revenue"));
       setEncryptedBalance(null);
+      setLedgerNonce(null);
       setTotalRevenue(null);
     } finally {
       setIsLoading(false);
     }
-  }, [connection, wallet]);
+  }, [wallet.publicKey, program, initialize, isInitializing]);
 
   /**
    * Decrypt the balance
    */
   const decrypt = useCallback(async () => {
-    if (!wallet.publicKey || !encryptedBalance) {
+    if (!wallet.publicKey || !encryptedBalance || ledgerNonce === null) {
       return;
     }
 
@@ -95,18 +102,27 @@ export function useRevenue(): UseRevenueReturn {
     setError(null);
 
     try {
-      // Create Arcium context for decryption
-      const arciumContext = await createArciumContext(connection);
+      if (!arciumContext && !isInitializing) {
+        await initialize();
+      }
 
-      // Generate a nonce for decryption (in real implementation, nonce should come from the account)
-      const nonce = generateNonce();
+      if (!arciumContext) {
+        throw new Error("Arcium context not initialized");
+      }
+
+      // Convert nonce to Uint8Array (16 bytes, little-endian)
+      const nonceBytes = new Uint8Array(16);
+      let nonce = ledgerNonce;
+      for (let i = 0; i < 16; i++) {
+        nonceBytes[i] = Number(nonce & BigInt(0xff));
+        nonce >>= BigInt(8);
+      }
 
       // Decrypt the balance
-      // Note: In a real implementation, the nonce should be retrieved from the MerchantLedger account
       const decrypted = decryptBalance(
         arciumContext.cipher,
-        encryptedBalance[0],
-        nonce
+        encryptedBalance,
+        nonceBytes
       );
 
       setTotalRevenue(decrypted);
@@ -117,7 +133,7 @@ export function useRevenue(): UseRevenueReturn {
     } finally {
       setIsDecrypting(false);
     }
-  }, [connection, wallet.publicKey, encryptedBalance]);
+  }, [wallet.publicKey, encryptedBalance, ledgerNonce, arciumContext, initialize, isInitializing]);
 
   /**
    * Refresh revenue data

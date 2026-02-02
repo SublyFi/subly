@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { createAnchorProvider, getProgram } from "@/lib/anchor";
+import { useArcium } from "@/components/providers/ArciumProvider";
 import {
   fetchMerchant,
   executeRegisterMerchant,
@@ -31,6 +32,7 @@ export interface UseMerchantReturn {
 export function useMerchant(): UseMerchantReturn {
   const { connection } = useConnection();
   const wallet = useWallet();
+  const { arciumContext, initialize, isInitializing } = useArcium();
 
   const [isRegistered, setIsRegistered] = useState(false);
   const [merchant, setMerchant] = useState<Merchant | null>(null);
@@ -92,6 +94,14 @@ export function useMerchant(): UseMerchantReturn {
         throw new Error("Wallet not connected");
       }
 
+      if (!arciumContext && !isInitializing) {
+        await initialize();
+      }
+
+      if (!arciumContext) {
+        throw new Error("Encryption context not initialized");
+      }
+
       const provider = createAnchorProvider(connection, wallet);
       if (!provider) {
         throw new Error("Failed to create provider");
@@ -101,7 +111,8 @@ export function useMerchant(): UseMerchantReturn {
       const signature = await executeRegisterMerchant(
         program,
         wallet.publicKey,
-        name
+        name,
+        arciumContext.publicKey
       );
 
       // Refresh merchant data after registration
@@ -109,7 +120,7 @@ export function useMerchant(): UseMerchantReturn {
 
       return signature;
     },
-    [connection, wallet, fetchMerchantData]
+    [connection, wallet, fetchMerchantData, arciumContext, initialize, isInitializing]
   );
 
   /**

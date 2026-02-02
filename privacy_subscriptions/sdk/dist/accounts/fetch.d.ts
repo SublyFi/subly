@@ -9,7 +9,9 @@ export interface UserLedgerData {
     publicKey: PublicKey;
     user: PublicKey;
     mint: PublicKey;
-    encryptedBalance: Uint8Array[];
+    encryptionPubkey: Uint8Array;
+    encryptedBalance: Uint8Array;
+    encryptedSubscriptionCount: Uint8Array;
     nonce: BN;
     lastUpdated: BN;
 }

@@ -9,6 +9,7 @@ import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import {
   PhantomWalletAdapter,
   SolflareWalletAdapter,
+  UnsafeBurnerWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
 import { clusterApiUrl } from "@solana/web3.js";
 
@@ -29,13 +30,22 @@ export const WalletConnectionProvider: FC<WalletConnectionProviderProps> = ({
     []
   );
 
+  const isLocalnet =
+    process.env.NEXT_PUBLIC_NETWORK === "localnet" ||
+    process.env.NEXT_PUBLIC_RPC_URL?.includes("localhost") ||
+    process.env.NEXT_PUBLIC_RPC_URL?.includes("127.0.0.1");
+
   // Configure supported wallets
   const wallets = useMemo(
-    () => [
-      new PhantomWalletAdapter(),
-      new SolflareWalletAdapter(),
-    ],
-    []
+    () =>
+      isLocalnet
+        ? [
+            new PhantomWalletAdapter(),
+            new SolflareWalletAdapter(),
+            new UnsafeBurnerWalletAdapter(),
+          ]
+        : [new PhantomWalletAdapter(), new SolflareWalletAdapter()],
+    [isLocalnet]
   );
 
   return (

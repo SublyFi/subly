@@ -5,94 +5,31 @@ mod circuits {
     use arcis::*;
 
     // ========================================================================
-    // Input Structures
+    // Encrypted State Structures
     // ========================================================================
 
-    /// Deposit circuit input
-    pub struct DepositInput {
-        pub current_balance: u64,
-        pub deposit_amount: u64,
+    /// User ledger state (encrypted)
+    pub struct UserLedgerState {
+        pub balance: u64,
+        pub subscription_count: u64,
     }
 
-    /// Withdraw circuit input
-    pub struct WithdrawInput {
-        pub current_balance: u64,
-        pub withdraw_amount: u64,
+    /// Merchant ledger state (encrypted)
+    pub struct MerchantLedgerState {
+        pub balance: u64,
+        pub total_claimed: u64,
     }
 
-    /// Subscribe circuit input
-    /// Simplified: only essential encrypted fields for subscription creation
-    pub struct SubscribeInput {
-        pub user_balance: u64,       // User's current encrypted balance
-        pub merchant_balance: u64,   // Merchant's current encrypted balance
-        pub price: u64,              // Subscription price (encrypted from client)
-        pub current_timestamp: i64,  // Current timestamp (plaintext)
-        pub billing_cycle_days: u32, // Billing cycle in days (plaintext)
-    }
-
-    /// Unsubscribe circuit input
-    pub struct UnsubscribeInput {
-        pub current_status: u8,
-    }
-
-    /// ProcessPayment circuit input
-    pub struct ProcessPaymentInput {
-        pub user_balance: u64,
-        pub merchant_balance: u64,
-        pub subscription_status: u8,
+    /// User subscription state (encrypted)
+    pub struct UserSubscriptionState {
+        /// Encrypted plan public key as two u128 values (32 bytes total)
+        pub plan: [u128; 2],
+        /// Subscription status (0=Active, 1=Cancelled, 2=Expired)
+        pub status: u8,
+        /// Next payment date (unix timestamp)
         pub next_payment_date: i64,
-        pub current_timestamp: i64,
-        pub plan_price: u64,
-        pub billing_cycle_days: u32,
-    }
-
-    /// VerifySubscription circuit input
-    pub struct VerifySubscriptionInput {
-        pub subscription_status: u8,
-        pub next_payment_date: i64,
-        pub current_timestamp: i64,
-    }
-
-    /// ClaimRevenue circuit input
-    pub struct ClaimRevenueInput {
-        pub current_balance: u64,
-        pub claim_amount: u64,
-    }
-
-    // ========================================================================
-    // Output Structures
-    // ========================================================================
-
-    /// Withdraw circuit output
-    pub struct WithdrawOutput {
-        pub new_balance: u64,
-        pub actual_amount: u64,
-        pub success: bool,
-    }
-
-    /// Subscribe circuit output
-    /// Returns: new_user_balance, new_merchant_balance, status, next_payment_date
-    pub struct SubscribeOutput {
-        pub new_user_balance: u64,           // User's new encrypted balance
-        pub new_merchant_balance: u64,       // Merchant's new encrypted balance
-        pub encrypted_status: u8,            // Subscription status (0=Active, 1=Cancelled)
-        pub encrypted_next_payment_date: i64, // Next payment date timestamp
-    }
-
-    /// ProcessPayment circuit output
-    pub struct ProcessPaymentOutput {
-        pub new_user_balance: u64,
-        pub new_merchant_balance: u64,
-        pub new_status: u8,
-        pub new_next_payment_date: i64,
-        pub payment_processed: bool,
-    }
-
-    /// ClaimRevenue circuit output
-    pub struct ClaimRevenueOutput {
-        pub new_balance: u64,
-        pub actual_amount: u64,
-        pub success: bool,
+        /// Start date (unix timestamp)
+        pub start_date: i64,
     }
 
     // ========================================================================
@@ -100,177 +37,304 @@ mod circuits {
     // ========================================================================
 
     /// Deposit circuit: Add funds to user's encrypted balance
-    /// Input: current_balance (encrypted), deposit_amount (encrypted)
-    /// Output: new_balance (encrypted)
+    /// Input: user_ledger (encrypted), amount (encrypted), is_new (plaintext)
+    /// Output: updated user_ledger (encrypted)
     #[instruction]
-    pub fn deposit(input: Enc<Shared, DepositInput>) -> Enc<Shared, u64> {
-        let inp = input.to_arcis();
-        let new_balance = inp.current_balance + inp.deposit_amount;
-        input.owner.from_arcis(new_balance)
+    pub fn deposit_v2(
+        user_ledger: Enc<Shared, UserLedgerState>,
+        amount: Enc<Shared, u64>,
+        is_new: bool,
+    ) -> Enc<Shared, UserLedgerState> {
+        let mut ledger = user_ledger.to_arcis();
+        let deposit_amount = amount.to_arcis();
+
+        if is_new {
+            ledger.balance = 0;
+            ledger.subscription_count = 0;
+        }
+
+        let new_balance = ledger.balance + deposit_amount;
+        let new_state = UserLedgerState {
+            balance: new_balance,
+            subscription_count: ledger.subscription_count,
+        };
+
+        user_ledger.owner.from_arcis(new_state)
     }
 
     /// Withdraw circuit: Subtract funds from user's encrypted balance
-    /// Input: current_balance (encrypted), withdraw_amount (encrypted)
-    /// Output: WithdrawOutput with new_balance, actual_amount, and success flag
+    /// Input: user_ledger (encrypted), amount (plaintext), is_new (plaintext)
+    /// Output: updated user_ledger (encrypted) and actual_amount (revealed)
     #[instruction]
-    pub fn withdraw(input: Enc<Shared, WithdrawInput>) -> Enc<Shared, WithdrawOutput> {
-        let inp = input.to_arcis();
+    pub fn withdraw_v2(
+        user_ledger: Enc<Shared, UserLedgerState>,
+        amount: u64,
+        is_new: bool,
+    ) -> (Enc<Shared, UserLedgerState>, u64) {
+        let mut ledger = user_ledger.to_arcis();
+
+        if is_new {
+            ledger.balance = 0;
+            ledger.subscription_count = 0;
+        }
 
         // Check if user has sufficient balance
-        let has_balance = inp.current_balance >= inp.withdraw_amount;
+        let has_balance = ledger.balance >= amount;
 
         // Conditional subtraction: only subtract if has_balance is true
         let new_balance = if has_balance {
-            inp.current_balance - inp.withdraw_amount
+            ledger.balance - amount
         } else {
-            inp.current_balance
+            ledger.balance
         };
 
-        // Actual withdraw amount: if success, use withdraw_amount, else 0
-        let actual_amount = if has_balance {
-            inp.withdraw_amount
-        } else {
-            0u64
+        // Actual withdraw amount: if success, use amount, else 0
+        let actual_amount = if has_balance { amount } else { 0u64 };
+
+        let new_state = UserLedgerState {
+            balance: new_balance,
+            subscription_count: ledger.subscription_count,
         };
 
-        let output = WithdrawOutput {
-            new_balance,
-            actual_amount,
-            success: has_balance,
-        };
-
-        input.owner.from_arcis(output)
+        (
+            user_ledger.owner.from_arcis(new_state),
+            actual_amount.reveal(),
+        )
     }
 
     /// Subscribe circuit: Create subscription and process initial payment
-    /// Input: user_balance, merchant_balance, price (encrypted), timestamps (plaintext)
-    /// Output: Updated balances, subscription state
+    /// Input: user_ledger, merchant_ledger (encrypted), plan/price/cycle (encrypted), timestamps + plan metadata (plaintext)
+    /// Output: Updated ledgers + subscription state (encrypted)
     #[instruction]
-    pub fn subscribe(input: Enc<Shared, SubscribeInput>) -> Enc<Shared, SubscribeOutput> {
-        let inp = input.to_arcis();
+    pub fn subscribe_v2(
+        user_ledger: Enc<Shared, UserLedgerState>,
+        merchant_ledger: Enc<Shared, MerchantLedgerState>,
+        plan: Enc<Shared, [u128; 2]>,
+        price: Enc<Shared, u64>,
+        billing_cycle_days: Enc<Shared, u32>,
+        current_timestamp: i64,
+        plan_pubkey: [u128; 2],
+        plan_price: u64,
+        plan_billing_cycle_days: u32,
+        user_is_new: bool,
+        merchant_is_new: bool,
+    ) -> (
+        Enc<Shared, UserLedgerState>,
+        Enc<Shared, MerchantLedgerState>,
+        Enc<Shared, UserSubscriptionState>,
+    ) {
+        let mut user = user_ledger.to_arcis();
+        let mut merchant = merchant_ledger.to_arcis();
+        let input_plan = plan.to_arcis();
+        let input_price = price.to_arcis();
+        let input_cycle = billing_cycle_days.to_arcis();
 
-        // Check if user has sufficient balance for initial payment
-        let has_balance = inp.user_balance >= inp.price;
+        if user_is_new {
+            user.balance = 0;
+            user.subscription_count = 0;
+        }
+
+        if merchant_is_new {
+            merchant.balance = 0;
+            merchant.total_claimed = 0;
+        }
+
+        // Validate encrypted inputs against the provided plan metadata
+        let is_plan_match =
+            (input_plan[0] == plan_pubkey[0]) & (input_plan[1] == plan_pubkey[1]);
+        let is_price_match = input_price == plan_price;
+        let is_cycle_match = input_cycle == plan_billing_cycle_days;
+        let is_valid_plan = is_plan_match & is_price_match & is_cycle_match;
+
+        // Check if user has sufficient balance for initial payment (use plaintext plan price)
+        let has_balance = user.balance >= plan_price;
 
         // Calculate new balances (only if has_balance)
-        let new_user_bal = if has_balance {
-            inp.user_balance - inp.price
+        let can_subscribe = is_valid_plan & has_balance;
+        let new_user_bal = if can_subscribe {
+            user.balance - plan_price
         } else {
-            inp.user_balance
+            user.balance
         };
 
-        let new_merchant_bal = if has_balance {
-            inp.merchant_balance + inp.price
+        let new_merchant_bal = if can_subscribe {
+            merchant.balance + plan_price
         } else {
-            inp.merchant_balance
+            merchant.balance
+        };
+
+        let new_subscription_count = if can_subscribe {
+            user.subscription_count + 1
+        } else {
+            user.subscription_count
         };
 
         // Calculate next payment date: current_timestamp + (billing_cycle_days * 86400 seconds)
         let seconds_per_day: i64 = 86400;
-        let cycle_seconds = (inp.billing_cycle_days as i64) * seconds_per_day;
-        let next_payment = inp.current_timestamp + cycle_seconds;
+        let cycle_seconds = (plan_billing_cycle_days as i64) * seconds_per_day;
+        let next_payment = current_timestamp + cycle_seconds;
 
         // Status: 0 = Active, 1 = Cancelled
-        let status: u8 = if has_balance { 0 } else { 1 };
+        let status: u8 = if can_subscribe { 0 } else { 1 };
 
-        let output = SubscribeOutput {
-            new_user_balance: new_user_bal,
-            new_merchant_balance: new_merchant_bal,
-            encrypted_status: status,
-            encrypted_next_payment_date: if has_balance { next_payment } else { 0 },
+        let user_state = UserLedgerState {
+            balance: new_user_bal,
+            subscription_count: new_subscription_count,
         };
 
-        input.owner.from_arcis(output)
+        let merchant_state = MerchantLedgerState {
+            balance: new_merchant_bal,
+            total_claimed: merchant.total_claimed,
+        };
+
+        let subscription_state = UserSubscriptionState {
+            plan: plan_pubkey,
+            status,
+            next_payment_date: if can_subscribe { next_payment } else { 0 },
+            start_date: if can_subscribe { current_timestamp } else { 0 },
+        };
+
+        let subscription_owner = Shared::new(user_ledger.owner.public_key);
+
+        (
+            user_ledger.owner.from_arcis(user_state),
+            merchant_ledger.owner.from_arcis(merchant_state),
+            subscription_owner.from_arcis(subscription_state),
+        )
     }
 
     /// Unsubscribe circuit: Cancel subscription
-    /// Input: current_status (encrypted)
-    /// Output: new_status (encrypted) - always set to Cancelled (1)
+    /// Input: subscription (encrypted)
+    /// Output: updated subscription (encrypted) - always set to Cancelled (1)
     #[instruction]
-    pub fn unsubscribe(input: Enc<Shared, UnsubscribeInput>) -> Enc<Shared, u8> {
-        // Status 1 = Cancelled
-        let cancelled_status: u8 = 1;
-        input.owner.from_arcis(cancelled_status)
+    pub fn unsubscribe_v2(
+        subscription: Enc<Shared, UserSubscriptionState>,
+    ) -> Enc<Shared, UserSubscriptionState> {
+        let mut sub = subscription.to_arcis();
+        sub.status = 1;
+        sub.next_payment_date = 0;
+        subscription.owner.from_arcis(sub)
     }
 
     /// ProcessPayment circuit: Process recurring subscription payment
-    /// Input: User/merchant balances, subscription state, timestamp info
-    /// Output: Updated balances, subscription state
+    /// Input: ledgers + subscription (encrypted), timestamps + plan metadata (plaintext)
+    /// Output: Updated ledgers + subscription (encrypted)
     #[instruction]
-    pub fn process_payment(input: Enc<Shared, ProcessPaymentInput>) -> Enc<Shared, ProcessPaymentOutput> {
-        let inp = input.to_arcis();
+    pub fn process_payment_v2(
+        user_ledger: Enc<Shared, UserLedgerState>,
+        merchant_ledger: Enc<Shared, MerchantLedgerState>,
+        subscription: Enc<Shared, UserSubscriptionState>,
+        current_timestamp: i64,
+        plan_price: u64,
+        billing_cycle_days: u32,
+        plan_pubkey: [u128; 2],
+        user_is_new: bool,
+        merchant_is_new: bool,
+    ) -> (
+        Enc<Shared, UserLedgerState>,
+        Enc<Shared, MerchantLedgerState>,
+        Enc<Shared, UserSubscriptionState>,
+    ) {
+        let mut user = user_ledger.to_arcis();
+        let mut merchant = merchant_ledger.to_arcis();
+        let mut sub = subscription.to_arcis();
+
+        if user_is_new {
+            user.balance = 0;
+            user.subscription_count = 0;
+        }
+
+        if merchant_is_new {
+            merchant.balance = 0;
+            merchant.total_claimed = 0;
+        }
 
         // Check if subscription is Active (status == 0)
-        let is_active = inp.subscription_status == 0;
+        let is_active = sub.status == 0;
 
         // Check if payment is due (next_payment_date <= current_timestamp)
-        let is_due = inp.next_payment_date <= inp.current_timestamp;
+        let is_due = sub.next_payment_date <= current_timestamp;
+
+        // Ensure the subscription plan matches the provided plan metadata
+        let is_plan_match =
+            (sub.plan[0] == plan_pubkey[0]) & (sub.plan[1] == plan_pubkey[1]);
 
         // Should we process this payment?
-        let should_process = is_active && is_due;
+        let should_process = is_active && is_due && is_plan_match;
 
         // Check if user has sufficient balance
-        let has_balance = inp.user_balance >= inp.plan_price;
+        let has_balance = user.balance >= plan_price;
 
         // Can we actually process the payment?
         let can_pay = should_process && has_balance;
 
         // Calculate new balances
         let new_user_bal = if can_pay {
-            inp.user_balance - inp.plan_price
+            user.balance - plan_price
         } else {
-            inp.user_balance
+            user.balance
         };
 
         let new_merchant_bal = if can_pay {
-            inp.merchant_balance + inp.plan_price
+            merchant.balance + plan_price
         } else {
-            inp.merchant_balance
+            merchant.balance
         };
 
         // Update status: If should_process but !has_balance, cancel the subscription
-        let new_status = if should_process && !has_balance {
-            1u8 // Cancelled due to insufficient balance
-        } else {
-            inp.subscription_status
-        };
+        if should_process && !has_balance {
+            sub.status = 1u8; // Cancelled due to insufficient balance
+        }
 
         // Calculate next payment date
         let seconds_per_day: i64 = 86400;
-        let cycle_seconds = (inp.billing_cycle_days as i64) * seconds_per_day;
-        let new_next_date = if can_pay {
-            inp.next_payment_date + cycle_seconds
-        } else {
-            inp.next_payment_date
+        let cycle_seconds = (billing_cycle_days as i64) * seconds_per_day;
+
+        if can_pay {
+            let base_date = if sub.next_payment_date == 0 {
+                current_timestamp
+            } else {
+                sub.next_payment_date
+            };
+            sub.next_payment_date = base_date + cycle_seconds;
+        }
+
+        let user_state = UserLedgerState {
+            balance: new_user_bal,
+            subscription_count: user.subscription_count,
         };
 
-        let output = ProcessPaymentOutput {
-            new_user_balance: new_user_bal,
-            new_merchant_balance: new_merchant_bal,
-            new_status,
-            new_next_payment_date: new_next_date,
-            payment_processed: can_pay,
+        let merchant_state = MerchantLedgerState {
+            balance: new_merchant_bal,
+            total_claimed: merchant.total_claimed,
         };
 
-        input.owner.from_arcis(output)
+        (
+            user_ledger.owner.from_arcis(user_state),
+            merchant_ledger.owner.from_arcis(merchant_state),
+            subscription.owner.from_arcis(sub),
+        )
     }
 
     /// VerifySubscription circuit: Check if subscription is valid
     /// Input: subscription_status (encrypted), next_payment_date (encrypted), current_timestamp
     /// Output: is_valid (bool, revealed)
     #[instruction]
-    pub fn verify_subscription(input: Enc<Shared, VerifySubscriptionInput>) -> bool {
-        let inp = input.to_arcis();
+    pub fn verify_subscription_v2(
+        subscription: Enc<Shared, UserSubscriptionState>,
+        current_timestamp: i64,
+    ) -> bool {
+        let sub = subscription.to_arcis();
 
         // Subscription is valid if:
         // 1. Status is Active (0)
         // 2. Not past the grace period (next_payment_date + some buffer)
-        let is_active = inp.subscription_status == 0;
+        let is_active = sub.status == 0;
 
         // Allow some grace period (e.g., 3 days = 259200 seconds)
         let grace_period: i64 = 259200;
-        let grace_deadline = inp.next_payment_date + grace_period;
-        let not_expired = inp.current_timestamp <= grace_deadline;
+        let grace_deadline = sub.next_payment_date + grace_period;
+        let not_expired = current_timestamp <= grace_deadline;
 
         let is_valid = is_active && not_expired;
 
@@ -278,35 +342,46 @@ mod circuits {
     }
 
     /// ClaimRevenue circuit: Merchant withdraws accumulated revenue
-    /// Input: current_balance (encrypted), claim_amount (encrypted)
-    /// Output: ClaimRevenueOutput with new_balance, actual_amount, and success flag
+    /// Input: merchant_ledger (encrypted), amount (plaintext), is_new (plaintext)
+    /// Output: updated merchant_ledger (encrypted) and actual_amount (revealed)
     #[instruction]
-    pub fn claim_revenue(input: Enc<Shared, ClaimRevenueInput>) -> Enc<Shared, ClaimRevenueOutput> {
-        let inp = input.to_arcis();
+    pub fn claim_revenue_v2(
+        merchant_ledger: Enc<Shared, MerchantLedgerState>,
+        amount: u64,
+        is_new: bool,
+    ) -> (Enc<Shared, MerchantLedgerState>, u64) {
+        let mut merchant = merchant_ledger.to_arcis();
+
+        if is_new {
+            merchant.balance = 0;
+            merchant.total_claimed = 0;
+        }
 
         // Check if merchant has sufficient balance
-        let has_balance = inp.current_balance >= inp.claim_amount;
+        let has_balance = merchant.balance >= amount;
 
         // Conditional subtraction
         let new_balance = if has_balance {
-            inp.current_balance - inp.claim_amount
+            merchant.balance - amount
         } else {
-            inp.current_balance
+            merchant.balance
         };
 
         // Actual claim amount
-        let actual_amount = if has_balance {
-            inp.claim_amount
-        } else {
-            0u64
+        let actual_amount = if has_balance { amount } else { 0u64 };
+
+        let new_state = MerchantLedgerState {
+            balance: new_balance,
+            total_claimed: if has_balance {
+                merchant.total_claimed + amount
+            } else {
+                merchant.total_claimed
+            },
         };
 
-        let output = ClaimRevenueOutput {
-            new_balance,
-            actual_amount,
-            success: has_balance,
-        };
-
-        input.owner.from_arcis(output)
+        (
+            merchant_ledger.owner.from_arcis(new_state),
+            actual_amount.reveal(),
+        )
     }
 }

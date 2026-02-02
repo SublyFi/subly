@@ -21,17 +21,19 @@ export interface UserSubscription {
     publicKey: PublicKey;
     /** User wallet public key */
     user: PublicKey;
-    /** Subscription plan public key */
-    plan: PublicKey;
-    /** Merchant wallet public key */
-    merchant: PublicKey;
     /** Subscription index for this user */
     subscriptionIndex: BN;
-    /** Next billing date (Unix timestamp) - encrypted in on-chain account */
-    nextBillingDate?: BN;
-    /** Whether the subscription is cancelled */
-    isCancelled: boolean;
-    /** Account creation timestamp */
-    createdAt: BN;
+    /** X25519 encryption public key */
+    encryptionPubkey: Uint8Array;
+    /** Encrypted plan public key (two ciphertexts) */
+    encryptedPlan: [Uint8Array, Uint8Array];
+    /** Encrypted status */
+    encryptedStatus: Uint8Array;
+    /** Encrypted next payment date */
+    encryptedNextPaymentDate: Uint8Array;
+    /** Encrypted start date */
+    encryptedStartDate: Uint8Array;
+    /** Encryption nonce */
+    nonce: BN;
 }
 //# sourceMappingURL=subscription.d.ts.map

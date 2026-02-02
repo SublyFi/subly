@@ -30,9 +30,6 @@ export async function executeDeposit(
   arciumContext: ArciumContext
 ): Promise<string> {
   const computationOffset = generateComputationOffset();
-  const nonce = generateNonce();
-  const encryptedAmount = encryptAmount(arciumContext.cipher, amount, nonce);
-  const nonceValue = deserializeLE(nonce);
 
   const [userLedgerPDA] = getUserLedgerPDA(userPubkey, TOKEN_MINT);
   const [protocolPoolPDA] = getProtocolPoolPDA(TOKEN_MINT);
@@ -54,13 +51,17 @@ export async function executeDeposit(
     computationOffset
   );
 
+  const amountNonce = generateNonce();
+  const encryptedAmount = encryptAmount(arciumContext.cipher, amount, amountNonce);
+  const amountNonceU128 = new BN(deserializeLE(amountNonce).toString());
+
   const signature = await program.methods
     .deposit(
       computationOffset,
       new BN(amount.toString()),
-      Array.from(encryptedAmount),
       Array.from(arciumContext.publicKey),
-      new BN(nonceValue.toString())
+      Array.from(encryptedAmount),
+      amountNonceU128
     )
     .accounts({
       user: userPubkey,
@@ -101,9 +102,6 @@ export async function executeWithdraw(
   arciumContext: ArciumContext
 ): Promise<string> {
   const computationOffset = generateComputationOffset();
-  const nonce = generateNonce();
-  const encryptedAmount = encryptAmount(arciumContext.cipher, amount, nonce);
-  const nonceValue = deserializeLE(nonce);
 
   const [userLedgerPDA] = getUserLedgerPDA(userPubkey, TOKEN_MINT);
   const [protocolPoolPDA] = getProtocolPoolPDA(TOKEN_MINT);
@@ -125,9 +123,8 @@ export async function executeWithdraw(
   const signature = await program.methods
     .withdraw(
       computationOffset,
-      Array.from(encryptedAmount),
-      Array.from(arciumContext.publicKey),
-      new BN(nonceValue.toString())
+      new BN(amount.toString()),
+      Array.from(arciumContext.publicKey)
     )
     .accounts({
       user: userPubkey,
@@ -163,12 +160,9 @@ export async function executeWithdraw(
 export async function executeUnsubscribe(
   program: Program<Idl>,
   userPubkey: PublicKey,
-  subscriptionIndex: bigint,
-  arciumContext: ArciumContext
+  subscriptionIndex: bigint
 ): Promise<string> {
   const computationOffset = generateComputationOffset();
-  const nonce = generateNonce();
-  const nonceValue = deserializeLE(nonce);
 
   // Import getUserSubscriptionPDA
   const { getUserSubscriptionPDA } = await import("./pda");
@@ -181,11 +175,7 @@ export async function executeUnsubscribe(
   );
 
   const signature = await program.methods
-    .unsubscribe(
-      computationOffset,
-      Array.from(arciumContext.publicKey),
-      new BN(nonceValue.toString())
-    )
+    .unsubscribe(computationOffset)
     .accounts({
       user: userPubkey,
       userSubscription: userSubscriptionPDA,
@@ -219,7 +209,9 @@ export async function fetchUserLedger(
 ): Promise<{
   user: PublicKey;
   mint: PublicKey;
-  encryptedBalance: number[][];
+  encryptionPubkey: number[];
+  encryptedBalance: number[];
+  encryptedSubscriptionCount: number[];
   nonce: BN;
   lastUpdated: BN;
   bump: number;
@@ -231,7 +223,9 @@ export async function fetchUserLedger(
     return account as {
       user: PublicKey;
       mint: PublicKey;
-      encryptedBalance: number[][];
+      encryptionPubkey: number[];
+      encryptedBalance: number[];
+      encryptedSubscriptionCount: number[];
       nonce: BN;
       lastUpdated: BN;
       bump: number;
@@ -254,9 +248,11 @@ export async function fetchUserSubscriptions(
     account: {
       user: PublicKey;
       subscriptionIndex: BN;
-      plan: PublicKey;
+      encryptionPubkey: number[];
+      encryptedPlan: number[][];
       encryptedStatus: number[];
       encryptedNextPaymentDate: number[];
+      encryptedStartDate: number[];
       nonce: BN;
       bump: number;
     };
@@ -276,9 +272,11 @@ export async function fetchUserSubscriptions(
     account: acc.account as {
       user: PublicKey;
       subscriptionIndex: BN;
-      plan: PublicKey;
+      encryptionPubkey: number[];
+      encryptedPlan: number[][];
       encryptedStatus: number[];
       encryptedNextPaymentDate: number[];
+      encryptedStartDate: number[];
       nonce: BN;
       bump: number;
     },

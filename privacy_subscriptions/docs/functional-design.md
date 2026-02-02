@@ -213,11 +213,15 @@ pub struct MerchantLedger {
     pub merchant: Pubkey,
     /// トークンミント
     pub mint: Pubkey,
-    /// 暗号化された残高（Enc<Mxe, u64>）
-    pub encrypted_balance: [u8; 64],
-    /// 暗号化された累計引き出し額（Enc<Mxe, u64>）
+    /// X25519 暗号化公開鍵（Enc<Shared, T> 用）
+    pub encryption_pubkey: [u8; 32],
+    /// 暗号化された残高（Enc<Shared, u64>）
+    pub encrypted_balance: [u8; 32],
+    /// 暗号化された累計引き出し額（Enc<Shared, u64>）
     /// ※プライバシー保護のため暗号化
-    pub encrypted_total_claimed: [u8; 64],
+    pub encrypted_total_claimed: [u8; 32],
+    /// 暗号化 nonce
+    pub nonce: u128,
     /// バンプシード
     pub bump: u8,
 }
@@ -264,12 +268,16 @@ pub struct UserLedger {
     pub user: Pubkey,
     /// トークンミント
     pub mint: Pubkey,
-    /// 暗号化された残高（Enc<Mxe, u64>）
-    pub encrypted_balance: [u8; 64],
-    /// 暗号化されたサブスクリプションカウンター（Enc<Mxe, u64>）
+    /// X25519 暗号化公開鍵（Enc<Shared, T> 用）
+    pub encryption_pubkey: [u8; 32],
+    /// 暗号化された残高（Enc<Shared, u64>）
+    pub encrypted_balance: [u8; 32],
+    /// 暗号化されたサブスクリプションカウンター（Enc<Shared, u64>）
     /// ※UserSubscription作成時にMPC内でインクリメント
     /// ※第三者からはサブスク数が不明
-    pub encrypted_subscription_count: [u8; 64],
+    pub encrypted_subscription_count: [u8; 32],
+    /// 暗号化 nonce
+    pub nonce: u128,
     /// 最終更新日時
     pub last_updated: i64,
     /// バンプシード
@@ -293,16 +301,20 @@ pub struct UserSubscription {
     pub user: Pubkey,
     /// サブスクリプションインデックス（ユーザーごとの連番）
     pub subscription_index: u64,
-    /// 暗号化されたプラン（Enc<Mxe, Pubkey>）
+    /// X25519 暗号化公開鍵（Enc<Shared, T> 用）
+    pub encryption_pubkey: [u8; 32],
+    /// 暗号化されたプラン（Enc<Shared, [u128; 2]>）
     /// ※どのプランにサブスクしているか第三者には不明
-    pub encrypted_plan: [u8; 64],
-    /// 暗号化されたステータス（Enc<Mxe, SubscriptionStatus>）
+    pub encrypted_plan: [[u8; 32]; 2],
+    /// 暗号化されたステータス（Enc<Shared, SubscriptionStatus>）
     /// SubscriptionStatus: Active = 0, Cancelled = 1, Expired = 2
     pub encrypted_status: [u8; 32],
-    /// 暗号化された次回支払日（Enc<Mxe, i64>）
+    /// 暗号化された次回支払日（Enc<Shared, i64>）
     pub encrypted_next_payment_date: [u8; 32],
-    /// 暗号化された開始日（Enc<Mxe, i64>）
+    /// 暗号化された開始日（Enc<Shared, i64>）
     pub encrypted_start_date: [u8; 32],
+    /// 暗号化 nonce
+    pub nonce: u128,
     /// バンプシード
     pub bump: u8,
 }
@@ -310,15 +322,16 @@ pub struct UserSubscription {
 
 **PDA Seeds**: `["user_subscription", user, subscription_index]`
 
-> **Note**: `subscription_index` は `UserLedger.encrypted_subscription_count` から払い出す。
+> **Note**: `subscription_index` は `UserLedger.encrypted_subscription_count`（Enc<Shared>）を
+> 復号した現在値から払い出す（0 始まりの連番）。
 > カウンター自体も暗号化されているため、第三者からは以下がすべて秘匿される：
 > - ユーザーがいくつサブスクを持っているか
 > - どのプランにサブスクしているか
 > - どの事業者と契約しているか
 >
-> Subscribe 時は MPC 内でカウンターをインクリメントし、その値を `subscription_index` として
-> UserSubscription PDA のシードに使用する。SDK は復号したカウンター値を保持し、
-> PDA アドレスの導出に使用する。
+> Subscribe 時は MPC 内でカウンターをインクリメントし、帳簿の暗号化カウントを更新する。
+> PDA の `subscription_index` はクライアントが復号済みカウントから導出して渡すため、
+> SDK 側での一貫性保持が前提となる。
 
 ### 2.3 Arcium アカウント命名規則
 
@@ -452,7 +465,7 @@ sequenceDiagram
     Program->>Pool: Transfer tokens from User
     Program->>Arcium: queue_computation(deposit)
     Arcium->>Arcium: MPC: decrypt + add to ledger
-    Arcium->>Program: deposit_callback(encrypted_new_balance)
+    Arcium->>Program: deposit_callback(encrypted_user_ledger)
     Program->>Program: Update UserLedger
     Program-->>UI: Success
     UI-->>U: Deposit confirmed
@@ -566,6 +579,8 @@ pub fn create_subscription_plan(
 
 ### 4.2 暗号化インストラクション（3 フェーズ）
 
+> **Note**: Queue Phase の実装ではすべて `computation_offset: u64` を先頭引数として受け取る。
+
 #### 4.2.1 Deposit
 
 **Init Phase**
@@ -581,8 +596,9 @@ pub fn init_deposit_comp_def(
 ```rust
 pub fn deposit(
     ctx: Context<Deposit>,
-    amount: u64,  // 平文（Pool への実送金額）
-    encrypted_amount: [u8; 64],  // 暗号化（帳簿更新用）
+    amount: u64,                 // 平文（Pool への実送金額）
+    encrypted_amount: [u8; 32],  // 暗号化（Enc<Shared, u64>）
+    encrypted_amount_nonce: u128,
 ) -> Result<()>
 ```
 
@@ -591,23 +607,30 @@ pub fn deposit(
 ```rust
 pub fn deposit_callback(
     ctx: Context<DepositCallback>,
-    encrypted_new_balance: [u8; 64],
+    encrypted_user_balance: [u8; 32],
+    encrypted_subscription_count: [u8; 32],
+    nonce: u128,
 ) -> Result<()>
 ```
 
 #### 4.2.2 Subscribe
 
-**プライバシー設計**: トランザクション時点から plan を暗号化して送信。
-第三者はトランザクション履歴を追跡してもどのプランにサブスクしたか判別不可。
+**プライバシー設計**: トランザクション時点から plan/price/billing を暗号化して送信。
+検証のため SubscriptionPlan アカウントはトランザクションに含まれるため完全秘匿ではないが、
+オンチェーン状態は暗号化される。
 
 **Queue Phase**
 
 ```rust
 pub fn subscribe(
     ctx: Context<Subscribe>,
-    encrypted_plan: [u8; 64],  // 暗号化されたプラン（Enc<Shared, Pubkey>）
-    encrypted_price: [u8; 64], // 暗号化された価格（Enc<Shared, u64>）
+    subscription_index: u64,
+    encrypted_plan: [[u8; 32]; 2], // 暗号化されたプラン（Enc<Shared, [u128; 2]>）
+    encrypted_plan_nonce: u128,
+    encrypted_price: [u8; 32], // 暗号化された価格（Enc<Shared, u64>）
+    encrypted_price_nonce: u128,
     encrypted_billing_cycle: [u8; 32], // 暗号化された請求サイクル（Enc<Shared, u32>）
+    encrypted_billing_cycle_nonce: u128,
 ) -> Result<()>
 ```
 
@@ -615,16 +638,20 @@ pub fn subscribe(
 > 1. 復号した plan が有効な SubscriptionPlan アカウントか
 > 2. 復号した price/billing_cycle がプランの実際の値と一致するか
 > 3. ユーザー残高が price 以上あるか
+>
+> **Privacy Note**: SubscriptionPlan アカウントは検証のためトランザクションに含まれる。
+> そのため「どのプランを選んだか」はトランザクション観測者に推測される可能性がある。
+> ただし UserSubscription のオンチェーン状態は暗号化されるため、後続の状態は秘匿される。
 
 **Callback Phase**
 
 ```rust
 pub fn subscribe_callback(
     ctx: Context<SubscribeCallback>,
-    encrypted_plan: [u8; 64],           // Enc<Mxe, Pubkey> に再暗号化
-    encrypted_user_balance: [u8; 64],
-    encrypted_merchant_balance: [u8; 64],
-    encrypted_subscription_count: [u8; 64],
+    encrypted_plan: [[u8; 32]; 2],     // Enc<Shared, [u128; 2]>
+    encrypted_user_balance: [u8; 32],
+    encrypted_merchant_balance: [u8; 32],
+    encrypted_subscription_count: [u8; 32],
     encrypted_subscription_status: [u8; 32],
     encrypted_next_payment_date: [u8; 32],
     encrypted_start_date: [u8; 32],
@@ -638,8 +665,6 @@ pub fn subscribe_callback(
 ```rust
 pub fn verify_subscription(
     ctx: Context<VerifySubscription>,
-    user: Pubkey,
-    merchant: Pubkey,
 ) -> Result<()>
 ```
 
@@ -658,16 +683,25 @@ pub fn verify_subscription_callback(
 
 ```rust
 #[encrypted]
-pub fn deposit_circuit(
-    current_balance: Enc<Mxe, u64>,
-    deposit_amount: Enc<Shared, u64>,
-) -> Enc<Mxe, u64> {
-    let current = current_balance.to_arcis();
-    let amount = deposit_amount.to_arcis();
+pub fn deposit_v2(
+    user_ledger: Enc<Shared, UserLedgerState>,
+    amount: Enc<Shared, u64>,
+    is_new: bool,
+) -> Enc<Shared, UserLedgerState> {
+    let mut ledger = user_ledger.to_arcis();
+    let deposit_amount = amount.to_arcis();
 
-    let new_balance = current + amount;
+    if is_new {
+        ledger.balance = 0;
+        ledger.subscription_count = 0;
+    }
 
-    new_balance.from_arcis()
+    let new_state = UserLedgerState {
+        balance: ledger.balance + deposit_amount,
+        subscription_count: ledger.subscription_count,
+    };
+
+    user_ledger.owner.from_arcis(new_state)
 }
 ```
 
@@ -675,73 +709,70 @@ pub fn deposit_circuit(
 
 ```rust
 #[encrypted]
-pub fn process_payment_circuit(
-    user_balance: Enc<Mxe, u64>,
-    merchant_balance: Enc<Mxe, u64>,
-    subscription_status: Enc<Mxe, u8>,
-    next_payment_date: Enc<Mxe, i64>,
+pub fn process_payment_v2(
+    user_ledger: Enc<Shared, UserLedgerState>,
+    merchant_ledger: Enc<Shared, MerchantLedgerState>,
+    subscription: Enc<Shared, UserSubscriptionState>,
     current_timestamp: i64,  // 平文（公開情報）
     plan_price: u64,         // 平文（公開情報）
     billing_cycle_days: u32, // 平文（公開情報）
+    plan_pubkey: [u128; 2],  // 平文（公開情報）
+    user_is_new: bool,
+    merchant_is_new: bool,
 ) -> (
-    Enc<Mxe, u64>,  // new_user_balance
-    Enc<Mxe, u64>,  // new_merchant_balance
-    Enc<Mxe, u8>,   // new_status
-    Enc<Mxe, i64>,  // new_next_payment_date
-    bool,           // payment_processed (平文)
+    Enc<Shared, UserLedgerState>,
+    Enc<Shared, MerchantLedgerState>,
+    Enc<Shared, UserSubscriptionState>,
 ) {
-    let user_bal = user_balance.to_arcis();
-    let merchant_bal = merchant_balance.to_arcis();
-    let status = subscription_status.to_arcis();
-    let next_date = next_payment_date.to_arcis();
+    let mut user = user_ledger.to_arcis();
+    let mut merchant = merchant_ledger.to_arcis();
+    let mut sub = subscription.to_arcis();
 
-    // ステータスがActiveでない場合はスキップ
-    let is_active = status.eq(&0u8);
+    if user_is_new {
+        user.balance = 0;
+        user.subscription_count = 0;
+    }
+    if merchant_is_new {
+        merchant.balance = 0;
+        merchant.total_claimed = 0;
+    }
 
-    // 支払い日が到来しているか
-    let is_due = next_date.le(&current_timestamp);
+    let is_active = sub.status == 0;
+    let is_due = sub.next_payment_date <= current_timestamp;
+    let is_plan_match =
+        (sub.plan[0] == plan_pubkey[0]) & (sub.plan[1] == plan_pubkey[1]);
 
-    // 残高が十分か
-    let has_balance = user_bal.ge(&plan_price);
+    let should_process = is_active && is_due && is_plan_match;
+    let has_balance = user.balance >= plan_price;
+    let can_pay = should_process && has_balance;
 
-    // 支払い実行判定
-    let should_process = is_active & is_due;
-    let can_pay = should_process & has_balance;
+    if should_process && !has_balance {
+        sub.status = 1u8; // Cancelled
+    }
 
-    // 残高更新
-    let new_user_bal = if can_pay {
-        user_bal - plan_price
-    } else {
-        user_bal
-    };
-
-    let new_merchant_bal = if can_pay {
-        merchant_bal + plan_price
-    } else {
-        merchant_bal
-    };
-
-    // ステータス更新（残高不足時はキャンセル）
-    let new_status = if should_process & !has_balance {
-        1u8  // Cancelled
-    } else {
-        status
-    };
-
-    // 次回支払日更新
     let cycle_seconds = (billing_cycle_days as i64) * 86400;
-    let new_next_date = if can_pay {
-        next_date + cycle_seconds
-    } else {
-        next_date
+    if can_pay {
+        let base_date = if sub.next_payment_date == 0 {
+            current_timestamp
+        } else {
+            sub.next_payment_date
+        };
+        sub.next_payment_date = base_date + cycle_seconds;
+    }
+
+    let user_state = UserLedgerState {
+        balance: if can_pay { user.balance - plan_price } else { user.balance },
+        subscription_count: user.subscription_count,
+    };
+    let merchant_state = MerchantLedgerState {
+        balance: if can_pay { merchant.balance + plan_price } else { merchant.balance },
+        total_claimed: merchant.total_claimed,
     };
 
     (
-        new_user_bal.from_arcis(),
-        new_merchant_bal.from_arcis(),
-        new_status.from_arcis(),
-        new_next_date.from_arcis(),
-        can_pay.reveal(),
+        user_ledger.owner.from_arcis(user_state),
+        merchant_ledger.owner.from_arcis(merchant_state),
+        subscription.owner.from_arcis(sub),
     )
 }
 ```
@@ -750,19 +781,19 @@ pub fn process_payment_circuit(
 
 ```rust
 #[encrypted]
-pub fn verify_subscription_circuit(
-    subscription_status: Enc<Mxe, u8>,
-    next_payment_date: Enc<Mxe, i64>,
+pub fn verify_subscription_v2(
+    subscription: Enc<Shared, UserSubscriptionState>,
     current_timestamp: i64,
 ) -> bool {
-    let status = subscription_status.to_arcis();
-    let next_date = next_payment_date.to_arcis();
+    let sub = subscription.to_arcis();
 
-    // Active かつ 支払い期限内
-    let is_active = status.eq(&0u8);
-    let is_valid = next_date.gt(&current_timestamp);
+    // Active かつ 支払い期限内（grace period あり）
+    let is_active = sub.status == 0;
+    let grace_period: i64 = 259200; // 3 days
+    let grace_deadline = sub.next_payment_date + grace_period;
+    let is_valid = current_timestamp <= grace_deadline;
 
-    (is_active & is_valid).reveal()
+    (is_active && is_valid).reveal()
 }
 ```
 

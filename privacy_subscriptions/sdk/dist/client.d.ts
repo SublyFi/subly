@@ -12,6 +12,7 @@ export interface Wallet {
     publicKey: PublicKey;
     signTransaction<T extends Transaction>(tx: T): Promise<T>;
     signAllTransactions<T extends Transaction>(txs: T[]): Promise<T[]>;
+    signMessage?: (message: Uint8Array) => Promise<Uint8Array>;
 }
 /**
  * Options for subscribe/unsubscribe operations
@@ -36,7 +37,7 @@ export interface TransactionOptions {
  * const plans = await sdk.getPlans(true); // active only
  *
  * // Check user subscription status
- * const status = await sdk.checkSubscription(userWallet, planId);
+ * const status = await sdk.checkSubscription(wallet, planId);
  *
  * // Subscribe a user
  * const signature = await sdk.subscribe(planId, wallet);
@@ -46,8 +47,10 @@ export declare class SublySDK {
     private connection;
     private merchantWallet;
     private programId;
-    private arciumClient;
     private commitment;
+    private arciumContext;
+    private arciumContextOwner;
+    private clusterOffset;
     /**
      * Create a new SublySDK instance
      *
@@ -64,9 +67,9 @@ export declare class SublySDK {
      */
     private toPublicKey;
     /**
-     * Get or initialize Arcium client
+     * Get or initialize Arcium encryption context for a wallet
      */
-    private getArciumClient;
+    private getArciumContext;
     /**
      * Get all subscription plans for this merchant
      *
@@ -89,20 +92,13 @@ export declare class SublySDK {
      */
     getPlanById(planId: BN | number): Promise<SubscriptionPlan | null>;
     /**
-     * Check a user's subscription status
+     * Check a user's subscription status (decrypts the user's subscription data).
      *
-     * Note: This is a simplified implementation. In production, this would:
-     * 1. Send a verify_subscription transaction
-     * 2. Wait for the Arcium MPC callback
-     * 3. Parse the SubscriptionVerified event
-     *
-     * For now, we check if the UserSubscription account exists and is not cancelled
-     *
-     * @param userWallet - User's wallet public key
+     * @param wallet - User's wallet (requires signMessage)
      * @param planPDA - Plan account public key
      * @returns Subscription status
      */
-    checkSubscription(userWallet: PublicKey | string, planPDA: PublicKey | string): Promise<SubscriptionStatus>;
+    checkSubscription(wallet: Wallet, planPDA: PublicKey | string): Promise<SubscriptionStatus>;
     /**
      * Subscribe a user to a plan
      *
@@ -123,7 +119,7 @@ export declare class SublySDK {
     unsubscribe(subscriptionIndex: BN | number, wallet: Wallet, options?: TransactionOptions): Promise<TransactionSignature>;
     /**
      * Get the next subscription index for a user
-     * (scans existing subscriptions to find the next available index)
+     * (decrypts encrypted_subscription_count from the user's ledger)
      */
     private getNextSubscriptionIndex;
     /**

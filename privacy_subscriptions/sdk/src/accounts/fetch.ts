@@ -23,7 +23,9 @@ export interface UserLedgerData {
   publicKey: PublicKey;
   user: PublicKey;
   mint: PublicKey;
-  encryptedBalance: Uint8Array[];
+  encryptionPubkey: Uint8Array;
+  encryptedBalance: Uint8Array;
+  encryptedSubscriptionCount: Uint8Array;
   nonce: BN;
   lastUpdated: BN;
 }
@@ -99,32 +101,41 @@ function parseUserSubscription(
   const subscriptionIndex = new BN(data.subarray(offset, offset + 8), 'le');
   offset += 8;
 
-  // plan: Pubkey (32 bytes)
-  const plan = new PublicKey(data.subarray(offset, offset + 32));
+  // encryption_pubkey: [u8; 32]
+  const encryptionPubkey = new Uint8Array(data.subarray(offset, offset + 32));
   offset += 32;
 
-  // encrypted_status: [u8; 32] (32 bytes) - skip for now
+  // encrypted_plan: [[u8; 32]; 2]
+  const encryptedPlan0 = new Uint8Array(data.subarray(offset, offset + 32));
+  const encryptedPlan1 = new Uint8Array(data.subarray(offset + 32, offset + 64));
+  offset += 64;
+
+  // encrypted_status: [u8; 32]
+  const encryptedStatus = new Uint8Array(data.subarray(offset, offset + 32));
   offset += 32;
 
-  // encrypted_next_payment_date: [u8; 32] (32 bytes) - skip for now
+  // encrypted_next_payment_date: [u8; 32]
+  const encryptedNextPaymentDate = new Uint8Array(data.subarray(offset, offset + 32));
   offset += 32;
 
-  // nonce: u128 (16 bytes) - skip for now
+  // encrypted_start_date: [u8; 32]
+  const encryptedStartDate = new Uint8Array(data.subarray(offset, offset + 32));
+  offset += 32;
+
+  // nonce: u128 (16 bytes)
+  const nonce = new BN(data.subarray(offset, offset + 16), 'le');
   offset += 16;
 
-  // bump: u8 (1 byte) - skip
-  offset += 1;
-
-  // We need to get merchant from the plan, but for now we'll leave it empty
-  // The caller should populate this from the plan data
   return {
     publicKey,
     user,
-    plan,
-    merchant: PublicKey.default, // To be populated by caller
     subscriptionIndex,
-    isCancelled: false, // Encrypted on-chain, can't determine without decryption
-    createdAt: new BN(0), // Not stored in account
+    encryptionPubkey,
+    encryptedPlan: [encryptedPlan0, encryptedPlan1],
+    encryptedStatus,
+    encryptedNextPaymentDate,
+    encryptedStartDate,
+    nonce,
   };
 }
 
@@ -146,12 +157,17 @@ function parseUserLedger(
   const mint = new PublicKey(data.subarray(offset, offset + 32));
   offset += 32;
 
-  // encrypted_balance: [[u8; 32]; 2] (64 bytes)
-  const encryptedBalance: Uint8Array[] = [
-    new Uint8Array(data.subarray(offset, offset + 32)),
-    new Uint8Array(data.subarray(offset + 32, offset + 64)),
-  ];
-  offset += 64;
+  // encryption_pubkey: [u8; 32]
+  const encryptionPubkey = new Uint8Array(data.subarray(offset, offset + 32));
+  offset += 32;
+
+  // encrypted_balance: [u8; 32]
+  const encryptedBalance = new Uint8Array(data.subarray(offset, offset + 32));
+  offset += 32;
+
+  // encrypted_subscription_count: [u8; 32]
+  const encryptedSubscriptionCount = new Uint8Array(data.subarray(offset, offset + 32));
+  offset += 32;
 
   // nonce: u128 (16 bytes)
   const nonce = new BN(data.subarray(offset, offset + 16), 'le');
@@ -164,7 +180,9 @@ function parseUserLedger(
     publicKey,
     user,
     mint,
+    encryptionPubkey,
     encryptedBalance,
+    encryptedSubscriptionCount,
     nonce,
     lastUpdated,
   };

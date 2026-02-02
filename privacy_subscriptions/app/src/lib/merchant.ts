@@ -4,10 +4,6 @@ import { BN, Program, Idl } from "@coral-xyz/anchor";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import {
-  ArciumContext,
-  encryptAmount,
-  generateNonce,
-  deserializeLE,
   getArciumAccounts,
   generateComputationOffset,
 } from "./arcium";
@@ -31,13 +27,14 @@ import {
 export async function executeRegisterMerchant(
   program: Program<Idl>,
   walletPubkey: PublicKey,
-  name: string
+  name: string,
+  encryptionPubkey: Uint8Array
 ): Promise<string> {
   const [merchantPDA] = getMerchantPDA(walletPubkey);
   const [merchantLedgerPDA] = getMerchantLedgerPDA(merchantPDA, TOKEN_MINT);
 
   const signature = await program.methods
-    .registerMerchant(name)
+    .registerMerchant(name, Array.from(encryptionPubkey))
     .accounts({
       wallet: walletPubkey,
       mint: TOKEN_MINT,
@@ -122,13 +119,9 @@ export async function executeUpdatePlan(
 export async function executeClaimRevenue(
   program: Program<Idl>,
   walletPubkey: PublicKey,
-  amount: bigint,
-  arciumContext: ArciumContext
+  amount: bigint
 ): Promise<string> {
   const computationOffset = generateComputationOffset();
-  const nonce = generateNonce();
-  const encryptedAmount = encryptAmount(arciumContext.cipher, amount, nonce);
-  const nonceValue = deserializeLE(nonce);
 
   const [merchantPDA] = getMerchantPDA(walletPubkey);
   const [merchantLedgerPDA] = getMerchantLedgerPDA(merchantPDA, TOKEN_MINT);
@@ -154,12 +147,7 @@ export async function executeClaimRevenue(
   );
 
   const signature = await program.methods
-    .claimRevenue(
-      computationOffset,
-      Array.from(encryptedAmount),
-      Array.from(arciumContext.publicKey),
-      new BN(nonceValue.toString())
-    )
+    .claimRevenue(computationOffset, new BN(amount.toString()))
     .accounts({
       wallet: walletPubkey,
       mint: TOKEN_MINT,
@@ -232,7 +220,9 @@ export async function fetchMerchantLedger(
   publicKey: PublicKey;
   merchant: PublicKey;
   mint: PublicKey;
-  encryptedBalance: number[][];
+  encryptionPubkey: number[];
+  encryptedBalance: number[];
+  encryptedTotalClaimed: number[];
   nonce: BN;
   bump: number;
 } | null> {
@@ -247,7 +237,9 @@ export async function fetchMerchantLedger(
       publicKey: merchantLedgerPDA,
       merchant: account.merchant,
       mint: account.mint,
+      encryptionPubkey: account.encryptionPubkey,
       encryptedBalance: account.encryptedBalance,
+      encryptedTotalClaimed: account.encryptedTotalClaimed,
       nonce: account.nonce,
       bump: account.bump,
     };
@@ -345,21 +337,10 @@ export async function countActiveSubscribers(
   program: Program<Idl>,
   walletPubkey: PublicKey
 ): Promise<number> {
-  const plans = await fetchMerchantPlans(program, walletPubkey);
-  if (plans.length === 0) {
-    return 0;
-  }
-
-  // Get all user subscriptions
-  const allSubscriptions = await (
-    program.account as any
-  ).userSubscription.all();
-
-  // Filter subscriptions that reference this merchant's plans
-  const planPubkeys = new Set(plans.map((p) => p.publicKey.toBase58()));
-  const activeSubscriptions = allSubscriptions.filter((sub: any) =>
-    planPubkeys.has(sub.account.plan.toBase58())
-  );
-
-  return activeSubscriptions.length;
+  // Plan is encrypted on-chain, so we cannot filter subscriptions by plan
+  // without an MPC aggregation flow. Return 0 until a privacy-preserving
+  // counter is implemented.
+  const _ = program;
+  const __ = walletPubkey;
+  return 0;
 }

@@ -4,7 +4,6 @@ import { useState, useCallback } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { createAnchorProvider, getProgram } from "@/lib/anchor";
 import { executeClaimRevenue } from "@/lib/merchant";
-import { createArciumContext } from "@/lib/arcium";
 import { ClaimState } from "@/types";
 import { MPCTimeoutError } from "@/lib/errors";
 
@@ -46,9 +45,6 @@ export function useClaim(): UseClaimReturn {
       setTxSignature(null);
 
       try {
-        // Create Arcium context for encryption
-        const arciumContext = await createArciumContext(connection);
-
         setState("sending");
 
         // Create provider and program
@@ -63,8 +59,7 @@ export function useClaim(): UseClaimReturn {
         const signature = await executeClaimRevenue(
           program,
           wallet.publicKey,
-          amount,
-          arciumContext
+          amount
         );
 
         setState("waiting_mpc");

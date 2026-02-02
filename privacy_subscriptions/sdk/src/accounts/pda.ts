@@ -2,7 +2,7 @@ import { PublicKey } from '@solana/web3.js';
 import BN from 'bn.js';
 
 /** Default program ID for Privacy Subscriptions */
-export const PROGRAM_ID = new PublicKey('8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2');
+export const PROGRAM_ID = new PublicKey('Hwmvq4rJ1P6bxHD5G6KvzteuXdMtMzpwZTT7AJb3wSa9');
 
 /** PDA Seeds */
 export const PROTOCOL_CONFIG_SEED = Buffer.from('protocol_config');

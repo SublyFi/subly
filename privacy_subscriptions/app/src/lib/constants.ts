@@ -3,11 +3,11 @@ import { BN } from "@coral-xyz/anchor";
 
 // Program IDs
 export const PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_PROGRAM_ID || "B2WX7o3djQSAus1QdHYuezL95qUox6C1zmRS6JdDL7Ye"
+  process.env.NEXT_PUBLIC_PROGRAM_ID || "Hwmvq4rJ1P6bxHD5G6KvzteuXdMtMzpwZTT7AJb3wSa9"
 );
 
 export const ARCIUM_PROGRAM_ID = new PublicKey(
-  process.env.NEXT_PUBLIC_ARCIUM_PROGRAM_ID || "arcm2q7TLNUFpKtTg6Fv8mzJVLhVAAEDvPXYLfuiXjN"
+  process.env.NEXT_PUBLIC_ARCIUM_PROGRAM_ID || "Arcj82pX7HxYKLR92qvgZUAd7vGS1k4hQvAFcPATFdEQ"
 );
 
 // Token Mint (Devnet USDC)
@@ -33,13 +33,13 @@ export const SEEDS = {
 
 // Computation Definition Offsets (for Arcium)
 export const COMP_DEF_OFFSETS = {
-  DEPOSIT: 0,
-  WITHDRAW: 1,
-  SUBSCRIBE: 2,
-  UNSUBSCRIBE: 3,
-  PROCESS_PAYMENT: 4,
-  VERIFY_SUBSCRIPTION: 5,
-  CLAIM_REVENUE: 6,
+  DEPOSIT: 1894255896,
+  WITHDRAW: 2549376853,
+  SUBSCRIBE: 524592853,
+  UNSUBSCRIBE: 3264881130,
+  PROCESS_PAYMENT: 930732409,
+  VERIFY_SUBSCRIPTION: 1451574225,
+  CLAIM_REVENUE: 2315398764,
 } as const;
 
 // Token decimals

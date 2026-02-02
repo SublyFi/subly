@@ -121,11 +121,11 @@ pub struct InitAddTogetherCompDef<'info> {
 ```
 
 ```
-Program Id: 8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2
+Program Id: Hwmvq4rJ1P6bxHD5G6KvzteuXdMtMzpwZTT7AJb3wSa9
 
 Signature: 4ykqe7Pip1uEZHSzDxgkJoY7inLYR5csu2F6Z3r8TiurAVTcTCnmEQfubfCvPor3uecezHRffTEwqSdj4qXTkRPR
 
-Waiting for program 8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2 to be confirmed...
+Waiting for program Hwmvq4rJ1P6bxHD5G6KvzteuXdMtMzpwZTT7AJb3wSa9 to be confirmed...
 Program confirmed on-chain
 Idl data length: 5408 bytes
 Step 0/5408
@@ -153,7 +153,7 @@ $ /Users/yukikimura/work/solana-privacy/sublyfi/subly/privacy_subscriptions/node
 ╚════════════════════════════════════════════════════════════╝
 
 --- Configuration ---
-Program ID: 8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2
+Program ID: Hwmvq4rJ1P6bxHD5G6KvzteuXdMtMzpwZTT7AJb3wSa9
 Cluster: https://api.devnet.solana.com
 USDC Mint: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
 Fee Rate: 100 bps (1%)
@@ -212,11 +212,11 @@ yukikimura@YukinoMacBook-Pro privacy_subscriptions %
 ```
 
 ```
-Program Id: 8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2
+Program Id: Hwmvq4rJ1P6bxHD5G6KvzteuXdMtMzpwZTT7AJb3wSa9
 
 Signature: uPnrxGEbG4RTSgFmThcMMkKiWMKRsBkezicwTH3sMyF8aCNJ2ZabXZTcQX3wXrxxViEx2Cm9PBvHzEcoTmJWS9a
 
-Waiting for program 8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2 to be confirmed...
+Waiting for program Hwmvq4rJ1P6bxHD5G6KvzteuXdMtMzpwZTT7AJb3wSa9 to be confirmed...
 Program confirmed on-chain
 Idl data length: 5408 bytes
 Step 0/5408
@@ -244,7 +244,7 @@ $ /Users/yukikimura/work/solana-privacy/sublyfi/subly/privacy_subscriptions/node
 ╚════════════════════════════════════════════════════════════╝
 
 --- Configuration ---
-Program ID: 8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2
+Program ID: Hwmvq4rJ1P6bxHD5G6KvzteuXdMtMzpwZTT7AJb3wSa9
 Cluster: https://devnet.helius-rpc.com/?api-key=8725da20-c68a-48f9-bac4-bed8f6e9fa0a
 USDC Mint: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
 Fee Rate: 0 bps (0%)

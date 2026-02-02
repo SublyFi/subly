@@ -2,10 +2,11 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 import { UserSubscription } from "@/types";
 import { useArcium } from "@/components/providers/ArciumProvider";
 import { fetchUserSubscriptions, fetchSubscriptionPlan } from "@/lib/transactions";
-import { decryptBalance } from "@/lib/arcium";
+import { decryptValues, u128sToPubkey } from "@/lib/arcium";
 
 export interface UseSubscriptionsResult {
   subscriptions: UserSubscription[];
@@ -54,11 +55,10 @@ export const useSubscriptions = (): UseSubscriptionsResult => {
       // Process each subscription
       const processedSubs: UserSubscription[] = await Promise.all(
         userSubs.map(async (sub) => {
-          // Fetch the associated plan
-          const plan = await fetchSubscriptionPlan(program, sub.account.plan);
-
-          // Decode plan name
-          const planName = plan ? decodePlanName(plan.name) : null;
+          let planPubkey: PublicKey | null = null;
+          let status: "active" | "cancelled" | "expired" | "unknown" = "unknown";
+          let nextPaymentAt = 0;
+          let startDate = 0;
 
           // Convert nonce to Uint8Array for decryption
           const nonceBytes = new Uint8Array(16);
@@ -68,46 +68,55 @@ export const useSubscriptions = (): UseSubscriptionsResult => {
             nonce >>= BigInt(8);
           }
 
-          // Decrypt status and next payment date if we have arcium context
-          let status: "active" | "cancelled" | "expired" = "active";
-          let nextPaymentAt = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60; // Default to 30 days
-
           if (arciumContext) {
             try {
-              // Decrypt status (0 = Active, 1 = Cancelled, 2 = Expired)
-              const decryptedStatus = decryptBalance(
-                arciumContext.cipher,
-                sub.account.encryptedStatus,
-                nonceBytes
-              );
-              const statusValue = Number(decryptedStatus);
-              if (statusValue === 1) {
+              const [planPart1, planPart2, statusVal, nextPayVal, startVal] =
+                decryptValues(
+                  arciumContext.cipher,
+                  [
+                    sub.account.encryptedPlan[0],
+                    sub.account.encryptedPlan[1],
+                    sub.account.encryptedStatus,
+                    sub.account.encryptedNextPaymentDate,
+                    sub.account.encryptedStartDate,
+                  ],
+                  nonceBytes
+                );
+
+              planPubkey = u128sToPubkey([planPart1, planPart2]);
+
+              const statusValue = Number(statusVal);
+              if (statusValue === 0) {
+                status = "active";
+              } else if (statusValue === 1) {
                 status = "cancelled";
               } else if (statusValue === 2) {
                 status = "expired";
               }
 
-              // Decrypt next payment date
-              const decryptedDate = decryptBalance(
-                arciumContext.cipher,
-                sub.account.encryptedNextPaymentDate,
-                nonceBytes
-              );
-              nextPaymentAt = Number(decryptedDate);
+              nextPaymentAt = Number(BigInt.asIntN(64, nextPayVal));
+              startDate = Number(BigInt.asIntN(64, startVal));
             } catch (decryptErr) {
               console.error("Failed to decrypt subscription data:", decryptErr);
             }
           }
 
+          const plan = planPubkey
+            ? await fetchSubscriptionPlan(program, planPubkey)
+            : null;
+
+          const planName = plan ? decodePlanName(plan.name) : null;
+
           return {
             publicKey: sub.publicKey,
-            merchant: plan?.merchant || sub.account.plan,
-            plan: sub.account.plan,
+            subscriptionIndex: BigInt(sub.account.subscriptionIndex.toString()),
+            merchant: plan?.merchant || PublicKey.default,
+            plan: planPubkey,
             planName,
             status,
             nextPaymentAt,
             paymentAmount: plan ? BigInt(plan.price.toString()) : BigInt(0),
-            createdAt: Math.floor(Date.now() / 1000), // Not stored on-chain, use current
+            createdAt: startDate,
             updatedAt: Math.floor(Date.now() / 1000),
           };
         })

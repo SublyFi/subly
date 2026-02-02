@@ -1,12 +1,13 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { PublicKey, Keypair } from "@solana/web3.js";
+import { PublicKey, Keypair, AddressLookupTableProgram } from "@solana/web3.js";
 import { PrivacySubscriptions } from "../target/types/privacy_subscriptions";
 import {
   getArciumAccountBaseSeed,
   getArciumProgramId,
   getCompDefAccOffset,
   getMXEAccAddress,
+  getLookupTableAddress,
 } from "@arcium-hq/client";
 import * as fs from "fs";
 import * as os from "os";
@@ -15,8 +16,12 @@ import * as os from "os";
 // Configuration
 // ============================================================================
 
-// Devnet USDC address
-const USDC_MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
+// Token mint (override with TOKEN_MINT or NEXT_PUBLIC_TOKEN_MINT for localnet)
+const TOKEN_MINT_ADDRESS =
+  process.env.TOKEN_MINT ||
+  process.env.NEXT_PUBLIC_TOKEN_MINT ||
+  "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
+const USDC_MINT = new PublicKey(TOKEN_MINT_ADDRESS);
 
 // Protocol fee rate in basis points (100 = 1%)
 const FEE_RATE_BPS = 0;
@@ -27,13 +32,13 @@ const PROTOCOL_POOL_SEED = Buffer.from("protocol_pool");
 
 // Computation definition names
 const COMP_DEF_NAMES = [
-  "deposit",
-  "withdraw",
-  "subscribe",
-  "unsubscribe",
-  "process_payment",
-  "verify_subscription",
-  "claim_revenue",
+  "deposit_v2",
+  "withdraw_v2",
+  "subscribe_v2",
+  "unsubscribe_v2",
+  "process_payment_v2",
+  "verify_subscription_v2",
+  "claim_revenue_v2",
 ] as const;
 
 // ============================================================================
@@ -115,13 +120,15 @@ async function initializeCompDefs(
   console.log("\n=== Initializing Computation Definitions ===\n");
 
   const mxeAccount = getMXEAccAddress(program.programId);
+  const addressLookupTable = getLookupTableAddress(program.programId);
+  const forceReinit = process.env.FORCE_REINIT === "1";
 
   for (const compDefName of COMP_DEF_NAMES) {
     const [compDefPDA] = getCompDefPDA(program.programId, compDefName);
 
     // Check if already initialized
     const accountInfo = await provider.connection.getAccountInfo(compDefPDA);
-    if (accountInfo !== null) {
+    if (accountInfo !== null && !forceReinit) {
       console.log(`[SKIP] ${compDefName} CompDef already initialized`);
       continue;
     }
@@ -136,30 +143,32 @@ async function initializeCompDefs(
           payer: payer.publicKey,
           mxeAccount,
           compDefAccount: compDefPDA,
+          addressLookupTable,
+          lutProgram: AddressLookupTableProgram.programId,
         };
 
         switch (compDefName) {
-          case "deposit":
+          case "deposit_v2":
             return program.methods.initDepositCompDef().accounts(baseAccounts);
-          case "withdraw":
+          case "withdraw_v2":
             return program.methods.initWithdrawCompDef().accounts(baseAccounts);
-          case "subscribe":
+          case "subscribe_v2":
             return program.methods
               .initSubscribeCompDef()
               .accounts(baseAccounts);
-          case "unsubscribe":
+          case "unsubscribe_v2":
             return program.methods
               .initUnsubscribeCompDef()
               .accounts(baseAccounts);
-          case "process_payment":
+          case "process_payment_v2":
             return program.methods
               .initProcessPaymentCompDef()
               .accounts(baseAccounts);
-          case "verify_subscription":
+          case "verify_subscription_v2":
             return program.methods
               .initVerifySubscriptionCompDef()
               .accounts(baseAccounts);
-          case "claim_revenue":
+          case "claim_revenue_v2":
             return program.methods
               .initClaimRevenueCompDef()
               .accounts(baseAccounts);

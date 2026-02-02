@@ -1,5 +1,5 @@
 {
-  "address": "8GVcKi58PTZYDjaBLaDnaaxDewrWwfaSQCST5v2tFnk2",
+  "address": "Hwmvq4rJ1P6bxHD5G6KvzteuXdMtMzpwZTT7AJb3wSa9",
   "metadata": {
     "name": "privacy_subscriptions",
     "version": "0.1.0",
@@ -211,40 +211,22 @@
           "type": "u64"
         },
         {
-          "name": "encrypted_amount",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "pubkey",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "nonce",
-          "type": "u128"
+          "name": "amount",
+          "type": "u64"
         }
       ]
     },
     {
-      "name": "claim_revenue_callback",
+      "name": "claim_revenue_v2_callback",
       "discriminator": [
-        61,
-        73,
-        61,
-        232,
-        9,
-        0,
-        194,
-        66
+        62,
+        251,
+        39,
+        68,
+        76,
+        198,
+        247,
+        174
       ],
       "accounts": [
         {
@@ -298,7 +280,7 @@
                   "kind": "type",
                   "type": {
                     "defined": {
-                      "name": "ClaimRevenueOutput"
+                      "name": "ClaimRevenueResult"
                     }
                   }
                 }
@@ -598,6 +580,15 @@
           "type": "u64"
         },
         {
+          "name": "encryption_pubkey",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
           "name": "encrypted_amount",
           "type": {
             "array": [
@@ -607,31 +598,22 @@
           }
         },
         {
-          "name": "pubkey",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "nonce",
+          "name": "encrypted_amount_nonce",
           "type": "u128"
         }
       ]
     },
     {
-      "name": "deposit_callback",
+      "name": "deposit_v2_callback",
       "discriminator": [
-        203,
-        84,
+        8,
         215,
-        177,
-        14,
-        39,
-        30,
-        203
+        104,
+        249,
+        29,
+        147,
+        120,
+        27
       ],
       "accounts": [
         {
@@ -670,7 +652,7 @@
                   "kind": "type",
                   "type": {
                     "defined": {
-                      "name": "DepositOutput"
+                      "name": "DepositV2Output"
                     }
                   }
                 }
@@ -705,6 +687,14 @@
         {
           "name": "comp_def_account",
           "writable": true
+        },
+        {
+          "name": "address_lookup_table",
+          "writable": true
+        },
+        {
+          "name": "lut_program",
+          "address": "AddressLookupTab1e1111111111111111111111111"
         },
         {
           "name": "arcium_program",
@@ -744,6 +734,14 @@
           "writable": true
         },
         {
+          "name": "address_lookup_table",
+          "writable": true
+        },
+        {
+          "name": "lut_program",
+          "address": "AddressLookupTab1e1111111111111111111111111"
+        },
+        {
           "name": "arcium_program",
           "address": "Arcj82pX7HxYKLR92qvgZUAd7vGS1k4hQvAFcPATFdEQ"
         },
@@ -779,6 +777,14 @@
         {
           "name": "comp_def_account",
           "writable": true
+        },
+        {
+          "name": "address_lookup_table",
+          "writable": true
+        },
+        {
+          "name": "lut_program",
+          "address": "AddressLookupTab1e1111111111111111111111111"
         },
         {
           "name": "arcium_program",
@@ -818,6 +824,14 @@
           "writable": true
         },
         {
+          "name": "address_lookup_table",
+          "writable": true
+        },
+        {
+          "name": "lut_program",
+          "address": "AddressLookupTab1e1111111111111111111111111"
+        },
+        {
           "name": "arcium_program",
           "address": "Arcj82pX7HxYKLR92qvgZUAd7vGS1k4hQvAFcPATFdEQ"
         },
@@ -853,6 +867,14 @@
         {
           "name": "comp_def_account",
           "writable": true
+        },
+        {
+          "name": "address_lookup_table",
+          "writable": true
+        },
+        {
+          "name": "lut_program",
+          "address": "AddressLookupTab1e1111111111111111111111111"
         },
         {
           "name": "arcium_program",
@@ -892,6 +914,14 @@
           "writable": true
         },
         {
+          "name": "address_lookup_table",
+          "writable": true
+        },
+        {
+          "name": "lut_program",
+          "address": "AddressLookupTab1e1111111111111111111111111"
+        },
+        {
           "name": "arcium_program",
           "address": "Arcj82pX7HxYKLR92qvgZUAd7vGS1k4hQvAFcPATFdEQ"
         },
@@ -927,6 +957,14 @@
         {
           "name": "comp_def_account",
           "writable": true
+        },
+        {
+          "name": "address_lookup_table",
+          "writable": true
+        },
+        {
+          "name": "lut_program",
+          "address": "AddressLookupTab1e1111111111111111111111111"
         },
         {
           "name": "arcium_program",
@@ -1350,33 +1388,20 @@
         {
           "name": "computation_offset",
           "type": "u64"
-        },
-        {
-          "name": "pubkey",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "nonce",
-          "type": "u128"
         }
       ]
     },
     {
-      "name": "process_payment_callback",
+      "name": "process_payment_v2_callback",
       "discriminator": [
-        103,
-        129,
-        250,
-        148,
+        53,
+        255,
+        223,
         222,
-        64,
-        45,
-        185
+        164,
+        103,
+        131,
+        109
       ],
       "accounts": [
         {
@@ -1423,7 +1448,7 @@
                   "kind": "type",
                   "type": {
                     "defined": {
-                      "name": "ProcessPaymentOutput"
+                      "name": "ProcessPaymentResult"
                     }
                   }
                 }
@@ -1527,6 +1552,15 @@
         {
           "name": "name",
           "type": "string"
+        },
+        {
+          "name": "encryption_pubkey",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         }
       ]
     },
@@ -1783,6 +1817,24 @@
           "type": "u64"
         },
         {
+          "name": "encrypted_plan",
+          "type": {
+            "array": [
+              {
+                "array": [
+                  "u8",
+                  32
+                ]
+              },
+              2
+            ]
+          }
+        },
+        {
+          "name": "encrypted_plan_nonce",
+          "type": "u128"
+        },
+        {
           "name": "encrypted_price",
           "type": {
             "array": [
@@ -1792,7 +1844,11 @@
           }
         },
         {
-          "name": "pubkey",
+          "name": "encrypted_price_nonce",
+          "type": "u128"
+        },
+        {
+          "name": "encrypted_billing_cycle",
           "type": {
             "array": [
               "u8",
@@ -1801,22 +1857,22 @@
           }
         },
         {
-          "name": "nonce",
+          "name": "encrypted_billing_cycle_nonce",
           "type": "u128"
         }
       ]
     },
     {
-      "name": "subscribe_callback",
+      "name": "subscribe_v2_callback",
       "discriminator": [
-        189,
-        209,
-        84,
-        165,
-        202,
-        208,
-        203,
-        223
+        243,
+        90,
+        254,
+        148,
+        126,
+        23,
+        5,
+        50
       ],
       "accounts": [
         {
@@ -1863,7 +1919,7 @@
                   "kind": "type",
                   "type": {
                     "defined": {
-                      "name": "SubscribeOutput"
+                      "name": "SubscribeResult"
                     }
                   }
                 }
@@ -2010,33 +2066,20 @@
         {
           "name": "computation_offset",
           "type": "u64"
-        },
-        {
-          "name": "pubkey",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "nonce",
-          "type": "u128"
         }
       ]
     },
     {
-      "name": "unsubscribe_callback",
+      "name": "unsubscribe_v2_callback",
       "discriminator": [
-        248,
-        162,
-        41,
-        204,
-        81,
-        93,
-        72,
-        129
+        150,
+        78,
+        216,
+        43,
+        110,
+        35,
+        123,
+        176
       ],
       "accounts": [
         {
@@ -2075,7 +2118,7 @@
                   "kind": "type",
                   "type": {
                     "defined": {
-                      "name": "UnsubscribeOutput"
+                      "name": "UnsubscribeV2Output"
                     }
                   }
                 }
@@ -2333,33 +2376,20 @@
         {
           "name": "computation_offset",
           "type": "u64"
-        },
-        {
-          "name": "pubkey",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "nonce",
-          "type": "u128"
         }
       ]
     },
     {
-      "name": "verify_subscription_callback",
+      "name": "verify_subscription_v2_callback",
       "discriminator": [
-        254,
-        0,
-        108,
-        226,
-        37,
-        204,
-        133,
-        138
+        161,
+        44,
+        207,
+        144,
+        185,
+        217,
+        34,
+        155
       ],
       "accounts": [
         {
@@ -2394,7 +2424,7 @@
                   "kind": "type",
                   "type": {
                     "defined": {
-                      "name": "VerifySubscriptionOutput"
+                      "name": "VerifySubscriptionV2Output"
                     }
                   }
                 }
@@ -2580,40 +2610,31 @@
           "type": "u64"
         },
         {
-          "name": "encrypted_amount",
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "encryption_pubkey",
           "type": {
             "array": [
               "u8",
               32
             ]
           }
-        },
-        {
-          "name": "pubkey",
-          "type": {
-            "array": [
-              "u8",
-              32
-            ]
-          }
-        },
-        {
-          "name": "nonce",
-          "type": "u128"
         }
       ]
     },
     {
-      "name": "withdraw_callback",
+      "name": "withdraw_v2_callback",
       "discriminator": [
-        75,
-        124,
-        115,
-        155,
-        173,
-        179,
-        40,
-        16
+        245,
+        27,
+        227,
+        4,
+        137,
+        96,
+        246,
+        232
       ],
       "accounts": [
         {
@@ -2667,7 +2688,7 @@
                   "kind": "type",
                   "type": {
                     "defined": {
-                      "name": "WithdrawOutput"
+                      "name": "WithdrawResult"
                     }
                   }
                 }
@@ -2897,31 +2918,51 @@
     },
     {
       "code": 6006,
+      "name": "InvalidAmount",
+      "msg": "Invalid amount (must be greater than 0)"
+    },
+    {
+      "code": 6007,
       "name": "InvalidBillingCycle",
       "msg": "Invalid billing cycle (must be 1-365 days)"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "NameTooLong",
       "msg": "Name too long"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "MerchantNotActive",
       "msg": "Merchant not active"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "PlanNotActive",
       "msg": "Plan not active"
     },
     {
-      "code": 6010,
+      "code": 6011,
+      "name": "InvalidMint",
+      "msg": "Invalid mint"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidEncryptionKey",
+      "msg": "Invalid encryption key"
+    },
+    {
+      "code": 6013,
+      "name": "EncryptionKeyMismatch",
+      "msg": "Encryption key mismatch"
+    },
+    {
+      "code": 6014,
       "name": "InsufficientBalance",
       "msg": "Insufficient balance"
     },
     {
-      "code": 6011,
+      "code": 6015,
       "name": "SubscriptionNotActive",
       "msg": "Subscription not active"
     }
@@ -3016,11 +3057,7 @@
       }
     },
     {
-      "name": "ClaimRevenueOutput",
-      "docs": [
-        "The output of the callback instruction. Provided as a struct with ordered fields",
-        "as anchor does not support tuples and tuple structs yet."
-      ],
+      "name": "ClaimRevenueResult",
       "type": {
         "kind": "struct",
         "fields": [
@@ -3032,11 +3069,15 @@
                 "generics": [
                   {
                     "kind": "const",
-                    "value": "3"
+                    "value": "2"
                   }
                 ]
               }
             }
+          },
+          {
+            "name": "field_1",
+            "type": "u64"
           }
         ]
       }
@@ -3275,7 +3316,7 @@
       }
     },
     {
-      "name": "DepositOutput",
+      "name": "DepositV2Output",
       "docs": [
         "The output of the callback instruction. Provided as a struct with ordered fields",
         "as anchor does not support tuples and tuple structs yet."
@@ -3291,7 +3332,7 @@
                 "generics": [
                   {
                     "kind": "const",
-                    "value": "1"
+                    "value": "2"
                   }
                 ]
               }
@@ -3500,19 +3541,38 @@
             "type": "pubkey"
           },
           {
-            "name": "encrypted_balance",
+            "name": "encryption_pubkey",
             "docs": [
-              "Encrypted balance (array of [u8; 32] ciphertexts)"
+              "X25519 encryption public key (used for Enc<Shared, T>)"
             ],
             "type": {
               "array": [
-                {
-                  "array": [
-                    "u8",
-                    32
-                  ]
-                },
-                2
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "encrypted_balance",
+            "docs": [
+              "Encrypted balance (Enc<Shared, u64>)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "encrypted_total_claimed",
+            "docs": [
+              "Encrypted total claimed (Enc<Shared, u64>)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
               ]
             }
           },
@@ -3768,16 +3828,40 @@
       }
     },
     {
-      "name": "ProcessPaymentOutput",
-      "docs": [
-        "The output of the callback instruction. Provided as a struct with ordered fields",
-        "as anchor does not support tuples and tuple structs yet."
-      ],
+      "name": "ProcessPaymentResult",
       "type": {
         "kind": "struct",
         "fields": [
           {
             "name": "field_0",
+            "type": {
+              "defined": {
+                "name": "SharedEncryptedStruct",
+                "generics": [
+                  {
+                    "kind": "const",
+                    "value": "2"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "field_1",
+            "type": {
+              "defined": {
+                "name": "SharedEncryptedStruct",
+                "generics": [
+                  {
+                    "kind": "const",
+                    "value": "2"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "field_2",
             "type": {
               "defined": {
                 "name": "SharedEncryptedStruct",
@@ -3988,11 +4072,7 @@
       }
     },
     {
-      "name": "SubscribeOutput",
-      "docs": [
-        "The output of the callback instruction. Provided as a struct with ordered fields",
-        "as anchor does not support tuples and tuple structs yet."
-      ],
+      "name": "SubscribeResult",
       "type": {
         "kind": "struct",
         "fields": [
@@ -4004,7 +4084,35 @@
                 "generics": [
                   {
                     "kind": "const",
-                    "value": "39"
+                    "value": "2"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "field_1",
+            "type": {
+              "defined": {
+                "name": "SharedEncryptedStruct",
+                "generics": [
+                  {
+                    "kind": "const",
+                    "value": "2"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "field_2",
+            "type": {
+              "defined": {
+                "name": "SharedEncryptedStruct",
+                "generics": [
+                  {
+                    "kind": "const",
+                    "value": "5"
                   }
                 ]
               }
@@ -4118,7 +4226,7 @@
       }
     },
     {
-      "name": "UnsubscribeOutput",
+      "name": "UnsubscribeV2Output",
       "docs": [
         "The output of the callback instruction. Provided as a struct with ordered fields",
         "as anchor does not support tuples and tuple structs yet."
@@ -4134,7 +4242,7 @@
                 "generics": [
                   {
                     "kind": "const",
-                    "value": "1"
+                    "value": "5"
                   }
                 ]
               }
@@ -4167,19 +4275,38 @@
             "type": "pubkey"
           },
           {
-            "name": "encrypted_balance",
+            "name": "encryption_pubkey",
             "docs": [
-              "Encrypted balance (array of [u8; 32] ciphertexts)"
+              "X25519 encryption public key (used for Enc<Shared, T>)"
             ],
             "type": {
               "array": [
-                {
-                  "array": [
-                    "u8",
-                    32
-                  ]
-                },
-                2
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "encrypted_balance",
+            "docs": [
+              "Encrypted balance (Enc<Shared, u64>)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "encrypted_subscription_count",
+            "docs": [
+              "Encrypted subscription count (Enc<Shared, u64>)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
               ]
             }
           },
@@ -4231,16 +4358,38 @@
             "type": "u64"
           },
           {
-            "name": "plan",
+            "name": "encryption_pubkey",
             "docs": [
-              "Associated plan"
+              "X25519 encryption public key (used for Enc<Shared, T>)"
             ],
-            "type": "pubkey"
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "encrypted_plan",
+            "docs": [
+              "Encrypted plan public key (Enc<Shared, [u128; 2]>)"
+            ],
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                2
+              ]
+            }
           },
           {
             "name": "encrypted_status",
             "docs": [
-              "Encrypted status (0: Active, 1: Cancelled, 2: Expired)"
+              "Encrypted status (Enc<Shared, u8>)"
             ],
             "type": {
               "array": [
@@ -4252,7 +4401,19 @@
           {
             "name": "encrypted_next_payment_date",
             "docs": [
-              "Encrypted next payment date"
+              "Encrypted next payment date (Enc<Shared, i64>)"
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "encrypted_start_date",
+            "docs": [
+              "Encrypted start date (Enc<Shared, i64>)"
             ],
             "type": {
               "array": [
@@ -4323,7 +4484,7 @@
       }
     },
     {
-      "name": "VerifySubscriptionOutput",
+      "name": "VerifySubscriptionV2Output",
       "docs": [
         "The output of the callback instruction. Provided as a struct with ordered fields",
         "as anchor does not support tuples and tuple structs yet."
@@ -4339,11 +4500,7 @@
       }
     },
     {
-      "name": "WithdrawOutput",
-      "docs": [
-        "The output of the callback instruction. Provided as a struct with ordered fields",
-        "as anchor does not support tuples and tuple structs yet."
-      ],
+      "name": "WithdrawResult",
       "type": {
         "kind": "struct",
         "fields": [
@@ -4355,11 +4512,15 @@
                 "generics": [
                   {
                     "kind": "const",
-                    "value": "3"
+                    "value": "2"
                   }
                 ]
               }
             }
+          },
+          {
+            "name": "field_1",
+            "type": "u64"
           }
         ]
       }

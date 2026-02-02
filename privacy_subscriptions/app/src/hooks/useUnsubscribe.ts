@@ -8,7 +8,7 @@ import { executeUnsubscribe } from "@/lib/transactions";
 
 export const useUnsubscribe = (): UseMutationResult<UnsubscribeParams> => {
   const { publicKey, connected } = useWallet();
-  const { arciumContext, program, initialize, isInitializing } = useArcium();
+  const { program, initialize, isInitializing } = useArcium();
 
   const [state, setState] = useState<TransactionState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -28,8 +28,8 @@ export const useUnsubscribe = (): UseMutationResult<UnsubscribeParams> => {
         return;
       }
 
-      // Initialize Arcium context if not ready
-      if (!arciumContext || !program) {
+      // Initialize program if not ready
+      if (!program) {
         if (!isInitializing) {
           await initialize();
         }
@@ -37,8 +37,8 @@ export const useUnsubscribe = (): UseMutationResult<UnsubscribeParams> => {
         await new Promise((r) => setTimeout(r, 1000));
       }
 
-      if (!arciumContext || !program) {
-        setError("Arcium context not initialized");
+      if (!program) {
+        setError("Program not initialized");
         setState("error");
         return;
       }
@@ -55,8 +55,7 @@ export const useUnsubscribe = (): UseMutationResult<UnsubscribeParams> => {
         const sig = await executeUnsubscribe(
           program,
           publicKey,
-          subscriptionIndex,
-          arciumContext
+          subscriptionIndex
         );
 
         setSignature(sig);
@@ -76,7 +75,7 @@ export const useUnsubscribe = (): UseMutationResult<UnsubscribeParams> => {
         setState("error");
       }
     },
-    [publicKey, connected, arciumContext, program, initialize, isInitializing]
+    [publicKey, connected, program, initialize, isInitializing]
   );
 
   return {

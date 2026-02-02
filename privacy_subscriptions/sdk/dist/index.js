@@ -14,7 +14,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getNextComputationOffset = exports.initArciumClient = exports.deriveClusterPDA = exports.deriveComputationPDA = exports.deriveExecPoolPDA = exports.deriveMempoolPDA = exports.deriveComputationDefinitionPDA = exports.deriveSignPDA = exports.deriveMxePDA = exports.COMP_DEF_OFFSETS = exports.ARCIUM_CLOCK_ACCOUNT = exports.ARCIUM_FEE_POOL_ACCOUNT = exports.ARCIUM_PROGRAM_ID = exports.SublySDK = void 0;
+exports.generateComputationOffset = exports.getNextComputationOffset = exports.u128sToPubkey = exports.pubkeyToU128s = exports.nonceToBytes = exports.bytesToU128 = exports.generateNonce = exports.encryptValues = exports.decryptValue = exports.decryptValues = exports.createArciumContextFromWallet = exports.createArciumContextFromSignature = exports.deriveEncryptionKeyFromSignature = exports.getMXEPublicKeyWithRetry = exports.getArciumAccounts = exports.deriveComputationDefinitionPDA = exports.deriveSignPDA = exports.ENCRYPTION_SIGNING_MESSAGE = exports.COMP_DEF_OFFSETS = exports.ARCIUM_CLOCK_ACCOUNT = exports.ARCIUM_FEE_POOL_ACCOUNT = exports.ARCIUM_PROGRAM_ID = exports.SublySDK = void 0;
 // Main SDK export
 var client_1 = require("./client");
 Object.defineProperty(exports, "SublySDK", { enumerable: true, get: function () { return client_1.SublySDK; } });
@@ -30,15 +30,24 @@ Object.defineProperty(exports, "ARCIUM_PROGRAM_ID", { enumerable: true, get: fun
 Object.defineProperty(exports, "ARCIUM_FEE_POOL_ACCOUNT", { enumerable: true, get: function () { return encryption_1.ARCIUM_FEE_POOL_ACCOUNT; } });
 Object.defineProperty(exports, "ARCIUM_CLOCK_ACCOUNT", { enumerable: true, get: function () { return encryption_1.ARCIUM_CLOCK_ACCOUNT; } });
 Object.defineProperty(exports, "COMP_DEF_OFFSETS", { enumerable: true, get: function () { return encryption_1.COMP_DEF_OFFSETS; } });
-Object.defineProperty(exports, "deriveMxePDA", { enumerable: true, get: function () { return encryption_1.deriveMxePDA; } });
+Object.defineProperty(exports, "ENCRYPTION_SIGNING_MESSAGE", { enumerable: true, get: function () { return encryption_1.ENCRYPTION_SIGNING_MESSAGE; } });
 Object.defineProperty(exports, "deriveSignPDA", { enumerable: true, get: function () { return encryption_1.deriveSignPDA; } });
 Object.defineProperty(exports, "deriveComputationDefinitionPDA", { enumerable: true, get: function () { return encryption_1.deriveComputationDefinitionPDA; } });
-Object.defineProperty(exports, "deriveMempoolPDA", { enumerable: true, get: function () { return encryption_1.deriveMempoolPDA; } });
-Object.defineProperty(exports, "deriveExecPoolPDA", { enumerable: true, get: function () { return encryption_1.deriveExecPoolPDA; } });
-Object.defineProperty(exports, "deriveComputationPDA", { enumerable: true, get: function () { return encryption_1.deriveComputationPDA; } });
-Object.defineProperty(exports, "deriveClusterPDA", { enumerable: true, get: function () { return encryption_1.deriveClusterPDA; } });
-Object.defineProperty(exports, "initArciumClient", { enumerable: true, get: function () { return encryption_1.initArciumClient; } });
+Object.defineProperty(exports, "getArciumAccounts", { enumerable: true, get: function () { return encryption_1.getArciumAccounts; } });
+Object.defineProperty(exports, "getMXEPublicKeyWithRetry", { enumerable: true, get: function () { return encryption_1.getMXEPublicKeyWithRetry; } });
+Object.defineProperty(exports, "deriveEncryptionKeyFromSignature", { enumerable: true, get: function () { return encryption_1.deriveEncryptionKeyFromSignature; } });
+Object.defineProperty(exports, "createArciumContextFromSignature", { enumerable: true, get: function () { return encryption_1.createArciumContextFromSignature; } });
+Object.defineProperty(exports, "createArciumContextFromWallet", { enumerable: true, get: function () { return encryption_1.createArciumContextFromWallet; } });
+Object.defineProperty(exports, "decryptValues", { enumerable: true, get: function () { return encryption_1.decryptValues; } });
+Object.defineProperty(exports, "decryptValue", { enumerable: true, get: function () { return encryption_1.decryptValue; } });
+Object.defineProperty(exports, "encryptValues", { enumerable: true, get: function () { return encryption_1.encryptValues; } });
+Object.defineProperty(exports, "generateNonce", { enumerable: true, get: function () { return encryption_1.generateNonce; } });
+Object.defineProperty(exports, "bytesToU128", { enumerable: true, get: function () { return encryption_1.bytesToU128; } });
+Object.defineProperty(exports, "nonceToBytes", { enumerable: true, get: function () { return encryption_1.nonceToBytes; } });
+Object.defineProperty(exports, "pubkeyToU128s", { enumerable: true, get: function () { return encryption_1.pubkeyToU128s; } });
+Object.defineProperty(exports, "u128sToPubkey", { enumerable: true, get: function () { return encryption_1.u128sToPubkey; } });
 Object.defineProperty(exports, "getNextComputationOffset", { enumerable: true, get: function () { return encryption_1.getNextComputationOffset; } });
+Object.defineProperty(exports, "generateComputationOffset", { enumerable: true, get: function () { return encryption_1.generateComputationOffset; } });
 // Instructions
 __exportStar(require("./instructions"), exports);
 //# sourceMappingURL=index.js.map

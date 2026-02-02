@@ -1,7 +1,6 @@
 import { PublicKey, TransactionInstruction } from '@solana/web3.js';
 import BN from 'bn.js';
 import { SubscriptionPlan } from '../types/plan';
-import { ArciumClientWrapper } from '../encryption/arcium';
 /**
  * Parameters for building a subscribe instruction
  */
@@ -12,10 +11,22 @@ export interface BuildSubscribeParams {
     plan: SubscriptionPlan;
     /** User's subscription index (incrementing counter for this user) */
     subscriptionIndex: BN | number;
+    /** Encrypted plan public key (Enc<Shared, [u128; 2]>) */
+    encryptedPlan: [Uint8Array | number[], Uint8Array | number[]];
+    /** Nonce for encrypted plan */
+    encryptedPlanNonce: BN | bigint;
+    /** Encrypted plan price (Enc<Shared, u64>) */
+    encryptedPrice: Uint8Array | number[];
+    /** Nonce for encrypted price */
+    encryptedPriceNonce: BN | bigint;
+    /** Encrypted billing cycle days (Enc<Shared, u32>) */
+    encryptedBillingCycle: Uint8Array | number[];
+    /** Nonce for encrypted billing cycle */
+    encryptedBillingCycleNonce: BN | bigint;
     /** Computation offset for Arcium */
     computationOffset: BN;
-    /** Arcium client wrapper */
-    arciumClient: ArciumClientWrapper;
+    /** Arcium cluster offset */
+    clusterOffset?: number;
     /** Program ID (optional) */
     programId?: PublicKey;
 }

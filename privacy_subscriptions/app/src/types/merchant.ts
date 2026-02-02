@@ -26,8 +26,12 @@ export interface MerchantLedger {
   merchant: PublicKey;
   // Token mint
   mint: PublicKey;
-  // Encrypted balance (array of ciphertexts)
-  encryptedBalance: number[][];
+  // X25519 encryption public key
+  encryptionPubkey: number[];
+  // Encrypted balance (ciphertext)
+  encryptedBalance: number[];
+  // Encrypted total claimed (ciphertext)
+  encryptedTotalClaimed: number[];
   // Nonce for encryption
   nonce: bigint;
 }
